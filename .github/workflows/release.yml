@@ -37,16 +37,17 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          VETTORE_NO_BROWSER=1 VETTORE_DB=/tmp/smoke.db ./dist/Vettore &
+          VETTORE_NO_BROWSER=1 VETTORE_DB=/tmp/smoke.db ./dist/Vettore >server.log 2>&1 &
           PID=$!
           ok=""
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
+            if ! kill -0 "$PID" 2>/dev/null; then echo "processo terminato"; break; fi
             if curl -sf http://127.0.0.1:8080/ | grep -q "data-screen-label"; then ok=1; break; fi
             sleep 2
           done
           curl -sf -o /dev/null http://127.0.0.1:8080/static/logic.js || ok=""
           kill "$PID" 2>/dev/null || true
-          [ -n "$ok" ]
+          if [ -z "$ok" ]; then echo "--- log del server:"; cat server.log; exit 1; fi
 
       - name: Smoke test (windows)
         if: runner.os == 'Windows'
