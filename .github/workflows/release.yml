@@ -7,6 +7,9 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      issues: write
     strategy:
       fail-fast: false
       matrix:
@@ -37,17 +40,34 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          VETTORE_NO_BROWSER=1 VETTORE_DB=/tmp/smoke.db ./dist/Vettore >server.log 2>&1 &
+          # porta alta e improbabile: i runner ospitati a volte occupano la 8080
+          lsof -iTCP:8123 -sTCP:LISTEN && exit 78 || true
+          VETTORE_NO_BROWSER=1 VETTORE_PORTA=8123 VETTORE_DB=/tmp/smoke.db ./dist/Vettore >server.log 2>&1 &
           PID=$!
           ok=""
           for i in $(seq 1 90); do
-            if ! kill -0 "$PID" 2>/dev/null; then echo "processo terminato"; break; fi
-            if curl -sf http://127.0.0.1:8080/ | grep -q "data-screen-label"; then ok=1; break; fi
+            if ! kill -0 "$PID" 2>/dev/null; then echo "processo terminato" >> server.log; break; fi
+            if curl -sf http://127.0.0.1:8123/ | grep -q "data-screen-label"; then ok=1; break; fi
             sleep 2
           done
-          curl -sf -o /dev/null http://127.0.0.1:8080/static/logic.js || ok=""
+          curl -sf -o /dev/null http://127.0.0.1:8123/static/logic.js || ok=""
           kill "$PID" 2>/dev/null || true
           if [ -z "$ok" ]; then echo "--- log del server:"; cat server.log; exit 1; fi
+
+      - name: Diagnostica pubblica su fallimento (macOS)
+        if: failure() && runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo '```'
+            sw_vers; uname -m
+            echo "--- porta 8123:"; lsof -iTCP:8123 -sTCP:LISTEN || echo "libera"
+            echo "--- server.log:"; head -80 server.log 2>/dev/null || echo "(assente)"
+            echo '```'
+          } > diagnosi.md
+          gh issue create --title "Diagnostica smoke macOS · run ${{ github.run_id }}" --body-file diagnosi.md || true
 
       - name: Smoke test (windows)
         if: runner.os == 'Windows'
