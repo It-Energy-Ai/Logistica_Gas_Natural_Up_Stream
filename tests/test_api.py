@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -77,8 +75,6 @@ def test_validazione_chiavi_e_forme(client):
     # righe utenti a 3 elementi non ammesse (il frontend ne pretende 4)
     assert client.put("/api/state", json={"extraUsers": [["wu1", "AF", "Anna"]]}).status_code == 422
     assert client.put("/api/state", json={"extraPunti": [["a", "b", "c", "d"]]}).status_code == 422
-    # flag di guardia degli import persistito
-    assert client.put("/api/state", json={"imported": True}).status_code == 200
 
 
 def test_email_non_valida_ripiega_su_demo(client):

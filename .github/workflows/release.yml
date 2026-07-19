@@ -5,11 +5,14 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.ref }}
+
 jobs:
   build:
     permissions:
       contents: read
-      issues: write
+      issues: write # solo per la diagnostica automatica su fallimento macOS
     strategy:
       fail-fast: false
       matrix:
@@ -25,11 +28,12 @@ jobs:
             prodotto: dist/Vettore
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Compila l'eseguibile
         run: |
@@ -54,6 +58,24 @@ jobs:
           kill "$PID" 2>/dev/null || true
           if [ -z "$ok" ]; then echo "--- log del server:"; cat server.log; exit 1; fi
 
+      - name: Smoke test (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:VETTORE_NO_BROWSER = "1"
+          $env:VETTORE_PORTA = "8123"
+          $env:VETTORE_DB = "$env:TEMP\smoke.db"
+          $p = Start-Process -FilePath "dist\Vettore.exe" -PassThru
+          $ok = $false
+          foreach ($i in 1..90) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8123/" -UseBasicParsing -TimeoutSec 2
+              if ($r.Content -match "data-screen-label") { $ok = $true; break }
+            } catch { Start-Sleep -Seconds 2 }
+          }
+          Stop-Process -Id $p.Id -Force
+          if (-not $ok) { exit 1 }
+
       - name: Diagnostica pubblica su fallimento (macOS)
         if: failure() && runner.os == 'macOS'
         env:
@@ -69,28 +91,11 @@ jobs:
           } > diagnosi.md
           gh issue create --title "Diagnostica smoke macOS · run ${{ github.run_id }}" --body-file diagnosi.md || true
 
-      - name: Smoke test (windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $env:VETTORE_NO_BROWSER = "1"
-          $env:VETTORE_DB = "$env:TEMP\smoke.db"
-          $p = Start-Process -FilePath "dist\Vettore.exe" -PassThru
-          $ok = $false
-          foreach ($i in 1..30) {
-            try {
-              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing -TimeoutSec 2
-              if ($r.Content -match "data-screen-label") { $ok = $true; break }
-            } catch { Start-Sleep -Seconds 1 }
-          }
-          Stop-Process -Id $p.Id -Force
-          if (-not $ok) { exit 1 }
-
       - name: Rinomina il prodotto
         shell: bash
         run: mv "${{ matrix.prodotto }}" "${{ matrix.nome }}"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.nome }}
           path: ${{ matrix.nome }}
@@ -103,16 +108,20 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v3
+      - name: Checksum degli eseguibili
+        run: sha256sum Vettore-windows.exe Vettore-macos-apple-silicon Vettore-linux > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         with:
           files: |
             Vettore-windows.exe
             Vettore-macos-apple-silicon
             Vettore-linux
+            SHA256SUMS.txt
           body: |
             **Vettore senza installare nulla**: scarica il file per il tuo sistema, doppio click, e il browser si apre su http://localhost:8080.
 
@@ -121,4 +130,6 @@ jobs:
             - **Linux** → `Vettore-linux` (poi `chmod +x Vettore-linux`)
             - **Mac Intel**: usa `avvio.sh` dal repository (serve solo Python)
 
-            I dati restano in `~/.vettore/vettore.db`. Niente Docker, niente Python: tutto incluso.
+            **Verifica dell'integrità** (consigliata, i binari non sono firmati): scarica anche `SHA256SUMS.txt` e confronta con `shasum -a 256 <file>` (macOS/Linux) o `Get-FileHash <file>` (Windows).
+
+            I dati restano in `~/.vettore/vettore.db`. Le novità di questa versione sono nel [CHANGELOG](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/CHANGELOG.md).

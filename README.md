@@ -54,9 +54,9 @@ flowchart LR
 ```
 
 - **`design/design.html`** — la fonte di verità dell'interfaccia.
-- **`build_frontend.py`** — genera il frontend: converte gli pseudo-stili (`style-hover`/`style-focus`) in CSS e applica le poche deviazioni documentate (campi login controllati, effetto hover del hub in CSS puro).
+- **`build_frontend.py`** — genera il frontend: converte gli pseudo-stili (`style-hover`/`style-focus`) in CSS e applica le poche deviazioni documentate (campi login controllati, effetto hover dell'hub in CSS puro).
 - **`runtime.js`** (~150 righe, zero dipendenze) — interpreta il template a runtime: condizioni, cicli, interpolazioni, eventi.
-- **`logic.js`** — porting quasi letterale della logica del canvas, con 6 deviazioni documentate in testa al file (API reali, persistenza, robustezza della sync).
+- **`logic.js`** — porting quasi letterale della logica del canvas, con le deviazioni documentate in testa al file (API reali, persistenza, robustezza della sync).
 
 Per modificare l'interfaccia: si aggiorna design/design.html e si rilancia `python3 build_frontend.py`. La CI verifica che il frontend generato resti allineato al design.
 
@@ -66,9 +66,9 @@ Per modificare l'interfaccia: si aggiorna design/design.html e si rilancia `pyth
 
 ### 1 · Eseguibile pronto (niente da installare)
 
-Scarica dalla pagina [**Releases**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases) il file per il tuo sistema — Windows, macOS (Intel o Apple Silicon) o Linux — e fai doppio click: il browser si apre da solo su <http://localhost:8080>. Nessun Docker, nessun Python, nessun terminale. I dati restano in `~/.vettore/vettore.db`.
+Scarica dalla pagina [**Releases**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases) il file per il tuo sistema — Windows, macOS (Apple Silicon) o Linux — e fai doppio click: il browser si apre da solo su <http://localhost:8080>. Nessun Docker, nessun Python, nessun terminale. I dati restano in `~/.vettore/vettore.db`.
 
-> macOS al primo avvio: tasto destro → *Apri* (il binario non è firmato). Windows: se SmartScreen avvisa, *Ulteriori informazioni → Esegui comunque*.
+> macOS al primo avvio: tasto destro → *Apri* (il binario non è firmato). Windows: se SmartScreen avvisa, *Ulteriori informazioni → Esegui comunque*. **Mac Intel**: usa la strada 2 qui sotto. Ogni release include `SHA256SUMS.txt` per verificare l'integrità dei file.
 
 ### 2 · Script di avvio (serve solo Python 3.11+)
 
@@ -104,8 +104,8 @@ La colonna di destra è la mappa esatta di cosa sostituire per andare in produzi
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest              # 8 test API: sessioni, validazione, persistenza
-node tests/logic.test.cjs     # 18 test logica: navigazione, nomine, wizard, sync
+.venv/bin/pytest              # test API: sessioni, validazione, persistenza
+node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, avvio pulito
 ```
 
 Il codice è passato da una revisione multi-agente (4 lenti indipendenti + verifica avversariale di ogni segnalazione): tutti i difetti confermati sono stati corretti e coperti da regressione — inclusa la sincronizzazione col backend, che ora accoda e ritenta invece di perdere modifiche su errori di rete o sessione scaduta.

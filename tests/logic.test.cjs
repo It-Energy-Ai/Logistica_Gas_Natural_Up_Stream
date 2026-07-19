@@ -265,15 +265,28 @@ test("sync: su errore di rete la patch resta in coda e si ritenta", async () => 
   global.fetch = FETCH_OK;
 });
 
-test("sync: 401 riporta al login conservando la coda", async () => {
+test("sync: 401 sospende (niente loop), il login riprende e svuota la coda", async () => {
   const app = new App();
   app.setState({ screen: "nomine" });
   global.fetch = async () => ({ ok: false, status: 401, text: async () => "" });
   app._pending = { gmeOk: true };
+  const timerPrima = app._syncTimer;
   await app._flush();
   assert.equal(app.state.screen, "login");
-  assert.deepEqual(app._pending, { gmeOk: true });
-  clearTimeout(app._syncTimer);
+  assert.deepEqual(app._pending, { gmeOk: true }); // coda conservata
+  assert.equal(app._sospesa, true);
+  assert.equal(app._syncTimer, timerPrima); // NESSUN nuovo retry programmato
+  // il login riattiva la sync e svuota la coda
+  let inviate = null;
+  global.fetch = async (url, opts) => {
+    if (url === "/api/state" && opts && opts.method === "PUT") inviate = JSON.parse(opts.body);
+    return { ok: true, status: 200, text: async () => "" };
+  };
+  await app.login("operazioni@gasadriatica.it");
+  assert.equal(app._sospesa, false);
+  await new Promise((r) => setTimeout(r, 300)); // debounce 250ms
+  assert.deepEqual(inviate, { gmeOk: true });
+  assert.deepEqual(app._pending, {});
   global.fetch = FETCH_OK;
 });
 
@@ -298,10 +311,3 @@ test("limiti: nomina e punto troncati ai cap del backend", () => {
   assert.equal(app.state.extraPunti[0][0].length, 160);
 });
 
-test("imported è tra le chiavi persistite", () => {
-  const app = new App();
-  app.renderVals().importNow();
-  assert.equal(app.state.imported, true);
-  assert.ok("imported" in app._pending && "imports" in app._pending);
-  clearTimeout(app._syncTimer);
-});

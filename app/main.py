@@ -65,18 +65,6 @@ def _is_str_list(v):
     return isinstance(v, list) and len(v) <= 200 and all(isinstance(x, str) and len(x) <= 64 for x in v)
 
 
-def _is_import_list(v):
-    return (
-        isinstance(v, list)
-        and len(v) <= 200
-        and all(
-            isinstance(r, dict)
-            and set(r) == {"time", "file", "rec", "esito"}
-            and all(isinstance(r[k], str) and len(r[k]) <= 120 for k in r)
-            for r in v
-        )
-    )
-
 
 VALIDATORS = {
     "nomList": _is_nom_list,
@@ -91,8 +79,6 @@ VALIDATORS = {
     "reps": _is_str_map,
     "gmeAuto": _is_bool,
     "gmeOk": _is_bool,
-    "imports": _is_import_list,
-    "imported": _is_bool,
     "demoMode": _is_bool,
 }
 

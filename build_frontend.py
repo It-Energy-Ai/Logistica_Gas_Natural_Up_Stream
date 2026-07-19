@@ -63,7 +63,7 @@ def main() -> None:
         template = template.replace(vecchio, nuovo)
 
     # Deviazione documentata (vedi logic.js, deviazione 6): l'effetto "mazzo"
-    # delle carte del hub passa da onMouseEnter/Leave (che nel runtime
+    # delle carte dell'hub passa da onMouseEnter/Leave (che nel runtime
     # causerebbe un re-render totale a ogni hover, perdendo le transizioni)
     # a puro CSS :hover, che riproduce l'animazione fluida del design.
     hub_anchor = '<div onMouseEnter="{{ hc.enter }}" onMouseLeave="{{ hc.leave }}" style="position:relative;width:252px;height:352px;cursor:pointer">'

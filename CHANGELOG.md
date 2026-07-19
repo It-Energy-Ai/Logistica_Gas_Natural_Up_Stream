@@ -2,6 +2,24 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.1.2] — 2026-07-19
+
+### Corretto
+- La sync verso il backend non entra più in loop di retry dopo una sessione scaduta: si sospende e riparte al login, svuotando la coda conservata.
+- Lo smoke test Windows della release usa la porta 8123 come quello unix.
+- README: rimossa la promessa dell'eseguibile per Mac Intel (mai esistito); conteggi e refusi sistemati.
+
+### Aggiunto
+- `SHA256SUMS.txt` in ogni release per verificare l'integrità degli eseguibili.
+- CONTRIBUTING (con la regola del frontend generato), Codice di condotta, Dependabot per le immagini Docker.
+- Scadenza delle sessioni a 30 giorni con pulizia automatica.
+
+### Sicurezza
+- Tutte le GitHub Actions pinnate al commit SHA; permessi minimi e concurrency nei workflow; cache pip in CI.
+
+### Rimosso
+- La feature "import sbilanci" rimasta senza interfaccia (stato, validatori e valori mai usati dal template).
+
 ## [1.1.1] — 2026-07-19
 
 ### Corretto
@@ -36,6 +54,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.1.2]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.2
 [1.1.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.1
 [1.1.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.0
 [1.0.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.0.1

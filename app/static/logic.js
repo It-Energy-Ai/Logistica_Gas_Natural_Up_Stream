@@ -32,7 +32,7 @@
   const PERSIST = [
     "nomList", "cfg", "hiddenPunti", "extraPunti", "nextP",
     "users", "extraUsers", "disabled", "nextU",
-    "reps", "gmeAuto", "gmeOk", "imports", "imported", "demoMode",
+    "reps", "gmeAuto", "gmeOk", "demoMode",
   ];
 
   // Tronca ai limiti accettati dai validatori del backend: un valore fuori
@@ -44,13 +44,12 @@
       this.state = {
         screen: "login", theme: store.getItem("vt-theme"), sso: null, dashOff: 0,
         loginEmail: "", loginPass: "", utenteEmail: "", demoMode: false,
-        saved: false, imported: false, gmeAuto: true, gmeOk: false,
+        saved: false, gmeAuto: true, gmeOk: false,
         users: {}, extraUsers: [], nextU: 1,
         wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
         nomList: [],
         nomPunto: "PSV", nomCiclo: "R4", nomQta: "",
         reps: { rg: true, rs: true, rr: false },
-        imports: [],
         cfg: {
           psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false,
           nEmail: true, nAlert: true, nReport: false, unit: "MWh", ciclo: "Intraday",
@@ -75,6 +74,7 @@
     setSilent(patch) { this.setState(patch, { silent: true }); }
 
     _scheduleSync(ritardo = 250) {
+      if (this._sospesa) return; // sessione scaduta: si riparte dopo il login
       if (Object.keys(this._pending).length === 0) return;
       clearTimeout(this._syncTimer);
       this._syncTimer = setTimeout(() => this._flush(), ritardo);
@@ -94,6 +94,9 @@
         });
         if (r.ok) return;
         if (r.status === 401) {
+          // sospende la sync (niente loop di retry contro un 401 permanente):
+          // login() la riattiva e svuota la coda conservata
+          this._sospesa = true;
           this._pending = { ...patch, ...this._pending };
           console.warn("sessione scaduta: torno al login, modifiche in coda");
           this.setState({ screen: "login" });
@@ -118,6 +121,8 @@
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
+        this._sospesa = false;
+        this._scheduleSync(); // svuota la coda accumulata durante la sessione scaduta
       } catch (e) { console.warn("login API non raggiungibile", e); }
     }
 
@@ -189,7 +194,7 @@
       }));
       const addPunto = () => this.setState((st) => {
         const name = cap((st.newPunto || "").trim(), 160);
-        if (!name) return {};
+        if (!name || st.extraPunti.length >= 200) return {}; // tetto del backend
         const k = "px" + st.nextP;
         return { extraPunti: [...st.extraPunti, [name, "Riconsegna", k]], cfg: { ...st.cfg, [k]: true }, nextP: st.nextP + 1, newPunto: "", saved: false };
       });
@@ -256,7 +261,6 @@
       // ogni hover spezzerebbe le transizioni. Qui restano i valori a riposo.
       const mkHub = (key, code, title, sub, target) => ({
         code, title, sub, go: go(target),
-        enter: () => {}, leave: () => {},
         t1: "rotate(-7deg) translate(-12px,2px)",
         t2: "rotate(4deg) translate(10px,-2px)",
         t3: "translateY(7px) rotate(-1deg)",
@@ -277,7 +281,6 @@
         { name: "Feed PSV · GME", desc: "Prezzi day-ahead", stato: "Da collegare", ...WAIT },
         { name: "SSO aziendale", desc: "Autenticazione utenti", stato: "Da collegare", ...WAIT },
       ];
-      const sysInfo = [["Versione", "4.2.1 · build 8842"], ["Ambiente", "Produzione"], ["Ultimo rilascio", "12/07/2026 · 03:40"], ["Regione dati", "EU-South · Milano"]].map(([k, v]) => ({ k, v }));
       const logs = !demoOn ? [] : [
         { time: "11:42", who: "M. Rossi", txt: "Rinomina R2 inviata su PSV" },
         { time: "10:15", who: "Sistema", txt: "Allocazioni G−1 ricevute da Snam" },
@@ -320,11 +323,11 @@
       const wDominio = demoOn ? "azienda1.it" : ident.dominio;
       const wEmail = wiz ? (wiz.email || ((wiz.nome ? wiz.nome[0].toLowerCase() + "." : "") + (wiz.cognome || "utente").toLowerCase() + "@" + wDominio)) : "";
       const wizFinish = () => this.setState((st) => {
+        if (st.extraUsers.length >= 200) return { wiz: null }; // tetto del backend
         const n = st.nextU, k = "wu" + n;
         const init = ((st.wiz.nome[0] || "N") + (st.wiz.cognome[0] || "U")).toUpperCase();
         return { extraUsers: [...st.extraUsers, [k, init, cap(wName || "Nuovo utente " + n, 160), cap(wEmail, 160)]], users: { ...st.users, [k]: st.wiz.perm }, nextU: n + 1, wiz: null };
       });
-      const impRows = this.state.imports.map((r) => ({ ...r, bg: OK.bg, fg: OK.fg }));
       const nomStatoC = { "Confermata": OK, "In corso": RUN, "Inviata": RUN, "In attesa": WAIT };
       // Le nomine demo compaiono DOPO quelle reali e non vengono mai salvate.
       const nomDemo = !demoOn ? [] : [
@@ -409,9 +412,6 @@
         { name: "Prezzi MGP-GAS vs sbilancio", tipo: "XLSX · settimanale", upd: "14/07 · 07:30", cat: "mkt", tag: "Mercato" },
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
-      const repTrend = [["Feb", 46, 31], ["Mar", 52, 38], ["Apr", 44, 27], ["Mag", 58, 35], ["Giu", 49, 22], ["Lug", 61, 18]].map(([m, gen, costo]) => ({
-        m, genH: Math.round((gen / 61) * 100) + "%", costoH: Math.round((costo / 61) * 100) + "%",
-      }));
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
       const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli" };
 
@@ -430,7 +430,7 @@
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
         loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report",
-        doLogin, logout, goHub: go("hub"), goModuli: go("moduli"), goDash: go("dash"),
+        doLogin, logout, goHub: go("hub"),
         loginEmail: this.state.loginEmail, loginPass: this.state.loginPass,
         setLoginEmail: (e) => this.setSilent({ loginEmail: e.target.value }),
         setLoginPass: (e) => this.setSilent({ loginPass: e.target.value }),
@@ -440,13 +440,13 @@
         ssoPick: () => { this.login("m.rossi@azienda1.it"); this.setState({ sso: "auth", utenteEmail: "m.rossi@azienda1.it" }); setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900); },
         ssoRedirect: this.state.sso === "redirect", ssoPickStep: this.state.sso === "pick", ssoAuth: this.state.sso === "auth", ssoOpen: !!this.state.sso,
         toggleTheme: () => { const t = theme === "dark" ? "light" : "dark"; store.setItem("vt-theme", t); this.setState({ theme: t }); },
-        crumbs, moduli, kpis, days, cicli, rows, punti, notifiche, unitOpts, cicloOpts, cfgCards, servizi, sysInfo, logs,
+        crumbs, moduli, kpis, days, cicli, rows, punti, notifiche, unitOpts, cicloOpts, cfgCards, servizi, logs,
         dashDate, dashTotNom: demoOn ? fmtN(dNom) : "0", dashCicloTxt: dashCiclo.txt, dashCicloBg: dashCiclo.bg, dashCicloFg: dashCiclo.fg,
         dashPrev: () => this.setState((st) => ({ dashOff: Math.max(st.dashOff - 1, -7) })),
         dashNext: () => this.setState((st) => ({ dashOff: Math.min(st.dashOff + 1, 7) })),
         dashNotToday: off !== 0, dashToday: () => this.setState({ dashOff: 0 }),
         saveConfig: () => this.setState({ saved: true }), savedOk: !!this.state.saved,
-        utenti, addUser, impRows, importedOk: !!this.state.imported,
+        utenti, addUser,
         wizOpen: !!wiz, wizStep1: wiz?.step === 1, wizStep2: wiz?.step === 2, wizStep3: wiz?.step === 3,
         wizSteps, wizPermOpts, wizClose: () => this.setState({ wiz: null }),
         wizNext: wStep(1), wizBack: wStep(-1), wizFinish, wizCanBack: wiz ? wiz.step > 1 : false,
@@ -463,7 +463,7 @@
         setNomPunto: (e) => this.setSilent({ nomPunto: e.target.value }),
         setNomCiclo: (e) => this.setSilent({ nomCiclo: e.target.value }),
         setNomQta: (e) => this.setSilent({ nomQta: e.target.value }),
-        oreSbil, bilKpis, azioni, capRows, capChip, scadenze, stocKpis, stocCap, stocMov, stocServ, repFiles, repProg, repKpis, repCats, repTrend,
+        oreSbil, bilKpis, azioni, capRows, capChip, scadenze, stocKpis, stocCap, stocMov, stocServ, repFiles, repProg, repKpis, repCats,
         demoOn, demoToggle: () => this.setState((st) => ({ demoMode: !st.demoMode })),
         demoKBg: knob(demoOn).kBg, demoKX: knob(demoOn).kX,
         giornoGas, vuotoDash: !demoOn && this.state.nomList.length === 0,
@@ -472,7 +472,6 @@
         gmeOk: !!this.state.gmeOk, verifyGme: () => this.setState({ gmeOk: true }),
         gmeToggle: () => this.setState((st) => ({ gmeAuto: !st.gmeAuto })),
         gmeKBg: knob(this.state.gmeAuto).kBg, gmeKX: knob(this.state.gmeAuto).kX,
-        importNow: () => { if (!this.state.imported) this.setState((st) => ({ imported: true, imports: [{ time: "17/07 · 11:58", file: "sbilancio_g20260717_prov.csv", rec: "288", esito: "OK" }, ...st.imports] })); },
       };
     }
   }

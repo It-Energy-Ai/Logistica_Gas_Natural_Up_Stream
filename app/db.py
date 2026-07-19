@@ -46,7 +46,14 @@ def init_db() -> None:
     print(f"[vettore] database: {db_path()}")
 
 
+SESSIONE_GIORNI = 30  # allineata al max_age del cookie
+
+
 def crea_sessione(conn: sqlite3.Connection, token: str, email: str) -> None:
+    conn.execute(
+        "DELETE FROM sessioni WHERE creata_il < datetime('now', ?)",
+        (f"-{SESSIONE_GIORNI} days",),
+    )
     conn.execute(
         "INSERT OR REPLACE INTO sessioni (token, email) VALUES (?, ?)", (token, email)
     )
@@ -54,7 +61,8 @@ def crea_sessione(conn: sqlite3.Connection, token: str, email: str) -> None:
 
 def email_sessione(conn: sqlite3.Connection, token: str) -> str | None:
     row = conn.execute(
-        "SELECT email FROM sessioni WHERE token = ?", (token,)
+        "SELECT email FROM sessioni WHERE token = ? AND creata_il > datetime('now', ?)",
+        (token, f"-{SESSIONE_GIORNI} days"),
     ).fetchone()
     return row["email"] if row else None
 
