@@ -1,0 +1,12 @@
+services:
+  vettore:
+    build: .
+    ports:
+      # Solo loopback: è una demo senza vera autenticazione, non va esposta in rete.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - vettore-data:/data
+    restart: unless-stopped
+
+volumes:
+  vettore-data:

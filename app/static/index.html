@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vettore · Logistica Gas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#F2F5F7;-webkit-font-smoothing:antialiased}
+:root{--prim:#0E5A75;--acc:#2FA37C;--primText:var(--prim);--bg:#F2F5F7;--surface:#FFFFFF;--surface2:#EBF0F3;--ink:#10222D;--ink2:#5A6E7A;--ink3:#8CA0AB;--line:rgba(16,34,45,.11);--shadow:0 1px 2px rgba(16,34,45,.05),0 8px 24px rgba(16,34,45,.06)}
+[data-theme="dark"]{--primText:color-mix(in oklab,var(--prim) 45%,#DCE9F2);--bg:#0C1319;--surface:#131E27;--surface2:#1A2833;--ink:#E9EFF3;--ink2:#9DB1BC;--ink3:#647985;--line:rgba(233,239,243,.1);--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35)}
+a{color:var(--acc);text-decoration:none}
+a:hover{color:var(--acc);text-decoration:underline}
+input::placeholder{color:var(--ink3)}
+@keyframes vtFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes vtSpin{to{transform:rotate(360deg)}}
+[data-vh="0"]:hover{background:var(--surface2);color:var(--ink)}
+[data-vh="1"]:hover{background:var(--surface2)}
+[data-vf="2"]:focus{border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)}
+[data-vh="3"]:hover{filter:brightness(1.12)}
+[data-vh="4"]:hover{border-color:color-mix(in oklab,var(--prim) 45%,var(--line));background:color-mix(in oklab,var(--prim) 5%,var(--surface))}
+[data-vh="5"]:hover{text-decoration:underline}
+[data-vh="6"]:hover{color:var(--ink)}
+[data-vh="7"]:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+[data-vh="8"]:hover{background:color-mix(in oklab,var(--prim) 8%,transparent)}
+[data-vh="9"]:hover{border-color:rgba(197,96,80,.4);color:#C05B4D;background:rgba(197,96,80,.08)}
+[data-vh="10"]:hover{border-color:rgba(197,96,80,.4);color:#C05B4D}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<template id="app-template">
+<div data-theme="{{ theme }}" style="--prim:{{ primC }};--acc:{{ accC }};min-height:100vh;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif">
+
+<sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ false }}">
+<header style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:22px;height:58px;padding:0 28px;background:var(--surface);border-bottom:1px solid var(--line)">
+  <div onClick="{{ goHub }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+    <span style="width:26px;height:26px;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),var(--prim));border-radius:8px"><span style="display:block;width:10px;height:10px;background:rgba(255,255,255,.95);border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span></span>
+    <span style="font-weight:700;letter-spacing:.16em;font-size:13px">VETTORE</span>
+  </div>
+  <sc-if value="{{ hasBack }}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{ goBack }}" title="Torna indietro" style="width:32px;height:32px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer;font-size:16px;line-height:1;font-family:inherit;transition:background .15s" data-vh="0">←</button>
+  </sc-if>
+  <nav style="display:flex;align-items:center;gap:8px;font-size:13px">
+    <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="2">
+      <span style="display:flex;align-items:center;gap:8px"><span style="color:var(--ink3)">{{ c.pre }}</span><span onClick="{{ c.go }}" style="cursor:{{ c.cur }};color:{{ c.col }};font-weight:{{ c.fw }}">{{ c.label }}</span></span>
+    </sc-for>
+  </nav>
+  <div style="flex:1"></div>
+  <button onClick="{{ toggleTheme }}" title="Cambia tema" style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500" data-vh="1">
+    <span style="width:11px;height:11px;border-radius:50%;background:conic-gradient(var(--ink2) 0 50%,transparent 50% 100%);border:1px solid var(--ink2)"></span>
+    Tema {{ themeLabel }}
+  </button>
+  <div style="width:1px;height:24px;background:var(--line)"></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700">MR</span>
+    <span style="display:flex;flex-direction:column;line-height:1.25">
+      <span style="font-size:13px;font-weight:600">Marco Rossi</span>
+      <span style="font-size:11px;color:var(--ink3)">Azienda 1</span>
+    </span>
+  </div>
+  <button onClick="{{ logout }}" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500" data-vh="0">Esci</button>
+</header>
+</sc-if>
+
+<sc-if value="{{ screenLogin }}" hint-placeholder-val="{{ true }}">
+<section data-screen-label="Login" style="display:grid;grid-template-columns:minmax(420px,44%) 1fr;min-height:100vh;animation:vtFade .3s ease">
+  <div style="position:relative;overflow:hidden;background:linear-gradient(165deg,#0F2C3B 0%,#0A1D29 100%);color:#E9EFF3;display:flex;flex-direction:column;justify-content:space-between;padding:44px 48px">
+    <div style="position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,transparent 0 79px,rgba(233,239,243,.045) 79px 80px),repeating-linear-gradient(0deg,transparent 0 79px,rgba(233,239,243,.045) 79px 80px)"></div>
+    <div style="position:relative;display:flex;align-items:center;gap:12px">
+      <span style="width:30px;height:30px;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),#1B6E8C);border-radius:9px"><span style="display:block;width:12px;height:12px;background:rgba(255,255,255,.95);border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span></span>
+      <span style="font-weight:700;letter-spacing:.18em;font-size:14px">VETTORE</span>
+    </div>
+    <div style="position:relative;display:flex;flex-direction:column;gap:18px;max-width:420px">
+      <h1 style="margin:0;font-size:33px;line-height:1.22;font-weight:600;letter-spacing:-.01em;text-wrap:pretty">La logistica del gas naturale, in un'unica piattaforma.</h1>
+      <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(233,239,243,.62);text-wrap:pretty">Il portale operativo per shipper e trader sul mercato italiano.</p>
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:rgba(233,239,243,.8)"><span style="width:6px;height:6px;border-radius:50%;background:var(--acc)"></span>Nomine e rinomine sulla rete di trasporto</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:rgba(233,239,243,.8)"><span style="width:6px;height:6px;border-radius:50%;background:var(--acc)"></span>Bilanciamento e posizione PSV in tempo reale</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:rgba(233,239,243,.8)"><span style="width:6px;height:6px;border-radius:50%;background:var(--acc)"></span>Capacità, stoccaggio e reportistica regolatoria</div>
+      </div>
+    </div>
+    <div style="position:relative;font-size:12px;color:rgba(233,239,243,.4)">© 2026 Vettore S.r.l. · Milano</div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;padding:40px;background:var(--bg)">
+    <div style="width:380px;display:flex;flex-direction:column;gap:22px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h2 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em">Accedi</h2>
+        <p style="margin:0;font-size:14px;color:var(--ink2)">Entra nel tuo ambiente di lavoro.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink2)">Email aziendale
+          <input type="email" placeholder="nome@azienda.it" value="{{ loginEmail }}" onChange="{{ setLoginEmail }}" onKeyDown="{{ loginKey }}" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink2)">Password
+          <input type="password" placeholder="••••••••••" value="{{ loginPass }}" onChange="{{ setLoginPass }}" onKeyDown="{{ loginKey }}" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+        </label>
+        <div style="display:flex;justify-content:flex-end"><a href="#" style="font-size:12.5px;font-weight:500">Password dimenticata?</a></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button onClick="{{ doLogin }}" style="width:100%;padding:13px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:14.5px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Accedi</button>
+        <div style="display:flex;align-items:center;gap:12px;color:var(--ink3);font-size:11.5px"><span style="flex:1;height:1px;background:var(--line)"></span>oppure<span style="flex:1;height:1px;background:var(--line)"></span></div>
+        <button onClick="{{ doSSO }}" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer" data-vh="1">Accedi con SSO aziendale</button>
+      </div>
+      <p style="margin:0;font-size:11.5px;line-height:1.5;color:var(--ink3);text-wrap:pretty">L'accesso è riservato agli utenti autorizzati. Per richiedere le credenziali contatta l'amministratore della tua società.</p>
+    </div>
+  </div>
+  <sc-if value="{{ ssoOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;animation:vtFade .18s ease">
+      <div style="position:absolute;inset:0;background:rgba(6,14,20,.55);backdrop-filter:blur(2px)"></div>
+      <div style="position:relative;width:400px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.35);padding:26px 28px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:28px;height:28px;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 12%,transparent);border-radius:8px;color:var(--primText);font-size:11px;font-weight:700">ID</span>
+          <span style="display:flex;flex-direction:column;line-height:1.3">
+            <span style="font-size:13.5px;font-weight:700">Azienda 1 · Identity</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)">sso.azienda1.it</span>
+          </span>
+        </div>
+        <div style="height:1px;background:var(--line)"></div>
+        <sc-if value="{{ ssoRedirect }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 0">
+            <span style="width:30px;height:30px;border-radius:50%;border:3px solid var(--surface2);border-top-color:var(--prim);animation:vtSpin .8s linear infinite"></span>
+            <span style="font-size:13px;color:var(--ink2)">Reindirizzamento al provider aziendale…</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ssoPickStep }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:13.5px;font-weight:600">Scegli un account</span>
+            <div onClick="{{ ssoPick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s" data-vh="4">
+              <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700">MR</span>
+              <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:600">Marco Rossi</span><span style="font-size:11px;color:var(--ink3)">m.rossi@azienda1.it</span></span>
+            </div>
+            <div onClick="{{ ssoPick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s" data-vh="4">
+              <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);color:var(--ink2);font-size:12px;font-weight:700">LB</span>
+              <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:600">Laura Bianchi</span><span style="font-size:11px;color:var(--ink3)">l.bianchi@azienda1.it</span></span>
+            </div>
+            <span style="font-size:12px;color:var(--primText);font-weight:600;cursor:pointer;padding:4px 2px" data-vh="5">Usa un altro account</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ssoAuth }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 0">
+            <span style="width:30px;height:30px;border-radius:50%;border:3px solid var(--surface2);border-top-color:var(--acc);animation:vtSpin .8s linear infinite"></span>
+            <span style="font-size:13px;color:var(--ink2)">Autenticazione in corso…</span>
+          </div>
+        </sc-if>
+        <div style="display:flex;justify-content:flex-end">
+          <button onClick="{{ ssoCancel }}" style="padding:8px 14px;border:none;background:none;color:var(--ink3);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" data-vh="6">Annulla</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenHub }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Hub moduli" style="min-height:calc(100vh - 58px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;padding:60px 24px;animation:vtFade .3s ease">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--ink3)">AMBIENTE DI LAVORO</span>
+    <h1 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em">Buongiorno, Marco</h1>
+    <p style="margin:0;font-size:14px;color:var(--ink2)">Seleziona un modulo per iniziare.</p>
+  </div>
+  <div style="display:flex;gap:150px;flex-wrap:wrap;justify-content:center">
+    <sc-for list="{{ hubCards }}" as="hc" hint-placeholder-count="2">
+      <div onMouseEnter="{{ hc.enter }}" onMouseLeave="{{ hc.leave }}" style="position:relative;width:252px;height:352px;cursor:pointer">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,color-mix(in oklab,var(--prim) 9%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t1 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .06s"></div>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(-45deg,color-mix(in oklab,var(--prim) 9%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t2 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .09s"></div>
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,color-mix(in oklab,var(--prim) 6%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t3 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .03s"></div>
+        <div onClick="{{ hc.go }}" style="position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:{{ hc.shadow }};cursor:pointer;display:flex;align-items:center;justify-content:center;transform:{{ hc.top }};transition:transform .55s cubic-bezier(.34,1.56,.64,1),box-shadow .55s ease">
+          <div style="position:absolute;inset:11px;border:1px solid var(--line);border-radius:10px"></div>
+          <div style="position:absolute;top:16px;left:18px;display:flex;flex-direction:column;align-items:center;gap:5px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--prim)">{{ hc.code }}</span>
+            <span style="display:block;width:8px;height:8px;background:var(--acc);border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span>
+          </div>
+          <div style="position:absolute;bottom:16px;right:18px;display:flex;flex-direction:column;align-items:center;gap:5px;transform:rotate(180deg)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--prim)">{{ hc.code }}</span>
+            <span style="display:block;width:8px;height:8px;background:var(--acc);border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:0 28px;text-align:center">
+            <span style="display:block;width:56px;height:56px;background:linear-gradient(135deg,var(--acc),var(--prim));border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <h2 style="margin:0;font-size:21px;font-weight:700;letter-spacing:-.01em">{{ hc.title }}</h2>
+              <p style="margin:0;font-size:12px;color:var(--ink2)">{{ hc.sub }}</p>
+            </div>
+            <span style="font-size:11.5px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:5px 12px;border-radius:99px">Apri modulo →</span>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <p style="margin:0;font-size:12px;color:var(--ink3)">Altri moduli verranno attivati dal tuo amministratore.</p>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenModuli }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Logistica Gas" style="max-width:1180px;margin:0 auto;padding:36px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em">Logistica Gas</h1>
+      <p style="margin:0;font-size:14px;color:var(--ink2)">Seleziona un'area di lavoro.</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Giorno gas · 17/07/2026</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px">
+    <sc-for list="{{ moduli }}" as="m" hint-placeholder-count="6">
+      <div onClick="{{ m.go }}" style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid {{ m.border }};border-radius:13px;padding:22px;cursor:{{ m.cursor }};transition:transform .2s ease,box-shadow .2s ease" data-vh="7">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="width:38px;height:38px;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 9%,transparent);border-radius:10px"><span style="display:block;width:14px;height:14px;background:linear-gradient(135deg,var(--acc),var(--prim));border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span></span>
+          <sc-if value="{{ m.primary }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:4px 10px;border-radius:99px">Apri →</span></sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <h3 style="margin:0;font-size:15.5px;font-weight:600">{{ m.title }}</h3>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--ink2);text-wrap:pretty">{{ m.desc }}</p>
+        </div>
+        <div style="height:1px;background:var(--line);margin-top:2px"></div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;color:var(--ink)">{{ m.stat }}</span>
+          <span style="font-size:11.5px;color:var(--ink3)">{{ m.statLabel }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenDash }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Dashboard" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Dashboard</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Logistica Gas · Posizione shipper — Azienda 1</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <button onClick="{{ dashPrev }}" title="Giorno precedente" style="width:32px;height:32px;display:grid;place-items:center;border:none;background:transparent;color:var(--ink2);font-size:14px;cursor:pointer;font-family:inherit" data-vh="0">‹</button>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink);padding:0 10px;border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:32px">Giorno gas · {{ dashDate }}</span>
+        <button onClick="{{ dashNext }}" title="Giorno successivo" style="width:32px;height:32px;display:grid;place-items:center;border:none;background:transparent;color:var(--ink2);font-size:14px;cursor:pointer;font-family:inherit" data-vh="0">›</button>
+      </div>
+      <span style="font-size:12px;font-weight:600;color:{{ dashCicloFg }};background:{{ dashCicloBg }};padding:8px 12px;border-radius:8px">{{ dashCicloTxt }}</span>
+      <sc-if value="{{ dashNotToday }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ dashToday }}" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" data-vh="8">Oggi</button>
+      </sc-if>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px">
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <h3 style="margin:0;font-size:15px;font-weight:600">Nominato vs allocato</h3>
+          <span style="font-size:12px;color:var(--ink3)">Ultimi 14 giorni gas · MWh/g</span>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--ink2)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--prim)"></span>Nominato</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--acc)"></span>Allocato</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:9px;height:190px;margin-top:20px">
+        <sc-for list="{{ days }}" as="d" hint-placeholder-count="14">
+          <div style="flex:1;display:flex;flex-direction:column;gap:7px;height:100%;justify-content:flex-end">
+            <div style="display:flex;gap:3px;align-items:flex-end;flex:1">
+              <span style="flex:1;height:{{ d.n }};background:var(--prim);opacity:.9;border-radius:3px 3px 0 0"></span>
+              <span style="flex:1;height:{{ d.a }};background:var(--acc);border-radius:3px 3px 0 0"></span>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:center;font-weight:{{ d.w }};color:{{ d.lc }}">{{ d.d }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <h3 style="margin:0 0 4px;font-size:15px;font-weight:600">Cicli di nomina · oggi</h3>
+      <span style="font-size:12px;color:var(--ink3);margin-bottom:10px">Rete di trasporto — punti in consegna</span>
+      <sc-for list="{{ cicli }}" as="c" hint-placeholder-count="6">
+        <div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)">
+          <span style="width:8px;height:8px;border-radius:50%;background:{{ c.fg }}"></span>
+          <span style="flex:1;font-size:13px;font-weight:600">{{ c.name }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3)">{{ c.time }}</span>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:{{ c.bg }};color:{{ c.fg }}">{{ c.stato }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <h3 style="margin:0;font-size:15px;font-weight:600">Nomine per punto</h3>
+        <span style="font-size:12px;color:var(--ink3)">Giorno gas {{ dashDate }} · valori in MWh</span>
+      </div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2)">Totale nominato · {{ dashTotNom }}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr .7fr 1.1fr;gap:12px;padding:14px 0 9px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
+      <span>PUNTO</span><span>CONTRATTO</span><span style="text-align:right">NOMINATO</span><span style="text-align:right">ALLOCATO</span><span style="text-align:right">Δ</span><span style="text-align:right">STATO</span>
+    </div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr .7fr 1.1fr;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)">
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;font-weight:600">{{ r.punto }}</span><span style="font-size:11px;color:var(--ink3)">{{ r.tipo }}</span></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2)">{{ r.contratto }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right">{{ r.nom }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right">{{ r.alloc }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;color:{{ r.dFg }}">{{ r.delta }}</span>
+        <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ r.sBg }};color:{{ r.sFg }}">{{ r.stato }}</span></span>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenCfgImp }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Impostazioni" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Impostazioni</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Configuratore — Azienda 1</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <sc-if value="{{ savedOk }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:600;color:#259372;background:rgba(47,163,124,.15);padding:8px 12px;border-radius:8px">Modifiche salvate ✓</span></sc-if>
+      <button onClick="{{ saveConfig }}" style="padding:10px 18px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Salva modifiche</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Generale</h3><span style="font-size:12px;color:var(--ink3)">Anagrafica shipper</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Ragione sociale
+        <input type="text" placeholder="Azienda 1" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Codice shipper
+          <input type="text" placeholder="AZ1-SHIP01" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Utente PSV
+          <input type="text" placeholder="PSV-AZ1-114" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Parametri di nomina</h3><span style="font-size:12px;color:var(--ink3)">Valori predefiniti in fase di invio</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--line)">
+        <span style="font-size:13px;font-weight:600">Unità di misura</span>
+        <div style="display:inline-flex;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:3px">
+          <sc-for list="{{ unitOpts }}" as="o" hint-placeholder-count="2">
+            <span onClick="{{ o.go }}" style="padding:6px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};transition:background .15s">{{ o.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--line)">
+        <span style="font-size:13px;font-weight:600">Programmazione predefinita</span>
+        <div style="display:inline-flex;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:3px">
+          <sc-for list="{{ cicloOpts }}" as="o" hint-placeholder-count="2">
+            <span onClick="{{ o.go }}" style="padding:6px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};transition:background .15s">{{ o.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 0">
+        <span style="font-size:13px;font-weight:600">Tolleranza sbilanciamento</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <input type="text" placeholder="±2,5" style="width:72px;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+          <span style="font-size:12.5px;color:var(--ink2)">%</span>
+        </span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:4px"><h3 style="margin:0;font-size:15px;font-weight:600">Punti di consegna</h3><span style="font-size:12px;color:var(--ink3)">I punti disattivati non compaiono in fase di nomina</span></div>
+      <sc-for list="{{ punti }}" as="p" hint-placeholder-count="6">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">{{ p.name }}</span><span style="font-size:11px;color:var(--ink3)">{{ p.tipo }}</span></span>
+          <sc-if value="{{ p.removable }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ p.removeP }}" title="Elimina punto" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink2);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;flex:none;transition:background .15s,color .15s,border-color .15s" data-vh="9">Elimina</button>
+          </sc-if>
+          <span onClick="{{ p.go }}" style="width:38px;height:22px;border-radius:99px;background:{{ p.kBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
+            <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ p.kX }};transition:transform .2s"></span>
+          </span>
+        </div>
+      </sc-for>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <input type="text" value="{{ newPunto }}" onChange="{{ setNewPunto }}" onKeyDown="{{ newPuntoKey }}" placeholder="Es. ReMi 34521405 · Brescia Est" style="flex:1;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:12.5px;outline:none" data-vf="2">
+        <button onClick="{{ addPunto }}" style="padding:9px 16px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;transition:background .15s" data-vh="8">+ Aggiungi punto</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:4px"><h3 style="margin:0;font-size:15px;font-weight:600">Notifiche</h3><span style="font-size:12px;color:var(--ink3)">Comunicazioni operative al tuo indirizzo</span></div>
+      <sc-for list="{{ notifiche }}" as="n" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">{{ n.name }}</span><span style="font-size:11px;color:var(--ink3)">{{ n.desc }}</span></span>
+          <span onClick="{{ n.go }}" style="width:38px;height:22px;border-radius:99px;background:{{ n.kBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
+            <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ n.kX }};transition:transform .2s"></span>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenConfig }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Configuratore" style="max-width:1180px;margin:0 auto;padding:36px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em">Configuratore</h1>
+    <p style="margin:0;font-size:14px;color:var(--ink2)">Seleziona un'area.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px">
+    <sc-for list="{{ cfgCards }}" as="cc" hint-placeholder-count="2">
+      <div onClick="{{ cc.go }}" style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:22px;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease" data-vh="7">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="width:38px;height:38px;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 9%,transparent);border-radius:10px"><span style="display:block;width:14px;height:14px;background:linear-gradient(135deg,var(--acc),var(--prim));border-radius:0 50% 50% 50%;transform:rotate(45deg)"></span></span>
+          <span style="font-size:11px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:4px 10px;border-radius:99px">Apri →</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <h3 style="margin:0;font-size:15.5px;font-weight:600">{{ cc.title }}</h3>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:var(--ink2);text-wrap:pretty">{{ cc.desc }}</p>
+        </div>
+        <div style="height:1px;background:var(--line);margin-top:2px"></div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;color:var(--ink)">{{ cc.stat }}</span>
+          <span style="font-size:11.5px;color:var(--ink3)">{{ cc.statLabel }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenCfgSis }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Sistema" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Sistema</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Configuratore — Stato della piattaforma</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">v 4.2.1</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px">
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Stato servizi</h3><span style="font-size:12px;color:var(--ink3)">Integrazioni collegate alla piattaforma</span></div>
+      <sc-for list="{{ servizi }}" as="sv" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:12px;min-height:52px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="width:8px;height:8px;border-radius:50%;background:{{ sv.fg }};flex:none"></span>
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">{{ sv.name }}</span><span style="font-size:11px;color:var(--ink3)">{{ sv.desc }}</span></span>
+          <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ sv.bg }};color:{{ sv.fg }}">{{ sv.stato }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Credenziali API GME</h3><span style="font-size:12px;color:var(--ink3)">Download dei dati di sbilancio giornaliero</span></div>
+        <sc-if value="{{ gmeOk }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#259372;background:rgba(47,163,124,.15);padding:5px 10px;border-radius:99px">Connessione verificata ✓</span></sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Endpoint
+          <input type="text" placeholder="https://api.mercatoelettrico.org/sbilancio" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Client ID
+            <input type="text" placeholder="AZ1-GME-01" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Client secret
+            <input type="password" placeholder="••••••••••••" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" data-vf="2">
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 0">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;font-weight:600">Download automatico</span><span style="font-size:11px;color:var(--ink3)">Ogni giorno alle 06:15, dopo la pubblicazione GME</span></span>
+          <span onClick="{{ gmeToggle }}" style="width:38px;height:22px;border-radius:99px;background:{{ gmeKBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
+            <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ gmeKX }};transition:transform .2s"></span>
+          </span>
+        </div>
+        <button onClick="{{ verifyGme }}" style="width:100%;padding:10px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Verifica e salva credenziali</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Utenti e privilegi</h3><span style="font-size:12px;color:var(--ink3)">Chi può caricare file e chi può solo consultare</span></div>
+      <sc-for list="{{ utenti }}" as="u" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:11px;font-weight:700;flex:none;opacity:{{ u.rowOp }}">{{ u.init }}</span>
+          <span style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;opacity:{{ u.rowOp }}"><span style="font-size:13px;font-weight:600">{{ u.name }}</span><span style="font-size:11px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ u.mail }}</span></span>
+          <button onClick="{{ u.togDis }}" style="padding:6px 12px;border:1px solid {{ u.disBorder }};border-radius:8px;background:{{ u.disBg }};color:{{ u.disFg }};font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;flex:none;transition:background .15s,color .15s,border-color .15s" data-vh="10">{{ u.disLabel }}</button>
+          <div style="display:inline-flex;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:3px;flex:none;opacity:{{ u.rowOp }}">
+            <sc-for list="{{ u.opts }}" as="o" hint-placeholder-count="2">
+              <span onClick="{{ o.go }}" style="padding:5px 10px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};transition:background .15s">{{ o.label }}</span>
+            </sc-for>
+          </div>
+
+        </div>
+      </sc-for>
+      <button onClick="{{ addUser }}" style="margin-top:14px;align-self:flex-start;display:flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s" data-vh="8">+ Aggiungi utente</button>
+    </div>
+    <div style="grid-column:1/-1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Attività recenti</h3><span style="font-size:12px;color:var(--ink3)">Giorno gas 17/07/2026</span></div>
+      <sc-for list="{{ logs }}" as="lg" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink3);width:48px;flex:none">{{ lg.time }}</span>
+          <span style="font-size:13px;font-weight:600;width:130px;flex:none">{{ lg.who }}</span>
+          <span style="font-size:13px;color:var(--ink2)">{{ lg.txt }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <sc-if value="{{ wizOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;animation:vtFade .18s ease">
+      <div onClick="{{ wizClose }}" style="position:absolute;inset:0;background:rgba(6,14,20,.55);backdrop-filter:blur(2px)"></div>
+      <div style="position:relative;width:480px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.35);padding:24px 26px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <h3 style="margin:0;font-size:17px;font-weight:700">Aggiungi utente</h3>
+            <span style="font-size:12.5px;color:var(--ink2)">Mappa un nuovo utente sull'ambiente Azienda 1</span>
+          </div>
+          <button onClick="{{ wizClose }}" style="width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink3);font-size:14px;line-height:1;cursor:pointer;font-family:inherit" data-vh="0">✕</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <sc-for list="{{ wizSteps }}" as="ws" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:8px;flex:1">
+              <span style="width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:{{ ws.bg }};color:{{ ws.fg }};font-size:11.5px;font-weight:700;flex:none;transition:background .2s">{{ ws.n }}</span>
+              <span style="font-size:12px;font-weight:{{ ws.lw }};color:{{ ws.lc }}">{{ ws.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:1px;background:var(--line)"></div>
+        <sc-if value="{{ wizStep1 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Nome
+                <input type="text" value="{{ wizNome }}" onChange="{{ wizSetNome }}" placeholder="Anna" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none" data-vf="2">
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Cognome
+                <input type="text" value="{{ wizCognome }}" onChange="{{ wizSetCognome }}" placeholder="Ferrari" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none" data-vf="2">
+              </label>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Email aziendale
+              <input type="email" value="{{ wizEmail }}" onChange="{{ wizSetEmail }}" placeholder="a.ferrari@azienda1.it" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none" data-vf="2">
+            </label>
+            <span style="font-size:11.5px;color:var(--ink3)">Se vuota, l'email viene generata da nome e cognome.</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ wizStep2 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ wizPermOpts }}" as="po" hint-placeholder-count="2">
+              <div onClick="{{ po.go }}" style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1.5px solid {{ po.border }};border-radius:11px;background:{{ po.bg }};cursor:pointer;transition:border-color .15s,background .15s">
+                <span style="width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none;margin-top:1px"><span style="width:8px;height:8px;border-radius:50%;background:{{ po.dot }};transition:background .15s"></span></span>
+                <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:13.5px;font-weight:600">{{ po.t }}</span><span style="font-size:12px;line-height:1.5;color:var(--ink2);text-wrap:pretty">{{ po.d }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ wizStep3 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:0">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+              <span style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700;flex:none">{{ wizInit }}</span>
+              <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13.5px;font-weight:600">{{ wizName }}</span><span style="font-size:11.5px;color:var(--ink3)">{{ wizMail }}</span></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)">
+              <span style="font-size:12.5px;font-weight:600;color:var(--ink2)">Privilegi</span>
+              <span style="font-size:12px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:4px 10px;border-radius:99px">{{ wizPermLabel }}</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--ink3);padding-top:12px">L'utente riceverà un invito via email per attivare l'accesso.</span>
+          </div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+          <button onClick="{{ wizClose }}" style="padding:9px 14px;border:none;background:none;color:var(--ink3);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" data-vh="6">Annulla</button>
+          <div style="flex:1"></div>
+          <sc-if value="{{ wizCanBack }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ wizBack }}" style="padding:10px 16px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--ink2);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" data-vh="1">Indietro</button>
+          </sc-if>
+          <sc-if value="{{ wizStep3 }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ wizFinish }}" style="padding:10px 18px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Conferma e aggiungi</button>
+          </sc-if>
+          <sc-if value="{{ wizStep1 }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ wizNext }}" style="padding:10px 18px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Avanti</button>
+          </sc-if>
+          <sc-if value="{{ wizStep2 }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ wizNext }}" style="padding:10px 18px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Avanti</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenNomine }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Nomine e Programmazione" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Nomine & Programmazione</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Invio e monitoraggio dei cicli — giorno gas 17/07/2026</p>
+    </div>
+    <span style="font-size:12px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:8px 12px;border-radius:8px">Ciclo R3 in corso · chiude 14:00</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:22px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nuova nomina</h3><span style="font-size:12px;color:var(--ink3)">Valori in MWh</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Punto
+        <select value="{{ nomPunto }}" onChange="{{ setNomPunto }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13px;outline:none">
+          <option>PSV</option><option>Passo Gries</option><option>Mazara del Vallo</option><option>ReMi 34521301 · Milano Ovest</option><option>Stogit · Erogazione</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Ciclo
+        <select value="{{ nomCiclo }}" onChange="{{ setNomCiclo }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13px;outline:none">
+          <option>R4</option><option>R5</option><option>D+1</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità
+        <input type="text" value="{{ nomQta }}" onChange="{{ setNomQta }}" placeholder="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
+      </label>
+      <button onClick="{{ addNomina }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Invia nomina</button>
+      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">La nomina sarà processata nel primo ciclo utile.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Nomine inviate · oggi</h3><span style="font-size:12px;color:var(--ink3)">Ordinate dalla più recente</span></div>
+      <div style="display:grid;grid-template-columns:2fr .7fr 1fr 1.1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
+        <span>PUNTO</span><span>CICLO</span><span style="text-align:right">QUANTITÀ</span><span style="text-align:right">STATO</span>
+      </div>
+      <sc-for list="{{ nomRows }}" as="nr" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:2fr .7fr 1fr 1.1fr;gap:12px;align-items:center;min-height:46px;padding:2px 0;border-bottom:1px solid var(--line)">
+          <span style="font-size:13px;font-weight:600">{{ nr.punto }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2)">{{ nr.ciclo }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;text-align:right">{{ nr.qta }}</span>
+          <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ nr.bg }};color:{{ nr.fg }}">{{ nr.stato }}</span></span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenBilancio }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Bilanciamento" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Bilanciamento</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Posizione fisica e commerciale — giorno gas 17/07/2026</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Aggiornato 11:45</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ bilKpis }}" as="k" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Disequilibrio (DS) · Delta IN–OUT</h3><span style="font-size:12px;color:var(--ink3)">DS = Σ immissioni − Σ prelievi · Codice di Rete Snam, cap. 9 · MWh</span></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:#B0842E">−312</span>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(196,140,42,.16);color:#B0842E">Disequilibrio · posizione corta</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:18px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="flex:1;font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--ink2)">IN · IMMISSIONI</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600">13.130</span>
+        </div>
+        <span style="height:10px;border-radius:99px;background:var(--surface2);overflow:hidden"><span style="display:block;height:100%;width:97.7%;background:var(--acc);border-radius:99px"></span></span>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Punti di Entrata · import</span><span style="font-family:'IBM Plex Mono',monospace">5.500</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Erogazione stoccaggio (S)</span><span style="font-family:'IBM Plex Mono',monospace">650</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Acquisti al PSV (T)</span><span style="font-family:'IBM Plex Mono',monospace">6.980</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="flex:1;font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--ink2)">OUT · PRELIEVI</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600">13.442</span>
+        </div>
+        <span style="height:10px;border-radius:99px;background:var(--surface2);overflow:hidden"><span style="display:block;height:100%;width:100%;background:#C05B4D;opacity:.85;border-radius:99px"></span></span>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Riconsegne clienti finali (R)</span><span style="font-family:'IBM Plex Mono',monospace">11.312</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Vendite al PSV (T)</span><span style="font-family:'IBM Plex Mono',monospace">2.130</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)"><span>Iniezione stoccaggio (S)</span><span style="font-family:'IBM Plex Mono',monospace">0</span></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3)">DS = 13.130 − 13.442 = −312 · provvisorio comunicato in G+1 (SB = DS)</span>
+      <span style="font-size:12px;color:var(--ink2)">Copertura suggerita: <span style="font-weight:600;color:var(--primText)">acquisto 250 MWh su MGP-GAS</span></span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Sbilanciamento giornaliero</h3><span style="font-size:12px;color:var(--ink3)">Ultimi 14 giorni gas · MWh · oggi stimato</span></div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--ink2)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--acc)"></span>Lungo</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:#C05B4D"></span>Corto</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;height:200px;margin-top:18px">
+        <sc-for list="{{ oreSbil }}" as="o" hint-placeholder-count="14">
+          <div style="flex:1;display:flex;flex-direction:column;height:100%">
+            <div style="flex:1;display:flex;align-items:flex-end;justify-content:center"><span style="width:62%;height:{{ o.top }};background:var(--acc);border-radius:3px 3px 0 0"></span></div>
+            <div style="height:1px;background:var(--line)"></div>
+            <div style="flex:1;display:flex;align-items:flex-start;justify-content:center"><span style="width:62%;height:{{ o.bot }};background:#C05B4D;opacity:.85;border-radius:0 0 3px 3px"></span></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:center;margin-top:6px;font-weight:{{ o.w }};color:{{ o.lc }}">{{ o.h }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Azioni correttive</h3><span style="font-size:12px;color:var(--ink3)">Per chiudere la posizione</span></div>
+      <sc-for list="{{ azioni }}" as="az" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">{{ az.txt }}</span><span style="font-size:11px;color:var(--ink3)">{{ az.sub }}</span></span>
+          <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ az.bg }};color:{{ az.fg }};flex:none">{{ az.stato }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenCapacita }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Capacita e Contratti" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Capacità & Contratti</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Capacità conferite e contratti attivi — anno termico 2025/26</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">5 contratti</span>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:22px">
+    <div style="display:grid;grid-template-columns:1.8fr 1.2fr 1fr 1.3fr .9fr 1fr;gap:12px;padding:2px 0 9px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
+      <span>PUNTO</span><span>TIPO</span><span style="text-align:right">CONFERITA</span><span>UTILIZZO</span><span style="text-align:right">SCADENZA</span><span style="text-align:right">STATO</span>
+    </div>
+    <sc-for list="{{ capRows }}" as="cr" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:1.8fr 1.2fr 1fr 1.3fr .9fr 1fr;gap:12px;align-items:center;min-height:52px;padding:2px 0;border-bottom:1px solid var(--line)">
+        <span style="font-size:13px;font-weight:600">{{ cr.punto }}</span>
+        <span style="font-size:12px;color:var(--ink2)">{{ cr.tipo }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ cr.conf }}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1;height:6px;border-radius:99px;background:var(--surface2);overflow:hidden"><span style="display:block;height:100%;width:{{ cr.usoW }};background:linear-gradient(90deg,var(--acc),var(--prim));border-radius:99px"></span></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2);width:34px;text-align:right">{{ cr.usoL }}</span>
+        </span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;color:var(--ink2)">{{ cr.scad }}</span>
+        <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ cr.bg }};color:{{ cr.fg }}">{{ cr.stato }}</span></span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Prossime scadenze</h3><span style="font-size:12px;color:var(--ink3)">Aste e rinnovi</span></div>
+    <sc-for list="{{ scadenze }}" as="sc" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">{{ sc.data }}</span>
+        <span style="font-size:13px;color:var(--ink)">{{ sc.txt }}</span>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenStoccaggio }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Stoccaggio" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Stoccaggio</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Capacità, giacenza e movimenti — contratto Stogit · Azienda 1</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Anno termico stoccaggio 26/27</span>
+      <span style="font-size:12px;font-weight:600;color:var(--acc);background:color-mix(in oklab,var(--acc) 12%,transparent);padding:8px 12px;border-radius:8px">Fase di Iniezione · 01/04 → 31/10</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ stocKpis }}" as="k" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Capacità del giorno gas · MWh/g</h3><span style="font-size:12px;color:var(--ink3)">Disponibilità di punta = conferita × fattore di adeguamento (Codice di Stoccaggio Stogit, cap. 6)</span></div>
+      <span style="font-size:11.5px;color:var(--ink3)">Fattori aggiornati da Stogit in base alla giacenza</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px">
+      <sc-for list="{{ stocCap }}" as="cp" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+            <span style="font-size:12.5px;font-weight:700;color:var(--ink2)">{{ cp.tipo }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--primText)">{{ cp.disp }} <span style="font-size:11px;font-weight:500;color:var(--ink3)">disponibile</span></span>
+          </div>
+          <span style="height:10px;border-radius:99px;background:var(--surface2);overflow:hidden"><span style="display:block;height:100%;width:{{ cp.dispW }};background:{{ cp.barCol }};border-radius:99px"></span></span>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Conferita</span><span style="font-family:'IBM Plex Mono',monospace">{{ cp.conf }}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)"><span>Fattore di adeguamento</span><span style="font-family:'IBM Plex Mono',monospace">{{ cp.fatt }}</span></div>
+          <span style="font-size:11.5px;color:var(--ink3)">{{ cp.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:14px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Riempimento dello Spazio</h3><span style="font-size:12px;color:var(--ink3)">Giacenza 109,8 GWh su 180 GWh conferiti · profilo ottimale Stogit rispettato</span></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--primText)">61%</span>
+    </div>
+    <div style="height:14px;border-radius:99px;background:var(--surface2);overflow:hidden">
+      <div style="height:100%;width:61%;background:linear-gradient(90deg,var(--acc),var(--prim));border-radius:99px"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)"><span>0</span><span>50%</span><span>100%</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Movimenti · ultimi 7 giorni</h3><span style="font-size:12px;color:var(--ink3)">MWh</span></div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--ink2)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--acc)"></span>Iniezione</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:#C05B4D"></span>Erogazione</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;height:180px;margin-top:18px">
+        <sc-for list="{{ stocMov }}" as="mv" hint-placeholder-count="7">
+          <div style="flex:1;display:flex;flex-direction:column;height:100%">
+            <div style="flex:1;display:flex;align-items:flex-end;justify-content:center"><span style="width:56%;height:{{ mv.top }};background:var(--acc);border-radius:3px 3px 0 0"></span></div>
+            <div style="height:1px;background:var(--line)"></div>
+            <div style="flex:1;display:flex;align-items:flex-start;justify-content:center"><span style="width:56%;height:{{ mv.bot }};background:#C05B4D;opacity:.85;border-radius:0 0 3px 3px"></span></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:center;color:var(--ink3);margin-top:6px">{{ mv.h }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Servizi conferiti</h3><span style="font-size:12px;color:var(--ink3)">Codice di Stoccaggio Stogit · cap. 3</span></div>
+      <sc-for list="{{ stocServ }}" as="sv" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">{{ sv.name }}</span><span style="font-size:11px;color:var(--ink3)">{{ sv.sub }}</span></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);flex:none">{{ sv.val }}</span>
+          <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ sv.bg }};color:{{ sv.fg }};flex:none">{{ sv.stato }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenReport }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Report e Analisi" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Report & Analisi</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Estrazioni, analisi e reportistica regolatoria</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Ultimo agg. 06:31</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ repKpis }}" as="k" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Report disponibili</h3><span style="font-size:12px;color:var(--ink3)">Generati dalla piattaforma</span></div>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ repCats }}" as="rc" hint-placeholder-count="4">
+            <button onClick="{{ rc.go }}" style="padding:6px 12px;border:1px solid {{ rc.bd }};border-radius:99px;background:{{ rc.bg }};color:{{ rc.fg }};font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s,color .15s,border-color .15s">{{ rc.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <sc-for list="{{ repFiles }}" as="rf" hint-placeholder-count="8">
+        <div style="display:flex;align-items:center;gap:14px;min-height:56px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="width:36px;height:36px;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 9%,transparent);border-radius:9px;flex:none;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--primText)">DOC</span>
+          <span style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span style="font-size:13px;font-weight:600">{{ rf.name }}</span><span style="font-size:11px;color:var(--ink3)">{{ rf.tipo }}</span></span>
+          <span style="font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--surface2);color:var(--ink2);flex:none">{{ rf.tag }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);flex:none">{{ rf.upd }}</span>
+          <button style="padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;flex:none;transition:background .15s" data-vh="8">Scarica</button>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Report programmati</h3><span style="font-size:12px;color:var(--ink3)">Invio automatico via email</span></div>
+      <sc-for list="{{ repProg }}" as="rp" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:12px;min-height:50px;padding:2px 0;border-top:1px solid var(--line)">
+          <span style="flex:1;font-size:13px;font-weight:600">{{ rp.name }}</span>
+          <span onClick="{{ rp.go }}" style="width:38px;height:22px;border-radius:99px;background:{{ rp.kBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
+            <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ rp.kX }};transition:transform .2s"></span>
+          </span>
+        </div>
+      </sc-for>
+      <span style="font-size:11.5px;color:var(--ink3);margin-top:12px;text-wrap:pretty">I report vengono inviati agli utenti abilitati del tuo ambiente.</span>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+</div>
+</template>
+<script src="/static/runtime.js"></script>
+<script src="/static/logic.js"></script>
+</body>
+</html>
