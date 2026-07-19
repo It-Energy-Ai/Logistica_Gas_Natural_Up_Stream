@@ -1,6 +1,6 @@
 """Vettore — portale demo di logistica gas per shipper.
 
-Backend leggero: serve il frontend (generato dal design Claude Design) e
+Backend leggero: serve il frontend (generato dal file di design) e
 persiste su SQLite lo stato mutabile (nomine, configurazione, utenti).
 Le integrazioni reali (Snam, GME, SSO) sono scenografia demo nel frontend.
 """

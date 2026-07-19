@@ -1,4 +1,4 @@
-/* Runtime del template Claude Design: interpreta sc-if / sc-for / {{ var }}
+/* Runtime del template di design: interpreta sc-if / sc-for / {{ var }}
  * e collega gli handler (onClick, onChange, ...). Nessuna dipendenza.
  *
  * Contratto con logic.js:

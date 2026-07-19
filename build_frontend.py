@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Genera app/static/index.html dal design Claude Design (design/design.html).
+"""Genera app/static/index.html dal file di design (design/design.html).
 
 Il markup del design resta identico al carattere: cambiano solo
 gli pseudo-stili (style-hover / style-focus), che diventano regole CSS

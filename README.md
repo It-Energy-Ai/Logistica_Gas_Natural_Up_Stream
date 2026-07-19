@@ -29,13 +29,13 @@ Nomine, bilanciamento, capacità, stoccaggio e reportistica regolatoria — in u
 
 E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
-## Da un design Claude Design a un'app funzionante
+## Dal design all'app funzionante
 
-Questo progetto nasce da un design realizzato su [Claude Design](https://claude.ai/design) e lo trasforma in una webapp reale **senza riscriverne l'interfaccia**: il markup del canvas è preservato al carattere.
+Questo progetto nasce da un design d'interfaccia completo e lo trasforma in una webapp reale **senza riscriverne l'interfaccia**: il markup del canvas è preservato al carattere.
 
 ```mermaid
 flowchart LR
-    D["design/design.html<br>(canvas Claude Design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
+    D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
     R --> UI["12 schermate"]
@@ -43,12 +43,12 @@ flowchart LR
     B --> DB[("SQLite")]
 ```
 
-- **`design/design.html`** — la fonte di verità: il file scaricato dal progetto Claude Design.
+- **`design/design.html`** — la fonte di verità dell'interfaccia.
 - **`build_frontend.py`** — genera il frontend: converte gli pseudo-stili (`style-hover`/`style-focus`) in CSS e applica le poche deviazioni documentate (campi login controllati, effetto hover del hub in CSS puro).
 - **`runtime.js`** (~150 righe, zero dipendenze) — interpreta il template a runtime: condizioni, cicli, interpolazioni, eventi.
 - **`logic.js`** — porting quasi letterale della logica del canvas, con 6 deviazioni documentate in testa al file (API reali, persistenza, robustezza della sync).
 
-Per modificare l'interfaccia: si modifica il design su Claude Design, si riscarica il file, si rilancia `python3 build_frontend.py`. La CI verifica che il frontend generato resti allineato al design.
+Per modificare l'interfaccia: si aggiorna design/design.html e si rilancia `python3 build_frontend.py`. La CI verifica che il frontend generato resti allineato al design.
 
 ## Avvio
 

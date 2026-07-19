@@ -1,5 +1,5 @@
 /* Logica applicativa di Vettore — porting della classe Component del design
- * Claude Design ("Vettore Portale Gas.dc.html", script data-dc-script).
+ * di partenza ("Vettore Portale Gas", script data-dc-script).
  *
  * Il corpo di renderVals() è portato quasi alla lettera; le deviazioni sono:
  *   1. doLogin/ssoPick/logout parlano con l'API (/api/login, /api/logout) e i
