@@ -93,6 +93,7 @@ VALIDATORS = {
     "gmeOk": _is_bool,
     "imports": _is_import_list,
     "imported": _is_bool,
+    "demoMode": _is_bool,
 }
 
 
@@ -146,10 +147,12 @@ def logout(request: Request, response: Response):
 
 @app.get("/api/state")
 def get_state(request: Request):
-    if not _sessione(request):
+    email = _sessione(request)
+    if not email:
         return JSONResponse({"errore": "sessione assente"}, status_code=401)
     with db.connect() as conn:
-        return db.leggi_stato(conn)
+        # "email" è l'identità della sessione: il client la separa dallo stato.
+        return {"email": email, **db.leggi_stato(conn)}
 
 
 @app.put("/api/state")

@@ -37,6 +37,8 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 
 E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
+> Screenshot e tour mostrano la **modalità demo** attiva; al primo avvio il portale parte pulito (vedi sotto).
+
 ## Dal design all'app funzionante
 
 Questo progetto nasce da un design d'interfaccia completo e lo trasforma in una webapp reale **senza riscriverne l'interfaccia**: il markup del canvas è preservato al carattere.
@@ -83,16 +85,20 @@ Al primo avvio crea da solo l'ambiente e installa le dipendenze, poi apre il bro
 docker compose up -d --build      # → http://localhost:8080
 ```
 
-## Cosa è reale e cosa è demo
+## Primo avvio pulito, demo su richiesta
 
-| Reale | Demo |
+Al primo avvio il portale è **pulito e tuo**: l'identità mostrata deriva dall'email con cui accedi, il giorno gas è quello reale, liste e contatori partono da zero, pronti per i dati veri.
+
+I dati di scena che vedi negli screenshot (KPI, grafici, cicli, contratti) sono la **modalità demo**: si attiva con un interruttore in *Configuratore → Sistema*, popola il portale con l'ambientazione del design (ancorata al giorno gas 17/07/2026) e si spegne senza lasciare tracce — le nomine demo non vengono mai salvate nel tuo database.
+
+| Reale | Demo (opzionale) |
 |---|---|
-| Navigazione, tutte le interazioni, wizard, tema chiaro/scuro | Dati di mercato (KPI, prezzi PSV, giacenze) ancorati al giorno gas 17/07/2026 |
+| Identità dal login, navigazione, wizard, tema chiaro/scuro | Dati di mercato: KPI, prezzi PSV, giacenze, cicli |
 | Sessioni con cookie, login/logout | Login e SSO accettano qualunque credenziale |
-| **Persistenza SQLite** di nomine, configurazione, punti e utenti (sopravvivono al riavvio) | Integrazioni Snam / GME / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
+| **Persistenza SQLite** di nomine, configurazione, punti e utenti | Integrazioni Snam / GME / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
 | Sync client→server con retry, gestione sessione scaduta, validazione a whitelist | |
 
-La colonna "demo" è la mappa esatta di cosa sostituire per andare in produzione.
+La colonna di destra è la mappa esatta di cosa sostituire per andare in produzione.
 
 ## Test e qualità
 

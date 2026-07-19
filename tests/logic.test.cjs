@@ -20,6 +20,56 @@ test("stato iniziale: schermata di login", () => {
   assert.equal(v.primC, "#0E5A75");
 });
 
+test("avvio pulito: niente scenografia, data reale, banner attivo", () => {
+  const app = new App();
+  app.setState({ screen: "dash" });
+  const v = app.renderVals();
+  assert.equal(v.demoOn, false);
+  assert.equal(v.kpis[0].value, "—");
+  assert.deepEqual(v.days, []);
+  assert.deepEqual(v.rows, []);
+  assert.equal(v.nomRows.length, 0);
+  assert.equal(v.vuotoDash, true);
+  const oggi = new Date();
+  const atteso = String(oggi.getDate()).padStart(2, "0") + "/" + String(oggi.getMonth() + 1).padStart(2, "0") + "/" + oggi.getFullYear();
+  assert.equal(v.giornoGas, atteso);
+  assert.equal(v.dashDate, atteso);
+  assert.equal(v.capChip, "0 contratti");
+  assert.ok(v.servizi.every((sv) => sv.stato === "Da collegare"));
+});
+
+test("modalità demo: l'interruttore popola la scenografia del canvas", () => {
+  const app = new App();
+  app.setState({ screen: "dash" });
+  app.renderVals().demoToggle();
+  const v = app.renderVals();
+  assert.equal(v.demoOn, true);
+  assert.equal(v.kpis[0].value, "12.480");
+  assert.equal(v.days.length, 14);
+  assert.equal(v.rows.length, 5);
+  assert.equal(v.nomRows.length, 3); // nomine di scena, non salvate
+  assert.equal(v.giornoGas, "17/07/2026");
+  assert.equal(v.vuotoDash, false);
+  assert.equal(v.capChip, "5 contratti");
+  assert.ok("demoMode" in app._pending, "demoMode persistito");
+  clearTimeout(app._syncTimer);
+  // le nomine demo NON entrano nello stato reale
+  assert.equal(app.state.nomList.length, 0);
+});
+
+test("identità derivata dall'email di login", () => {
+  const app = new App();
+  const v = app.renderVals();
+  v.setLoginEmail(ev("davide.bellini@itenergy.ai"));
+  app.renderVals().doLogin();
+  const v2 = app.renderVals();
+  assert.equal(v2.utenteNome, "Davide Bellini");
+  assert.equal(v2.utenteIniziali, "DB");
+  assert.equal(v2.utenteAzienda, "Itenergy");
+  assert.ok(v2.saluto.endsWith("Davide"));
+  clearTimeout(app._syncTimer);
+});
+
 test("navigazione e breadcrumb", () => {
   const app = new App();
   app.setState({ screen: "dash" });
@@ -34,7 +84,7 @@ test("navigazione e breadcrumb", () => {
 
 test("dashboard: giorno gas e KPI si muovono con offset", () => {
   const app = new App();
-  app.setState({ screen: "dash" });
+  app.setState({ screen: "dash", demoMode: true });
   let v = app.renderVals();
   assert.equal(v.dashDate, "17/07/2026");
   assert.equal(v.dashNotToday, false);
@@ -60,7 +110,7 @@ test("nomina: invio aggiunge in testa con stato Inviata e sincronizza", () => {
   v.setNomQta(ev("750"));
   app.renderVals().addNomina();
   const rows = app.renderVals().nomRows;
-  assert.equal(rows.length, 4);
+  assert.equal(rows.length, 1);
   assert.equal(rows[0].punto, "Passo Gries");
   assert.equal(rows[0].qta, "750");
   assert.equal(rows[0].stato, "Inviata");
@@ -70,7 +120,7 @@ test("nomina: invio aggiunge in testa con stato Inviata e sincronizza", () => {
 
 test("wizard utente: anagrafica, privilegi, conferma", () => {
   const app = new App();
-  app.setState({ screen: "cfgSis" });
+  app.setState({ screen: "cfgSis", demoMode: true });
   app.renderVals().addUser();
   let v = app.renderVals();
   assert.equal(v.wizOpen, true);
@@ -140,7 +190,7 @@ test("configurazione: toggle, segmenti e salvataggio", () => {
 
 test("report: filtro per categoria", () => {
   const app = new App();
-  app.setState({ screen: "report" });
+  app.setState({ screen: "report", demoMode: true });
   let v = app.renderVals();
   assert.equal(v.repFiles.length, 8);
   v.repCats[2].go(); // Regolatori
@@ -174,11 +224,11 @@ test("tema: toggle chiaro/scuro", () => {
 
 test("utenti: privilegi e disabilitazione", () => {
   const app = new App();
-  app.setState({ screen: "cfgSis" });
+  app.setState({ screen: "cfgSis", demoMode: true });
   let v = app.renderVals();
   assert.equal(v.utenti.length, 3);
-  v.utenti[2].opts[1].go(); // Giulio Verdi -> lettura e scrittura
-  assert.equal(app.state.users.gverdi, "up");
+  v.utenti[2].opts[0].go(); // Giulio Verdi -> solo lettura
+  assert.equal(app.state.users.gverdi, "ro");
   app.renderVals().utenti[2].togDis();
   v = app.renderVals();
   assert.equal(v.utenti[2].disLabel, "Riabilita");

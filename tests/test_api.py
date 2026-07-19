@@ -44,7 +44,8 @@ def test_login_e_persistenza_stato(client):
     r = client.post("/api/login", json={"email": "m.rossi@azienda1.it"})
     assert r.status_code == 200 and r.json()["email"] == "m.rossi@azienda1.it"
 
-    assert client.get("/api/state").json() == {}
+    # stato vuoto: la risposta porta solo l'identità della sessione
+    assert client.get("/api/state").json() == {"email": "m.rossi@azienda1.it"}
 
     nomina = {"punto": "PSV", "ciclo": "R4", "qta": "500", "stato": "Inviata"}
     r = client.put("/api/state", json={"nomList": [nomina], "gmeOk": True, "nextU": 2})
@@ -67,7 +68,9 @@ def test_validazione_chiavi_e_forme(client):
     # una chiave invalida respinge l'intera patch
     r = client.put("/api/state", json={"gmeOk": True, "altro": 1})
     assert r.status_code == 422
-    assert client.get("/api/state").json() == {}
+    assert client.get("/api/state").json() == {"email": "m.rossi@azienda1.it"}
+    # modalità demo persistibile
+    assert client.put("/api/state", json={"demoMode": True}).status_code == 200
     # cap sul numero di chiavi delle mappe (DoS)
     grande = {f"k{i}": True for i in range(300)}
     assert client.put("/api/state", json={"cfg": grande}).status_code == 422
@@ -100,4 +103,6 @@ def test_extra_punti_e_utenti_roundtrip(client):
         "hiddenPunti": ["cavarzere"],
     }
     assert client.put("/api/state", json=patch).status_code == 200
-    assert client.get("/api/state").json() == patch
+    stato = client.get("/api/state").json()
+    stato.pop("email")
+    assert stato == patch

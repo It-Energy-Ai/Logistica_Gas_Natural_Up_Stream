@@ -61,10 +61,10 @@ input::placeholder{color:var(--ink3)}
   </button>
   <div style="width:1px;height:24px;background:var(--line)"></div>
   <div style="display:flex;align-items:center;gap:10px">
-    <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700">MR</span>
+    <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700">{{ utenteIniziali }}</span>
     <span style="display:flex;flex-direction:column;line-height:1.25">
-      <span style="font-size:13px;font-weight:600">Marco Rossi</span>
-      <span style="font-size:11px;color:var(--ink3)">Azienda 1</span>
+      <span style="font-size:13px;font-weight:600">{{ utenteNome }}</span>
+      <span style="font-size:11px;color:var(--ink3)">{{ utenteAzienda }}</span>
     </span>
   </div>
   <button onClick="{{ logout }}" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500" data-vh="0">Esci</button>
@@ -164,7 +164,7 @@ input::placeholder{color:var(--ink3)}
 <section data-screen-label="Hub moduli" style="min-height:calc(100vh - 58px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;padding:60px 24px;animation:vtFade .3s ease">
   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center">
     <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--ink3)">AMBIENTE DI LAVORO</span>
-    <h1 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em">Buongiorno, Marco</h1>
+    <h1 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em">{{ saluto }}</h1>
     <p style="margin:0;font-size:14px;color:var(--ink2)">Seleziona un modulo per iniziare.</p>
   </div>
   <div style="display:flex;gap:150px;flex-wrap:wrap;justify-content:center">
@@ -206,7 +206,7 @@ input::placeholder{color:var(--ink3)}
       <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em">Logistica Gas</h1>
       <p style="margin:0;font-size:14px;color:var(--ink2)">Seleziona un'area di lavoro.</p>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Giorno gas · 17/07/2026</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Giorno gas · {{ giornoGas }}</span>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px">
     <sc-for list="{{ moduli }}" as="m" hint-placeholder-count="6">
@@ -235,7 +235,7 @@ input::placeholder{color:var(--ink3)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Dashboard</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Logistica Gas · Posizione shipper — Azienda 1</p>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Logistica Gas · Posizione shipper — {{ utenteAzienda }}</p>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div style="display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden">
@@ -249,6 +249,7 @@ input::placeholder{color:var(--ink3)}
       </sc-if>
     </div>
   </div>
+  <sc-if value="{{ vuotoDash }}"><div style="margin-top:14px;padding:12px 16px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--ink2);background:var(--surface)">Il portale è in attesa dei primi dati. Per un giro di prova attiva la <strong>modalità demo</strong> in Configuratore → Sistema.</div></sc-if>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px">
     <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
       <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
@@ -328,7 +329,7 @@ input::placeholder{color:var(--ink3)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Impostazioni</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Configuratore — Azienda 1</p>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Configuratore — {{ utenteAzienda }}</p>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <sc-if value="{{ savedOk }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:600;color:#259372;background:rgba(47,163,124,.15);padding:8px 12px;border-radius:8px">Modifiche salvate ✓</span></sc-if>
@@ -456,6 +457,12 @@ input::placeholder{color:var(--ink3)}
           <span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ sv.bg }};color:{{ sv.fg }}">{{ sv.stato }}</span>
         </div>
       </sc-for>
+      <div style="display:flex;align-items:center;gap:12px;min-height:52px;padding:2px 0;border-top:1px solid var(--line)">
+        <span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:13px;font-weight:600">Modalità demo</span><span style="font-size:11px;color:var(--ink3)">Popola il portale con dati di esempio</span></span>
+        <span onClick="{{ demoToggle }}" style="width:38px;height:22px;border-radius:99px;background:{{ demoKBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
+          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ demoKX }};transition:transform .2s"></span>
+        </span>
+      </div>
     </div>
 
     <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
@@ -502,7 +509,7 @@ input::placeholder{color:var(--ink3)}
       <button onClick="{{ addUser }}" style="margin-top:14px;align-self:flex-start;display:flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s" data-vh="8">+ Aggiungi utente</button>
     </div>
     <div style="grid-column:1/-1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
-      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Attività recenti</h3><span style="font-size:12px;color:var(--ink3)">Giorno gas 17/07/2026</span></div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Attività recenti</h3><span style="font-size:12px;color:var(--ink3)">Giorno gas {{ giornoGas }}</span></div>
       <sc-for list="{{ logs }}" as="lg" hint-placeholder-count="4">
         <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
           <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink3);width:48px;flex:none">{{ lg.time }}</span>
@@ -519,7 +526,7 @@ input::placeholder{color:var(--ink3)}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
           <div style="display:flex;flex-direction:column;gap:3px">
             <h3 style="margin:0;font-size:17px;font-weight:700">Aggiungi utente</h3>
-            <span style="font-size:12.5px;color:var(--ink2)">Mappa un nuovo utente sull'ambiente Azienda 1</span>
+            <span style="font-size:12.5px;color:var(--ink2)">Mappa un nuovo utente sull'ambiente {{ utenteAzienda }}</span>
           </div>
           <button onClick="{{ wizClose }}" style="width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink3);font-size:14px;line-height:1;cursor:pointer;font-family:inherit" data-vh="0">✕</button>
         </div>
@@ -598,9 +605,9 @@ input::placeholder{color:var(--ink3)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Nomine & Programmazione</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Invio e monitoraggio dei cicli — giorno gas 17/07/2026</p>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Invio e monitoraggio dei cicli — giorno gas {{ giornoGas }}</p>
     </div>
-    <span style="font-size:12px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:8px 12px;border-radius:8px">Ciclo R3 in corso · chiude 14:00</span>
+    <sc-if value="{{ demoOn }}"><span style="font-size:12px;font-weight:600;color:var(--primText);background:color-mix(in oklab,var(--prim) 10%,transparent);padding:8px 12px;border-radius:8px">Ciclo R3 in corso · chiude 14:00</span></sc-if>
   </div>
   <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:22px;align-items:start">
     <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
@@ -644,9 +651,9 @@ input::placeholder{color:var(--ink3)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Bilanciamento</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Posizione fisica e commerciale — giorno gas 17/07/2026</p>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Posizione fisica e commerciale — giorno gas {{ giornoGas }}</p>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Aggiornato 11:45</span>
+    <sc-if value="{{ demoOn }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Aggiornato 11:45</span></sc-if>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
     <sc-for list="{{ bilKpis }}" as="k" hint-placeholder-count="3">
@@ -660,7 +667,7 @@ input::placeholder{color:var(--ink3)}
       </div>
     </sc-for>
   </div>
-  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+  <sc-if value="{{ demoOn }}"><div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
       <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Disequilibrio (DS) · Delta IN–OUT</h3><span style="font-size:12px;color:var(--ink3)">DS = Σ immissioni − Σ prelievi · Codice di Rete Snam, cap. 9 · MWh</span></div>
       <div style="display:flex;align-items:center;gap:10px">
@@ -694,7 +701,7 @@ input::placeholder{color:var(--ink3)}
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3)">DS = 13.130 − 13.442 = −312 · provvisorio comunicato in G+1 (SB = DS)</span>
       <span style="font-size:12px;color:var(--ink2)">Copertura suggerita: <span style="font-weight:600;color:var(--primText)">acquisto 250 MWh su MGP-GAS</span></span>
     </div>
-  </div>
+  </div></sc-if>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;align-items:start">
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
@@ -735,7 +742,7 @@ input::placeholder{color:var(--ink3)}
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Capacità & Contratti</h1>
       <p style="margin:0;font-size:13.5px;color:var(--ink2)">Capacità conferite e contratti attivi — anno termico 2025/26</p>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">5 contratti</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">{{ capChip }}</span>
   </div>
   <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:22px">
     <div style="display:grid;grid-template-columns:1.8fr 1.2fr 1fr 1.3fr .9fr 1fr;gap:12px;padding:2px 0 9px;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
@@ -772,11 +779,11 @@ input::placeholder{color:var(--ink3)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px">
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Stoccaggio</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Capacità, giacenza e movimenti — contratto Stogit · Azienda 1</p>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Capacità, giacenza e movimenti — contratto Stogit · {{ utenteAzienda }}</p>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Anno termico stoccaggio 26/27</span>
-      <span style="font-size:12px;font-weight:600;color:var(--acc);background:color-mix(in oklab,var(--acc) 12%,transparent);padding:8px 12px;border-radius:8px">Fase di Iniezione · 01/04 → 31/10</span>
+      <sc-if value="{{ demoOn }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Anno termico stoccaggio 26/27</span></sc-if>
+      <sc-if value="{{ demoOn }}"><span style="font-size:12px;font-weight:600;color:var(--acc);background:color-mix(in oklab,var(--acc) 12%,transparent);padding:8px 12px;border-radius:8px">Fase di Iniezione · 01/04 → 31/10</span></sc-if>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px">
@@ -811,7 +818,7 @@ input::placeholder{color:var(--ink3)}
       </sc-for>
     </div>
   </div>
-  <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+  <sc-if value="{{ demoOn }}"><div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:14px">
       <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Riempimento dello Spazio</h3><span style="font-size:12px;color:var(--ink3)">Giacenza 109,8 GWh su 180 GWh conferiti · profilo ottimale Stogit rispettato</span></div>
       <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--primText)">61%</span>
@@ -820,7 +827,7 @@ input::placeholder{color:var(--ink3)}
       <div style="height:100%;width:61%;background:linear-gradient(90deg,var(--acc),var(--prim));border-radius:99px"></div>
     </div>
     <div style="display:flex;justify-content:space-between;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)"><span>0</span><span>50%</span><span>100%</span></div>
-  </div>
+  </div></sc-if>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;align-items:start">
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
@@ -862,7 +869,7 @@ input::placeholder{color:var(--ink3)}
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Report & Analisi</h1>
       <p style="margin:0;font-size:13.5px;color:var(--ink2)">Estrazioni, analisi e reportistica regolatoria</p>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Ultimo agg. 06:31</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px"<sc-if value="{{ demoOn }}">>Ultimo agg. 06:31</span></sc-if>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
     <sc-for list="{{ repKpis }}" as="k" hint-placeholder-count="3">
