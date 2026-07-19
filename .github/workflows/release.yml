@@ -17,9 +17,6 @@ jobs:
           - os: macos-latest
             nome: Vettore-macos-apple-silicon
             prodotto: dist/Vettore
-          - os: macos-13
-            nome: Vettore-macos-intel
-            prodotto: dist/Vettore
           - os: ubuntu-latest
             nome: Vettore-linux
             prodotto: dist/Vettore
@@ -41,10 +38,15 @@ jobs:
         shell: bash
         run: |
           VETTORE_NO_BROWSER=1 VETTORE_DB=/tmp/smoke.db ./dist/Vettore &
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
-          curl -sf http://127.0.0.1:8080/ | grep -q "data-screen-label"
-          curl -sf -o /dev/null http://127.0.0.1:8080/static/logic.js
-          kill %1
+          PID=$!
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8080/ | grep -q "data-screen-label"; then ok=1; break; fi
+            sleep 2
+          done
+          curl -sf -o /dev/null http://127.0.0.1:8080/static/logic.js || ok=""
+          kill "$PID" 2>/dev/null || true
+          [ -n "$ok" ]
 
       - name: Smoke test (windows)
         if: runner.os == 'Windows'
@@ -89,13 +91,13 @@ jobs:
           files: |
             Vettore-windows.exe
             Vettore-macos-apple-silicon
-            Vettore-macos-intel
             Vettore-linux
           body: |
             **Vettore senza installare nulla**: scarica il file per il tuo sistema, doppio click, e il browser si apre su http://localhost:8080.
 
             - **Windows** → `Vettore-windows.exe` (se SmartScreen avvisa: *Ulteriori informazioni → Esegui comunque*)
-            - **macOS** (M1/M2/M3/M4) → `Vettore-macos-apple-silicon` · (Intel) → `Vettore-macos-intel` — al primo avvio: tasto destro → *Apri* (binario non firmato); se scaricato dal browser può servire `xattr -d com.apple.quarantine <file>`
+            - **macOS** (Apple Silicon, M1 o successivi) → `Vettore-macos-apple-silicon` — al primo avvio: tasto destro → *Apri* (binario non firmato); se scaricato dal browser può servire `xattr -d com.apple.quarantine <file>`
             - **Linux** → `Vettore-linux` (poi `chmod +x Vettore-linux`)
+            - **Mac Intel**: usa `avvio.sh` dal repository (serve solo Python)
 
             I dati restano in `~/.vettore/vettore.db`. Niente Docker, niente Python: tutto incluso.
