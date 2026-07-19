@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Test API (pytest)
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test logica frontend (node)
+        run: node tests/logic.test.cjs
+
+      - name: Il frontend generato è allineato al design
+        run: |
+          python build_frontend.py
+          git diff --exit-code app/static/index.html

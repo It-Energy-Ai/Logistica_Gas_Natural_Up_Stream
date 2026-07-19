@@ -26,6 +26,12 @@ input::placeholder{color:var(--ink3)}
 [data-vh="8"]:hover{background:color-mix(in oklab,var(--prim) 8%,transparent)}
 [data-vh="9"]:hover{border-color:rgba(197,96,80,.4);color:#C05B4D;background:rgba(197,96,80,.08)}
 [data-vh="10"]:hover{border-color:rgba(197,96,80,.4);color:#C05B4D}
+
+.hub-card:hover>div:nth-child(1){transform:rotate(-13deg) translate(-36px,10px) !important}
+.hub-card:hover>div:nth-child(2){transform:rotate(9deg) translate(32px,0px) !important}
+.hub-card:hover>div:nth-child(3){transform:translateY(16px) rotate(-3deg) !important}
+.hub-card:hover>div:nth-child(4){transform:translateY(-14px) scale(1.03) rotate(.5deg) !important;box-shadow:0 26px 52px color-mix(in oklab,var(--prim) 28%,transparent) !important}
+
 </style>
 </head>
 <body>
@@ -162,7 +168,7 @@ input::placeholder{color:var(--ink3)}
   </div>
   <div style="display:flex;gap:150px;flex-wrap:wrap;justify-content:center">
     <sc-for list="{{ hubCards }}" as="hc" hint-placeholder-count="2">
-      <div onMouseEnter="{{ hc.enter }}" onMouseLeave="{{ hc.leave }}" style="position:relative;width:252px;height:352px;cursor:pointer">
+      <div class="hub-card" style="position:relative;width:252px;height:352px;cursor:pointer">
         <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,color-mix(in oklab,var(--prim) 9%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t1 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .06s"></div>
         <div style="position:absolute;inset:0;background:repeating-linear-gradient(-45deg,color-mix(in oklab,var(--prim) 9%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t2 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .09s"></div>
         <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,color-mix(in oklab,var(--prim) 6%,var(--surface)) 0 6px,var(--surface) 6px 12px);border:1px solid var(--line);border-radius:16px;transform:{{ hc.t3 }};box-shadow:0 1px 2px rgba(16,34,45,.08);transition:transform .55s cubic-bezier(.34,1.56,.64,1) .03s"></div>

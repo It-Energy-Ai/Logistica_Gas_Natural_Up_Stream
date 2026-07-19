@@ -12,7 +12,9 @@
  *      stato senza ri-renderizzare (il runtime ri-renderizza tutto, e un
  *      re-render per ogni tasto farebbe perdere il focus);
  *   5. i valori inseriti dall'utente sono troncati ai limiti dei validatori
- *      del backend (cap), per non far respingere la patch di sync.
+ *      del backend (cap), per non far respingere la patch di sync;
+ *   6. l'effetto hover del "mazzo" nel hub è CSS puro (:hover generato da
+ *      build_frontend.py) invece di deckHover+setState.
  * Le props del canvas (tema, colori) sono fissate ai default del design.
  */
 (function () {
@@ -219,17 +221,18 @@
         { punto: "ReMi 34521301 · Milano Ovest", tipo: "Riconsegna", contratto: "DI-2026-021", nom: "1.480", alloc: "1.480", delta: "0,0%", dFg: "var(--ink2)", stato: "Confermata", sBg: OK.bg, sFg: OK.fg },
         { punto: "Stogit · Erogazione", tipo: "Stoccaggio", contratto: "ST-2026-007", nom: "650", alloc: "—", delta: "—", dFg: "var(--ink3)", stato: "In verifica", sBg: WARN.bg, sFg: WARN.fg },
       ];
-      const dh = this.state.deckHover;
-      const mkHub = (key, code, title, sub, target) => {
-        const on = dh === key;
-        return { code, title, sub, go: go(target),
-          enter: () => this.setState({ deckHover: key }), leave: () => this.setState({ deckHover: null }),
-          t1: on ? "rotate(-13deg) translate(-36px,10px)" : "rotate(-7deg) translate(-12px,2px)",
-          t2: on ? "rotate(9deg) translate(32px,0px)" : "rotate(4deg) translate(10px,-2px)",
-          t3: on ? "translateY(16px) rotate(-3deg)" : "translateY(7px) rotate(-1deg)",
-          top: on ? "translateY(-14px) scale(1.03) rotate(.5deg)" : "none",
-          shadow: on ? "0 26px 52px color-mix(in oklab,var(--prim) 28%,transparent)" : "var(--shadow)" };
-      };
+      // Deviazione 6: l'effetto hover del mazzo è in CSS (:hover generato dal
+      // builder), non in deckHover+setState come nel design: un re-render a
+      // ogni hover spezzerebbe le transizioni. Qui restano i valori a riposo.
+      const mkHub = (key, code, title, sub, target) => ({
+        code, title, sub, go: go(target),
+        enter: () => {}, leave: () => {},
+        t1: "rotate(-7deg) translate(-12px,2px)",
+        t2: "rotate(4deg) translate(10px,-2px)",
+        t3: "translateY(7px) rotate(-1deg)",
+        top: "none",
+        shadow: "var(--shadow)",
+      });
       const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine · Bilanciamento · Stoccaggio", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
       const cfgCards = [
         { title: "Sistema", desc: "Stato dei servizi collegati, ambiente e attività recenti.", stat: "3", statLabel: "servizi collegati", go: go("cfgSis") },

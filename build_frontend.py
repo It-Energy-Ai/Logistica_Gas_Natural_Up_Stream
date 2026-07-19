@@ -61,6 +61,24 @@ def main() -> None:
             # design cambia e l'anchor non è più univoco, meglio fermarsi.
             sys.exit(f"anchor login non univoco ({occorrenze} occorrenze): {vecchio[:60]}")
         template = template.replace(vecchio, nuovo)
+
+    # Deviazione documentata (vedi logic.js, deviazione 6): l'effetto "mazzo"
+    # delle carte del hub passa da onMouseEnter/Leave (che nel runtime
+    # causerebbe un re-render totale a ogni hover, perdendo le transizioni)
+    # a puro CSS :hover, che riproduce l'animazione fluida del design.
+    hub_anchor = '<div onMouseEnter="{{ hc.enter }}" onMouseLeave="{{ hc.leave }}" style="position:relative;width:252px;height:352px;cursor:pointer">'
+    if template.count(hub_anchor) != 1:
+        sys.exit("anchor carta hub non trovato: il design è cambiato, aggiorna build_frontend.py")
+    template = template.replace(
+        hub_anchor,
+        '<div class="hub-card" style="position:relative;width:252px;height:352px;cursor:pointer">',
+    )
+    hub_css = """
+.hub-card:hover>div:nth-child(1){transform:rotate(-13deg) translate(-36px,10px) !important}
+.hub-card:hover>div:nth-child(2){transform:rotate(9deg) translate(32px,0px) !important}
+.hub-card:hover>div:nth-child(3){transform:translateY(16px) rotate(-3deg) !important}
+.hub-card:hover>div:nth-child(4){transform:translateY(-14px) scale(1.03) rotate(.5deg) !important;box-shadow:0 26px 52px color-mix(in oklab,var(--prim) 28%,transparent) !important}
+"""
     pseudo_css = "\n".join(
         f'[data-{"vh" if kind == "hover" else "vf"}="{idx}"]:{kind}{{{css}}}'
         for (kind, css), idx in rules.items()
@@ -81,6 +99,7 @@ def main() -> None:
 <style>
 {base_css}
 {pseudo_css}
+{hub_css}
 </style>
 </head>
 <body>

@@ -1,57 +1,89 @@
-# Vettore — portale logistica gas
+<div align="center">
 
-Webapp del portale operativo **Vettore** per shipper e trader gas sul mercato italiano, costruita a partire dal design realizzato su Claude Design ("Interfaccia webapp da creare" → *Vettore Portale Gas*). Il markup del design è preservato al carattere: quello che vedi è esattamente ciò che è stato disegnato, ma funzionante.
+# Vettore — Portale Logistica Gas
 
-## Schermate
+**Il portale operativo per shipper e trader di gas naturale sul mercato italiano.**
+Nomine, bilanciamento, capacità, stoccaggio e reportistica regolatoria — in un'unica piattaforma.
 
-- **Login** con email/password e flusso SSO aziendale simulato (scelta account, redirect)
-- **Hub moduli** → **Logistica Gas** e **Configurazione**
-- **Dashboard**: KPI del giorno gas (navigabile ±7 giorni), nominato vs allocato (14 giorni), cicli di nomina, nomine per punto
-- **Nomine & Programmazione**: invio nomine per punto/ciclo e storico giornaliero
-- **Bilanciamento**: disequilibrio DS immissioni−prelievi, sbilanciamento 14 giorni, azioni correttive
-- **Capacità & Contratti**, **Stoccaggio** (giacenza, fattori di adeguamento, movimenti), **Report & Analisi** (filtri per categoria, invii programmati)
-- **Configuratore**: anagrafica shipper, parametri di nomina, punti di consegna, notifiche, credenziali API GME, utenti con wizard a 3 passi, log attività
-- Tema chiaro/scuro persistente
+*A demo web portal for natural-gas shippers on the Italian market: nominations, balancing, capacity, storage and regulatory reporting.*
 
-## Cosa è reale e cosa è demo
+[![CI](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml/badge.svg)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml)
+[![Licenza MIT](https://img.shields.io/badge/licenza-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](app/main.py)
+[![Frontend vanilla](https://img.shields.io/badge/frontend-vanilla%20JS-F7DF1E?logo=javascript&logoColor=black)](app/static/runtime.js)
 
-**Reale**: navigazione, tutte le interazioni, invio nomine, configurazione, gestione utenti/punti, sessione con cookie e **persistenza su SQLite** (nomine, configurazione, utenti sopravvivono al riavvio).
+<img src="docs/screenshots/dashboard.png" alt="Dashboard — posizione shipper del giorno gas" width="900">
 
-**Demo**: i dati di mercato (KPI, allocazioni, prezzi PSV, giacenze) sono scenografia ancorata al giorno gas 17/07/2026; login e SSO accettano qualunque credenziale; le integrazioni Snam/GME/SSO non chiamano i sistemi veri. Sono i punti da sostituire per andare in produzione.
+</div>
+
+---
+
+## Le schermate
+
+| | |
+|:---:|:---:|
+| <img src="docs/screenshots/login.png" alt="Login con SSO aziendale"><br>**Login** · email/password o SSO aziendale con scelta account | <img src="docs/screenshots/hub.png" alt="Hub moduli"><br>**Hub** · moduli come carte da gioco, con effetto mazzo all'hover |
+| <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · invio per punto/ciclo, storico del giorno gas | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
+| <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · sei aree di lavoro | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi, credenziali GME |
+
+E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+
+## Da un design Claude Design a un'app funzionante
+
+Questo progetto nasce da un design realizzato su [Claude Design](https://claude.ai/design) e lo trasforma in una webapp reale **senza riscriverne l'interfaccia**: il markup del canvas è preservato al carattere.
+
+```mermaid
+flowchart LR
+    D["design/design.html<br>(canvas Claude Design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
+    T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
+    L["logic.js<br>porting della classe Component"] --> R
+    R --> UI["12 schermate"]
+    L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
+    B --> DB[("SQLite")]
+```
+
+- **`design/design.html`** — la fonte di verità: il file scaricato dal progetto Claude Design.
+- **`build_frontend.py`** — genera il frontend: converte gli pseudo-stili (`style-hover`/`style-focus`) in CSS e applica le poche deviazioni documentate (campi login controllati, effetto hover del hub in CSS puro).
+- **`runtime.js`** (~150 righe, zero dipendenze) — interpreta il template a runtime: condizioni, cicli, interpolazioni, eventi.
+- **`logic.js`** — porting quasi letterale della logica del canvas, con 6 deviazioni documentate in testa al file (API reali, persistenza, robustezza della sync).
+
+Per modificare l'interfaccia: si modifica il design su Claude Design, si riscarica il file, si rilancia `python3 build_frontend.py`. La CI verifica che il frontend generato resti allineato al design.
 
 ## Avvio
 
 ```bash
-docker compose up -d --build     # → http://localhost:8080
+docker compose up -d --build      # → http://localhost:8080
 ```
 
-Oppure senza Docker:
+Senza Docker:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --port 8080
 ```
 
-I font IBM Plex arrivano da Google Fonts: senza rete si degrada ai font di sistema.
+## Cosa è reale e cosa è demo
 
-## Architettura
+| Reale | Demo |
+|---|---|
+| Navigazione, tutte le interazioni, wizard, tema chiaro/scuro | Dati di mercato (KPI, prezzi PSV, giacenze) ancorati al giorno gas 17/07/2026 |
+| Sessioni con cookie, login/logout | Login e SSO accettano qualunque credenziale |
+| **Persistenza SQLite** di nomine, configurazione, punti e utenti (sopravvivono al riavvio) | Integrazioni Snam / GME / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
+| Sync client→server con retry, gestione sessione scaduta, validazione a whitelist | |
 
-```
-design/design.html      # il design originale scaricato da Claude Design (fonte di verità)
-build_frontend.py       # genera app/static/index.html dal design (pseudo-stili → CSS)
-app/static/runtime.js   # mini-runtime: interpreta sc-if / sc-for / {{var}} e collega gli eventi
-app/static/logic.js     # porting della logica del design (stato, azioni, dati demo) + sync API
-app/main.py             # FastAPI: sessioni, GET/PUT /api/state con whitelist e validazione
-app/db.py               # SQLite (sessioni + stato)
-tests/                  # pytest (API) + node --test (logica frontend)
-```
+La colonna "demo" è la mappa esatta di cosa sostituire per andare in produzione.
 
-Il frontend è un porting fedele: `logic.js` riproduce la classe `Component` del design con quattro deviazioni documentate nel file (login reale, tema persistito, sync col backend, setter "silenziosi" per gli input). Per modificare l'interfaccia si modifica il design su Claude Design, si riscarica `design/design.html` e si rilancia `build_frontend.py`.
-
-## Test
+## Test e qualità
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest              # API: login, validazione stato, persistenza
-node tests/logic.test.cjs     # logica frontend: navigazione, nomine, wizard, punti, report
+.venv/bin/pytest              # 8 test API: sessioni, validazione, persistenza
+node tests/logic.test.cjs     # 18 test logica: navigazione, nomine, wizard, sync
 ```
+
+Il codice è passato da una revisione multi-agente (4 lenti indipendenti + verifica avversariale di ogni segnalazione): tutti i difetti confermati sono stati corretti e coperti da regressione — inclusa la sincronizzazione col backend, che ora accoda e ritenta invece di perdere modifiche su errori di rete o sessione scaduta.
+
+## Licenza
+
+[MIT](LICENSE) · © 2026 It-Energy-Ai
