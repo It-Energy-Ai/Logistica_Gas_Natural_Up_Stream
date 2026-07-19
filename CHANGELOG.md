@@ -2,6 +2,11 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.1.1] — 2026-07-19
+
+### Corretto
+- Due dati demo che trapelavano in modalità pulita: il "Totale nominato" della dashboard e i numeri sulle card delle aree di lavoro. Verifica automatica anti-fuga su tutte le schermate (browser headless + marcatori della scenografia).
+
 ## [1.1.0] — 2026-07-19
 
 ### Cambiato
@@ -31,6 +36,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.1.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.1
 [1.1.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.0
 [1.0.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.0.1
 [1.0.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.0.0

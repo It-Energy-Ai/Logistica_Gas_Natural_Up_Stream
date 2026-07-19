@@ -36,6 +36,7 @@ test("avvio pulito: niente scenografia, data reale, banner attivo", () => {
   assert.equal(v.dashDate, atteso);
   assert.equal(v.capChip, "0 contratti");
   assert.ok(v.servizi.every((sv) => sv.stato === "Da collegare"));
+  assert.equal(v.dashTotNom, "0"); // regressione: il totale demo non deve trapelare
 });
 
 test("modalità demo: l'interruttore popola la scenografia del canvas", () => {

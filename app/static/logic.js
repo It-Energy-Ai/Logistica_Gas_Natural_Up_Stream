@@ -206,6 +206,7 @@
         { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
       ];
+      if (!demoOn) for (const m of moduli) m.stat = "—"; // i numeri delle card sono scenografia
       const off = this.state.dashOff;
       const fmtN = (n) => n.toLocaleString("it-IT");
       const dNom = 12480 + off * 260;
@@ -440,7 +441,7 @@
         ssoRedirect: this.state.sso === "redirect", ssoPickStep: this.state.sso === "pick", ssoAuth: this.state.sso === "auth", ssoOpen: !!this.state.sso,
         toggleTheme: () => { const t = theme === "dark" ? "light" : "dark"; store.setItem("vt-theme", t); this.setState({ theme: t }); },
         crumbs, moduli, kpis, days, cicli, rows, punti, notifiche, unitOpts, cicloOpts, cfgCards, servizi, sysInfo, logs,
-        dashDate, dashTotNom: fmtN(dNom), dashCicloTxt: dashCiclo.txt, dashCicloBg: dashCiclo.bg, dashCicloFg: dashCiclo.fg,
+        dashDate, dashTotNom: demoOn ? fmtN(dNom) : "0", dashCicloTxt: dashCiclo.txt, dashCicloBg: dashCiclo.bg, dashCicloFg: dashCiclo.fg,
         dashPrev: () => this.setState((st) => ({ dashOff: Math.max(st.dashOff - 1, -7) })),
         dashNext: () => this.setState((st) => ({ dashOff: Math.min(st.dashOff + 1, 7) })),
         dashNotToday: off !== 0, dashToday: () => this.setState({ dashOff: 0 }),
