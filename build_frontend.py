@@ -161,7 +161,10 @@ def main() -> None:
         '<span style="font-size:12px;font-weight:600;color:var(--acc);background:color-mix(in oklab,var(--acc) 12%,transparent);padding:8px 12px;border-radius:8px">Fase di Iniezione · 01/04 → 31/10</span>',
         "chip fase iniezione",
     )
-    avvolgi_demo(">Ultimo agg. 06:31</span>", "chip report")
+    avvolgi_demo(
+        '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Ultimo agg. 06:31</span>',
+        "chip report",
+    )
     sostituisci(">5 contratti</span>", ">{{ capChip }}</span>", "chip capacità")
 
     inizio_ds = '<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">\n    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">\n      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Disequilibrio (DS)'

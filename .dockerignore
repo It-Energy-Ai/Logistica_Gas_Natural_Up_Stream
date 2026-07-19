@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.pytest_cache/
+node_modules/
+build/
+dist/
+.git/
+docs/
+tests/
+design/
+*.spec
+launcher.py

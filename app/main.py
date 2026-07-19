@@ -111,9 +111,11 @@ async def login(request: Request, response: Response):
         body = await request.json()
     except Exception:
         body = {}
-    email = str(body.get("email") or "m.rossi@azienda1.it").strip()[:120]
+    # Su email assente o malformata si ripiega su un'identità NEUTRA, mai su
+    # quella di scena (Marco Rossi), che contaminerebbe la modalità pulita.
+    email = str(body.get("email") or "").strip()[:120]
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        email = "m.rossi@azienda1.it"
+        email = "utente@locale"
     token = secrets.token_urlsafe(32)
     with db.connect() as conn:
         db.crea_sessione(conn, token, email)

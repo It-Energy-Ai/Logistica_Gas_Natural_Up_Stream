@@ -95,6 +95,16 @@
           if (typeof fn === "function") {
             const ev = name === "onchange" ? changeEventFor(el) : EVENT_ATTRS[name];
             el.addEventListener(ev, fn);
+            // Accessibilità da tastiera: gli elementi cliccabili non nativi
+            // (div/span con onClick) diventano focalizzabili con Tab e
+            // attivabili con Invio/Spazio, come i <button>.
+            if (name === "onclick" && el.tagName !== "BUTTON" && el.tagName !== "A") {
+              if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+              if (!el.hasAttribute("role")) el.setAttribute("role", "button");
+              el.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(e); }
+              });
+            }
           }
           continue;
         }

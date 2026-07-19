@@ -66,7 +66,7 @@ def test_validazione_chiavi_e_forme(client):
     # una chiave invalida respinge l'intera patch
     r = client.put("/api/state", json={"gmeOk": True, "altro": 1})
     assert r.status_code == 422
-    assert client.get("/api/state").json() == {"email": "m.rossi@azienda1.it"}
+    assert client.get("/api/state").json() == {"email": "utente@locale"}
     # modalità demo persistibile
     assert client.put("/api/state", json={"demoMode": True}).status_code == 200
     # cap sul numero di chiavi delle mappe (DoS)
@@ -77,9 +77,29 @@ def test_validazione_chiavi_e_forme(client):
     assert client.put("/api/state", json={"extraPunti": [["a", "b", "c", "d"]]}).status_code == 422
 
 
-def test_email_non_valida_ripiega_su_demo(client):
+def test_email_non_valida_ripiega_su_identita_neutra(client):
+    # mai l'identità di scena (Marco Rossi), che contaminerebbe la modalità pulita
     r = client.post("/api/login", json={"email": "<script>alert(1)</script>"})
-    assert r.json()["email"] == "m.rossi@azienda1.it"
+    assert r.json()["email"] == "utente@locale"
+    r = client.post("/api/login", json={})
+    assert r.json()["email"] == "utente@locale"
+
+
+def test_scadenza_e_pulizia_sessioni(tmp_path, monkeypatch):
+    monkeypatch.setenv("VETTORE_DB", str(tmp_path / "s.db"))
+    from app import db
+
+    db.init_db()
+    with db.connect() as conn:
+        # una sessione più vecchia della finestra di 30 giorni non è valida...
+        conn.execute(
+            "INSERT INTO sessioni (token, email, creata_il) VALUES ('vecchio', 'a@b.it', datetime('now','-31 days'))"
+        )
+        assert db.email_sessione(conn, "vecchio") is None
+        # ...e una nuova sessione la elimina (pulizia) mentre resta valida
+        db.crea_sessione(conn, "nuovo", "a@b.it")
+        assert db.email_sessione(conn, "nuovo") == "a@b.it"
+        assert conn.execute("SELECT COUNT(*) FROM sessioni WHERE token='vecchio'").fetchone()[0] == 0
 
 
 def test_logout(client):

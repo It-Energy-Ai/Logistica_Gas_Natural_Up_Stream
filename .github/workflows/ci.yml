@@ -33,7 +33,9 @@ jobs:
           node-version: "22"
 
       - name: Test logica frontend (node)
-        run: node tests/logic.test.cjs
+        run: |
+          node tests/logic.test.cjs
+          node tests/runtime.test.cjs
 
       - name: Il frontend generato è allineato al design
         run: |

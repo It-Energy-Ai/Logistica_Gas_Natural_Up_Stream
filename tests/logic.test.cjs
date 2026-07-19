@@ -255,12 +255,40 @@ test("login: campi controllati e Invio", () => {
   assert.equal(app.state.loginPass, ""); // password azzerata dopo l'accesso
 });
 
-test("sync: su errore di rete la patch resta in coda e si ritenta", async () => {
+test("sync: su errore di rete la patch resta in coda E riprogramma un retry", async () => {
   const app = new App();
+  app.state.gmeOk = true;
   global.fetch = async () => { throw new Error("rete giù"); };
   app._pending = { gmeOk: true };
+  const timerPrima = app._syncTimer;
   await app._flush();
   assert.deepEqual(app._pending, { gmeOk: true }); // ri-accodata
+  assert.notEqual(app._syncTimer, timerPrima); // un NUOVO retry è stato programmato
+  clearTimeout(app._syncTimer);
+  global.fetch = FETCH_OK;
+});
+
+test("sync: su 5xx la patch resta in coda e si ritenta (non scartata come il 422)", async () => {
+  const app = new App();
+  app.state.gmeOk = true;
+  global.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
+  app._pending = { gmeOk: true };
+  const timerPrima = app._syncTimer;
+  await app._flush();
+  assert.deepEqual(app._pending, { gmeOk: true });
+  assert.notEqual(app._syncTimer, timerPrima);
+  clearTimeout(app._syncTimer);
+  global.fetch = FETCH_OK;
+});
+
+test("sync: il retry non riporta indietro un valore già superato", async () => {
+  const app = new App();
+  app.state.gmeOk = false; // valore CORRENTE
+  global.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
+  app._pending = { gmeOk: true }; // snapshot vecchio in volo
+  await app._flush();
+  // _riaccoda deve ripartire dallo stato corrente, non dallo snapshot inviato
+  assert.equal(app._pending.gmeOk, false);
   clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
 });
@@ -268,6 +296,7 @@ test("sync: su errore di rete la patch resta in coda e si ritenta", async () => 
 test("sync: 401 sospende (niente loop), il login riprende e svuota la coda", async () => {
   const app = new App();
   app.setState({ screen: "nomine" });
+  app.state.gmeOk = true; // valore corrente che _riaccoda deve conservare
   global.fetch = async () => ({ ok: false, status: 401, text: async () => "" });
   app._pending = { gmeOk: true };
   const timerPrima = app._syncTimer;
@@ -297,6 +326,41 @@ test("sync: 422 scarta la patch senza ritentare", async () => {
   await app._flush();
   assert.deepEqual(app._pending, {});
   global.fetch = FETCH_OK;
+});
+
+test("boot: idratazione dallo stato salvato separa email e salta il login", () => {
+  const app = new App();
+  app.idrata({
+    email: "operazioni@gasadriatica.it",
+    nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Inviata" }],
+    demoMode: true,
+  });
+  assert.equal(app.state.screen, "hub"); // sessione presente → niente login
+  assert.equal(app.state.utenteEmail, "operazioni@gasadriatica.it");
+  assert.equal(app.state.nomList.length, 1);
+  assert.equal(app.state.demoMode, true);
+  assert.equal("email" in app.state, false); // 'email' non finisce nello stato
+  const v = app.renderVals();
+  assert.equal(v.utenteAzienda, "Gasadriatica");
+  assert.equal(v.demoOn, true);
+});
+
+test("boot: senza sessione (payload nullo) resta al login", () => {
+  const app = new App();
+  app.idrata(null);
+  assert.equal(app.state.screen, "login");
+});
+
+test("demo: i permessi di scena di Bianchi e Verdi sono sola lettura", () => {
+  const app = new App();
+  app.setState({ screen: "cfgSis", demoMode: true });
+  const u = app.renderVals().utenti;
+  const bianchi = u.find((x) => x.name === "Laura Bianchi");
+  const verdi = u.find((x) => x.name === "Giulio Verdi");
+  // opts[0] = Solo lettura, opts[1] = Lettura e scrittura; il "cur" evidenzia il default
+  assert.equal(bianchi.opts[0].bg, "var(--surface)"); // sola lettura attiva
+  assert.equal(bianchi.opts[1].bg, "transparent");
+  assert.equal(verdi.opts[0].bg, "var(--surface)");
 });
 
 test("limiti: nomina e punto troncati ai cap del backend", () => {

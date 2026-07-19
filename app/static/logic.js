@@ -97,7 +97,7 @@
           // sospende la sync (niente loop di retry contro un 401 permanente):
           // login() la riattiva e svuota la coda conservata
           this._sospesa = true;
-          this._pending = { ...patch, ...this._pending };
+          this._riaccoda(patch);
           console.warn("sessione scaduta: torno al login, modifiche in coda");
           this.setState({ screen: "login" });
           return;
@@ -106,27 +106,53 @@
           console.error("sync respinta dal server (dati non validi), patch scartata:", await r.text());
           return;
         }
-        this._pending = { ...patch, ...this._pending };
+        this._riaccoda(patch);
         this._scheduleSync(3000);
       } catch (e) {
-        this._pending = { ...patch, ...this._pending };
+        this._riaccoda(patch);
         console.warn("sync fallita (rete), ritento tra 3s", e);
         this._scheduleSync(3000);
       }
     }
 
+    // Rimette in coda le chiavi di un flush fallito SENZA sovrascrivere valori
+    // più recenti: se una scrittura successiva ha già ri-accodato la chiave,
+    // vince quella; altrimenti si riparte dallo stato corrente (non dallo
+    // snapshot inviato, che potrebbe essere già superato).
+    _riaccoda(patch) {
+      for (const k of Object.keys(patch)) {
+        if (!(k in this._pending)) this._pending[k] = this.state[k];
+      }
+    }
+
+    // Ritorna l'email COME NORMALIZZATA DAL SERVER (fonte di verità): è quella
+    // che il boot rileggerà da /api/state, quindi l'identità mostrata resta
+    // coerente dopo un refresh anche se l'input era vuoto o malformato.
     async login(email) {
       try {
-        await fetch("/api/login", {
+        const r = await fetch("/api/login", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
         this._sospesa = false;
         this._scheduleSync(); // svuota la coda accumulata durante la sessione scaduta
-      } catch (e) { console.warn("login API non raggiungibile", e); }
+        const dati = await r.json().catch(() => ({}));
+        return dati.email || email;
+      } catch (e) {
+        console.warn("login API non raggiungibile", e);
+        return email;
+      }
     }
 
     go(s) { return () => this.setState({ screen: s }); }
+
+    // Idrata lo stato dal payload di /api/state: separa l'identità (email)
+    // dallo stato persistito e, se c'è una sessione, salta il login.
+    idrata(saved) {
+      if (!saved) return;
+      const { email, ...stato } = saved;
+      this.state = { ...this.state, ...stato, utenteEmail: email || "", screen: "hub" };
+    }
 
     // Identità mostrata nell'interfaccia, derivata dall'email di login.
     _identita() {
@@ -287,7 +313,10 @@
         { time: "09:58", who: "L. Bianchi", txt: "Modificata tolleranza di sbilanciamento" },
         { time: "06:02", who: "Sistema", txt: "Apertura giorno gas 17/07/2026" },
       ];
-      const permOpt = (uk, val, label) => { const cur = this.state.users[uk] ?? "up"; return { label, go: () => this.setState((st) => ({ users: { ...st.users, [uk]: val } })), bg: cur === val ? "var(--surface)" : "transparent", fg: cur === val ? "var(--ink)" : "var(--ink2)", sh: cur === val ? "0 1px 2px rgba(16,34,45,.12)" : "none" }; };
+      // Permessi di default degli utenti demo (nel canvas Bianchi/Verdi sono
+      // in sola lettura); l'utente reale ('me') resta in lettura/scrittura.
+      const DEMO_PERM = { mricci: "up", lbianchi: "ro", gverdi: "ro" };
+      const permOpt = (uk, val, label) => { const cur = this.state.users[uk] ?? DEMO_PERM[uk] ?? "up"; return { label, go: () => this.setState((st) => ({ users: { ...st.users, [uk]: val } })), bg: cur === val ? "var(--surface)" : "transparent", fg: cur === val ? "var(--ink)" : "var(--ink2)", sh: cur === val ? "0 1px 2px rgba(16,34,45,.12)" : "none" }; };
       const baseU = demoOn
         ? [["mricci", "MR", "Marco Rossi", "m.rossi@azienda1.it"], ["lbianchi", "LB", "Laura Bianchi", "l.bianchi@azienda1.it"], ["gverdi", "GV", "Giulio Verdi", "g.verdi@azienda1.it"]]
         : [["me", ident.iniziali, ident.nome, this.state.utenteEmail || ""]];
@@ -416,8 +445,10 @@
       const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli" };
 
       const doLogin = () => {
-        const email = (this.state.loginEmail || "").trim() || "m.rossi@azienda1.it";
-        this.login(email);
+        const email = (this.state.loginEmail || "").trim();
+        // l'identità mostrata è quella normalizzata dal server (fonte di verità),
+        // così un refresh la ripesca identica da /api/state
+        this.login(email).then((confermata) => this.setState({ utenteEmail: confermata }));
         this.setState({ screen: "hub", loginPass: "", utenteEmail: email });
       };
       const logout = () => {
@@ -485,10 +516,7 @@
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
       .then((saved) => {
-        if (saved) {
-          const { email, ...stato } = saved;
-          app.state = { ...app.state, ...stato, utenteEmail: email || "", screen: "hub" };
-        }
+        app.idrata(saved);
         VT.mount(document.getElementById("app"), document.getElementById("app-template"), app);
       });
   }

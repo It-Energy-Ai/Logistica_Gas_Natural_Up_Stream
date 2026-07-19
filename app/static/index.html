@@ -869,7 +869,7 @@ input::placeholder{color:var(--ink3)}
       <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Report & Analisi</h1>
       <p style="margin:0;font-size:13.5px;color:var(--ink2)">Estrazioni, analisi e reportistica regolatoria</p>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px"<sc-if value="{{ demoOn }}">>Ultimo agg. 06:31</span></sc-if>
+    <sc-if value="{{ demoOn }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Ultimo agg. 06:31</span></sc-if>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
     <sc-for list="{{ repKpis }}" as="k" hint-placeholder-count="3">
