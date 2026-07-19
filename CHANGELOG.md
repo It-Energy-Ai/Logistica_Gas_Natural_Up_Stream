@@ -2,6 +2,15 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.0.1] — 2026-07-19
+
+### Aggiunto
+- Favicon con il logo Vettore; tour animato delle schermate nel README.
+- CHANGELOG, security policy, template per issue e pull request, Dependabot.
+
+### Aggiornato
+- Dipendenze (FastAPI 0.139, uvicorn 0.51, pytest 9, httpx 0.28) e azioni CI, dalle prime PR di Dependabot — test completi rieseguiti.
+
 ## [1.0.0] — 2026-07-19
 
 Prima release pubblica.
@@ -16,4 +25,5 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.0.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.0.1
 [1.0.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.0.0
