@@ -7,7 +7,11 @@ Nomine, bilanciamento, capacità, stoccaggio e reportistica regolatoria — in u
 
 *A demo web portal for natural-gas shippers on the Italian market: nominations, balancing, capacity, storage and regulatory reporting.*
 
+Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energy-Ai
+
 [![CI](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml/badge.svg)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream?label=release&color=0E5A75)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest)
+[![Autore](https://img.shields.io/badge/autore-Davide%20Bellini-2FA37C)](https://github.com/It-Energy-Ai)
 [![Licenza MIT](https://img.shields.io/badge/licenza-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](app/main.py)
@@ -96,6 +100,11 @@ node tests/logic.test.cjs     # 18 test logica: navigazione, nomine, wizard, syn
 
 Il codice è passato da una revisione multi-agente (4 lenti indipendenti + verifica avversariale di ogni segnalazione): tutti i difetti confermati sono stati corretti e coperti da regressione — inclusa la sincronizzazione col backend, che ora accoda e ritenta invece di perdere modifiche su errori di rete o sessione scaduta.
 
+## Autore
+
+**Davide Bellini** — ideazione, design dell'interfaccia e direzione del progetto.
+Su GitHub: [It-Energy-Ai](https://github.com/It-Energy-Ai).
+
 ## Licenza
 
-[MIT](LICENSE) · © 2026 It-Energy-Ai
+[MIT](LICENSE) · © 2026 Davide Bellini — It-Energy-Ai
