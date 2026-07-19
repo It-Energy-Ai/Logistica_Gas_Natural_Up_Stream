@@ -50,17 +50,29 @@ flowchart LR
 
 Per modificare l'interfaccia: si aggiorna design/design.html e si rilancia `python3 build_frontend.py`. La CI verifica che il frontend generato resti allineato al design.
 
-## Avvio
+## Avvio — scegli la strada che preferisci
+
+**Docker non è un requisito**: è solo una delle tre opzioni.
+
+### 1 · Eseguibile pronto (niente da installare)
+
+Scarica dalla pagina [**Releases**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases) il file per il tuo sistema — Windows, macOS (Intel o Apple Silicon) o Linux — e fai doppio click: il browser si apre da solo su <http://localhost:8080>. Nessun Docker, nessun Python, nessun terminale. I dati restano in `~/.vettore/vettore.db`.
+
+> macOS al primo avvio: tasto destro → *Apri* (il binario non è firmato). Windows: se SmartScreen avvisa, *Ulteriori informazioni → Esegui comunque*.
+
+### 2 · Script di avvio (serve solo Python 3.11+)
+
+```bash
+./avvio.sh        # macOS / Linux
+avvio.bat         # Windows (doppio click)
+```
+
+Al primo avvio crea da solo l'ambiente e installa le dipendenze, poi apre il browser.
+
+### 3 · Docker (per chi lo usa già)
 
 ```bash
 docker compose up -d --build      # → http://localhost:8080
-```
-
-Senza Docker:
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --port 8080
 ```
 
 ## Cosa è reale e cosa è demo

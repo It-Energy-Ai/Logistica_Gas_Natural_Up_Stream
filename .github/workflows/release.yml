@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            nome: Vettore-windows.exe
+            prodotto: dist/Vettore.exe
+          - os: macos-latest
+            nome: Vettore-macos-apple-silicon
+            prodotto: dist/Vettore
+          - os: macos-13
+            nome: Vettore-macos-intel
+            prodotto: dist/Vettore
+          - os: ubuntu-latest
+            nome: Vettore-linux
+            prodotto: dist/Vettore
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compila l'eseguibile
+        run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller Vettore.spec
+
+      - name: Smoke test (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          VETTORE_NO_BROWSER=1 VETTORE_DB=/tmp/smoke.db ./dist/Vettore &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/ | grep -q "data-screen-label"
+          curl -sf -o /dev/null http://127.0.0.1:8080/static/logic.js
+          kill %1
+
+      - name: Smoke test (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:VETTORE_NO_BROWSER = "1"
+          $env:VETTORE_DB = "$env:TEMP\smoke.db"
+          $p = Start-Process -FilePath "dist\Vettore.exe" -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing -TimeoutSec 2
+              if ($r.Content -match "data-screen-label") { $ok = $true; break }
+            } catch { Start-Sleep -Seconds 1 }
+          }
+          Stop-Process -Id $p.Id -Force
+          if (-not $ok) { exit 1 }
+
+      - name: Rinomina il prodotto
+        shell: bash
+        run: mv "${{ matrix.prodotto }}" "${{ matrix.nome }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.nome }}
+          path: ${{ matrix.nome }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Vettore-windows.exe
+            Vettore-macos-apple-silicon
+            Vettore-macos-intel
+            Vettore-linux
+          body: |
+            **Vettore senza installare nulla**: scarica il file per il tuo sistema, doppio click, e il browser si apre su http://localhost:8080.
+
+            - **Windows** → `Vettore-windows.exe` (se SmartScreen avvisa: *Ulteriori informazioni → Esegui comunque*)
+            - **macOS** (M1/M2/M3/M4) → `Vettore-macos-apple-silicon` · (Intel) → `Vettore-macos-intel` — al primo avvio: tasto destro → *Apri* (binario non firmato); se scaricato dal browser può servire `xattr -d com.apple.quarantine <file>`
+            - **Linux** → `Vettore-linux` (poi `chmod +x Vettore-linux`)
+
+            I dati restano in `~/.vettore/vettore.db`. Niente Docker, niente Python: tutto incluso.
