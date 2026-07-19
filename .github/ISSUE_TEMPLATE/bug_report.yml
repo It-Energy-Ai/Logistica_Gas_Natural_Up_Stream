@@ -1,0 +1,37 @@
+name: Segnalazione bug
+description: Qualcosa non funziona come dovrebbe
+labels: [bug]
+body:
+  - type: textarea
+    id: descrizione
+    attributes:
+      label: Cosa succede
+      description: Descrivi il problema e cosa ti aspettavi al suo posto.
+    validations:
+      required: true
+  - type: textarea
+    id: passi
+    attributes:
+      label: Come riprodurlo
+      placeholder: |
+        1. Apri la schermata …
+        2. Clicca su …
+        3. Osserva che …
+    validations:
+      required: true
+  - type: dropdown
+    id: avvio
+    attributes:
+      label: Come hai avviato Vettore
+      options:
+        - Eseguibile dalla pagina Releases
+        - avvio.sh / avvio.bat
+        - Docker
+        - uvicorn manualmente
+    validations:
+      required: true
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema operativo e browser
+      placeholder: es. Windows 11 · Edge / macOS 15 · Safari

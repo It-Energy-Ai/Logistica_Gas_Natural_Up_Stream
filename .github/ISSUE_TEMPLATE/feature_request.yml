@@ -1,0 +1,29 @@
+name: Proposta di funzionalità
+description: Un'idea per migliorare Vettore
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Quale esigenza risolve
+      description: Il contesto operativo (es. "come shipper vorrei… per…").
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Come la immagini
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Nomine & Programmazione
+        - Bilanciamento
+        - Capacità / Stoccaggio
+        - Report
+        - Configuratore / Utenti
+        - Integrazioni (Snam, GME, SSO)
+        - Altro

@@ -25,6 +25,10 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 
 ## Le schermate
 
+<div align="center">
+<img src="docs/screenshots/tour.gif" alt="Tour animato delle schermate di Vettore" width="820">
+</div>
+
 | | |
 |:---:|:---:|
 | <img src="docs/screenshots/login.png" alt="Login con SSO aziendale"><br>**Login** · email/password o SSO aziendale con scelta account | <img src="docs/screenshots/hub.png" alt="Hub moduli"><br>**Hub** · moduli come carte da gioco, con effetto mazzo all'hover |
@@ -107,4 +111,4 @@ Su GitHub: [It-Energy-Ai](https://github.com/It-Energy-Ai).
 
 ## Licenza
 
-[MIT](LICENSE) · © 2026 Davide Bellini — It-Energy-Ai
+[MIT](LICENSE) · © 2026 Davide Bellini — It-Energy-Ai · Le versioni sono documentate nel [CHANGELOG](CHANGELOG.md).
