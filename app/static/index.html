@@ -960,7 +960,7 @@ input::placeholder{color:var(--ink3)}
         </label>
       </div>
       <button onClick="{{ addRem }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Registra segnalazione</button>
-      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">Standard: invio tramite RRM entro il giorno lavorativo successivo. Non-standard: entro un mese.</span>
+      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">Standard: invio tramite RRM entro due giorni lavorativi (T+2). Non-standard: entro dieci (T+10).</span>
       <div style="height:1px;background:var(--line)"></div>
       <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Il tuo codice ACER
         <input type="text" value="{{ remAcerVal }}" onChange="{{ setRemAcer }}" placeholder="Es. A0045821W.IT" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
@@ -984,18 +984,22 @@ input::placeholder{color:var(--ink3)}
     </div>
   </div>
   <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
-    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Scadenze e riferimenti</h3><span style="font-size:12px;color:var(--ink3)">Reg. UE 1227/2011 (REMIT) · Reg. UE 2024/1106 (REMIT II)</span></div>
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Scadenze e riferimenti</h3><span style="font-size:12px;color:var(--ink3)">Reg. UE 1227/2011 (REMIT) · Reg. UE 2024/1106 (REMIT II) · recast Implementing Regulation 2026</span></div>
     <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+1</span>
-      <span style="font-size:13px;color:var(--ink)">Contratti standard e ordini su mercati organizzati — invio tramite RRM entro il giorno lavorativo successivo</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+2</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti standard e ordini su mercati organizzati — invio tramite RRM entro due giorni lavorativi (recast IR, in vigore dal 29/04/2026)</span>
     </div>
     <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">1 mese</span>
-      <span style="font-size:13px;color:var(--ink)">Contratti non-standard (bilaterali) — segnalazione entro un mese da conclusione, modifica o cessazione</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+10</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti non-standard (bilaterali) — segnalazione entro dieci giorni lavorativi da conclusione, modifica o cessazione</span>
     </div>
     <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
       <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">CEREMP</span>
       <span style="font-size:13px;color:var(--ink)">Registrazione del market participant presso ARERA — assegnazione del codice ACER</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">ACER</span>
+      <span style="font-size:13px;color:var(--ink)">TRUM, Manual of Procedures e guidance ufficiali — <a href="https://www.acer.europa.eu/remit-documents" target="_blank" rel="noopener">acer.europa.eu/remit-documents</a></span>
     </div>
   </div>
 </section>

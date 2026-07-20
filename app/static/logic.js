@@ -466,7 +466,7 @@
       ];
       const remN = (s2) => remRows.filter((r) => r.stato === s2).length;
       const remKpis = [
-        { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+1", dBg: WAIT.bg, dFg: WAIT.fg },
+        { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+2", dBg: WAIT.bg, dFg: WAIT.fg },
         { label: "Inviate · mese", value: String(remN("Inviata") + remN("Accettata")), unit: "tramite RRM", delta: demoOn ? "flusso regolare" : "dal tuo registro", dBg: RUN.bg, dFg: RUN.fg },
         { label: "Respinte", value: String(remN("Respinta")), unit: "da correggere", delta: demoOn ? "verifica i campi" : "nessun esito negativo", dBg: remN("Respinta") ? NEG.bg : "var(--surface2)", dFg: remN("Respinta") ? NEG.fg : "var(--ink3)" },
       ];

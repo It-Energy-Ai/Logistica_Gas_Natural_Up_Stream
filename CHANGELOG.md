@@ -2,6 +2,11 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.2.1] — 2026-07-20
+
+### Corretto
+- Scadenze REMIT allineate al **recast dell'Implementing Regulation** (in vigore dal 29/04/2026, fonte: Open Letter ACER): contratti standard **T+2** giorni lavorativi (era T+1), non-standard **T+10** (era 1 mese). Aggiunto il link ai documenti ufficiali ACER nella card dei riferimenti.
+
 ## [1.2.0] — 2026-07-20
 
 ### Aggiunto
@@ -77,6 +82,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.2.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.1
 [1.2.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.0
 [1.1.3]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.3
 [1.1.2]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.2
