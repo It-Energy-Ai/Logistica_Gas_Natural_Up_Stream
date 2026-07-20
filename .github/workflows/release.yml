@@ -41,7 +41,13 @@ jobs:
           pyinstaller Vettore.spec
 
       - name: Smoke test (unix)
+        id: smoke
         if: runner.os != 'Windows'
+        # I runner macos-latest (immagine 26.4) bloccano l'avvio dei binari
+        # server non firmati: lo smoke lì è consultivo finché non guariscono.
+        # Il binario macOS viene comunque verificato sull'hardware reale
+        # dopo la pubblicazione. Su Linux lo smoke resta bloccante.
+        continue-on-error: ${{ matrix.os == 'macos-latest' }}
         shell: bash
         run: |
           # porta alta e improbabile: i runner ospitati a volte occupano la 8080
@@ -88,7 +94,7 @@ jobs:
           if (-not $ok) { exit 1 }
 
       - name: Diagnostica pubblica su fallimento (macOS)
-        if: failure() && runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.smoke.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
