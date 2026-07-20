@@ -55,6 +55,12 @@ def main() -> None:
         dati.mkdir(exist_ok=True)
         os.environ["VETTORE_DB"] = str(dati / "vettore.db")
 
+    if os.environ.get("VETTORE_DEBUG_STACK"):
+        # diagnostica CI: stampa lo stack Python su stderr a intervalli,
+        # per individuare eventuali blocchi all'avvio sui runner
+        import faulthandler
+        faulthandler.dump_traceback_later(45, repeat=True)
+
     import uvicorn
 
     from app.main import app

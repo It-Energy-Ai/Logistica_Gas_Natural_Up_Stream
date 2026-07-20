@@ -46,7 +46,7 @@ jobs:
         run: |
           # porta alta e improbabile: i runner ospitati a volte occupano la 8080
           lsof -iTCP:8123 -sTCP:LISTEN && exit 78 || true
-          VETTORE_NO_BROWSER=1 VETTORE_PORTA=8123 VETTORE_DB=/tmp/smoke.db ./dist/Vettore >server.log 2>&1 &
+          VETTORE_NO_BROWSER=1 VETTORE_DEBUG_STACK=1 VETTORE_PORTA=8123 VETTORE_DB=/tmp/smoke.db ./dist/Vettore >server.log 2>&1 &
           PID=$!
           echo "$PID" > server.pid
           ok=""
@@ -60,8 +60,9 @@ jobs:
             echo "--- log del server:"; cat server.log
             echo "--- porta al timeout:"; lsof -nP -iTCP:8123 -sTCP:LISTEN || echo "NESSUNO in ascolto"
             if [ "$(uname)" = "Darwin" ] && kill -0 "$PID" 2>/dev/null; then
-              echo "--- stack del processo (sample):"; sample "$PID" 2 -file sample.txt >/dev/null 2>&1 || true
-              head -80 sample.txt 2>/dev/null || echo "(sample non disponibile)"
+              FIGLIO=$(pgrep -P "$PID" | head -1)
+              echo "--- processi: padre=$PID figlio=${FIGLIO:-nessuno}"
+              echo "--- stack del FIGLIO (sample):"; [ -n "$FIGLIO" ] && sample "$FIGLIO" 2 -file sample.txt >/dev/null 2>&1 && head -60 sample.txt || echo "(non catturato)"
             fi
             kill "$PID" 2>/dev/null || true
             exit 1
