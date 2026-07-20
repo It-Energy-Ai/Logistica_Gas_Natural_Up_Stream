@@ -35,7 +35,7 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 | <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · invio per punto/ciclo, storico del giorno gas | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · sei aree di lavoro | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi, credenziali GME |
 
-E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **REMIT · Segnalazioni** (registro delle transazioni con ciclo di vita degli invii verso ACER, codice ACER configurabile, scadenze T+1 / 1 mese), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
 > Screenshot e tour mostrano la **modalità demo** attiva; al primo avvio il portale parte pulito (vedi sotto).
 
@@ -48,7 +48,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["12 schermate"]
+    R --> UI["13 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```

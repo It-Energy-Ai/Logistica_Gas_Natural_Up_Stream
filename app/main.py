@@ -42,6 +42,19 @@ def _is_nom_list(v):
     )
 
 
+def _is_rem_list(v):
+    return (
+        isinstance(v, list)
+        and len(v) <= 500
+        and all(
+            isinstance(r, dict)
+            and set(r) == {"rif", "tipo", "qta", "prezzo", "stato"}
+            and all(isinstance(r[k], str) and len(r[k]) <= 120 for k in r)
+            for r in v
+        )
+    )
+
+
 def _righe_di(n):
     def check(v):
         return (
@@ -68,6 +81,7 @@ def _is_str_list(v):
 
 VALIDATORS = {
     "nomList": _is_nom_list,
+    "remList": _is_rem_list,
     "cfg": _is_str_map,
     "hiddenPunti": _is_str_list,
     "extraPunti": _is_punti_list,

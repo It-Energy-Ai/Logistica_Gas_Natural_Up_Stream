@@ -895,11 +895,93 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenRemit }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Remit" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">REMIT · Segnalazioni</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Transaction reporting verso ACER — Reg. UE 1227/2011 e 2024/1106</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Codice ACER · {{ remAcer }}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ remKpis }}" as="k" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nuova segnalazione</h3><span style="font-size:12px;color:var(--ink3)">Transazione da registrare nel registro REMIT</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo di contratto
+        <select value="{{ remTipo }}" onChange="{{ setRemTipo }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13px;outline:none">
+          <option>Standard · mercato organizzato</option><option>Non-standard · bilaterale</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento contratto
+        <input type="text" value="{{ remRif }}" onChange="{{ setRemRif }}" placeholder="Es. PSV-2026-0142" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità · MWh
+          <input type="text" value="{{ remQta }}" onChange="{{ setRemQta }}" placeholder="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prezzo · €/MWh
+          <input type="text" value="{{ remPrezzo }}" onChange="{{ setRemPrezzo }}" placeholder="33,50" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
+        </label>
+      </div>
+      <button onClick="{{ addRem }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" style-hover="filter:brightness(1.12)">Registra segnalazione</button>
+      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">Standard: invio tramite RRM entro il giorno lavorativo successivo. Non-standard: entro un mese.</span>
+      <div style="height:1px;background:var(--line)"></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Il tuo codice ACER
+        <input type="text" value="{{ remAcerVal }}" onChange="{{ setRemAcer }}" placeholder="Es. A0045821W.IT" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
+      </label>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Registro segnalazioni</h3><span style="font-size:12px;color:var(--ink3)">Dalla più recente</span></div>
+      <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
+        <span>RIFERIMENTO</span><span>TIPO</span><span style="text-align:right">MWh</span><span style="text-align:right">€/MWh</span><span style="text-align:right">STATO</span><span></span>
+      </div>
+      <sc-for list="{{ remRows }}" as="rr" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;align-items:center;min-height:46px;padding:2px 0;border-bottom:1px solid var(--line)">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ rr.rif }}</span>
+          <span style="font-size:12px;color:var(--ink2)">{{ rr.tipo }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.qta }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.prezzo }}</span>
+          <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ rr.bg }};color:{{ rr.fg }}">{{ rr.stato }}</span></span>
+          <span style="text-align:right"><sc-if value="{{ rr.daInviare }}" hint-placeholder-val="{{ false }}"><button onClick="{{ rr.invia }}" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s" style-hover="background:color-mix(in oklab,var(--prim) 8%,transparent)">Segna inviata</button></sc-if></span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Scadenze e riferimenti</h3><span style="font-size:12px;color:var(--ink3)">Reg. UE 1227/2011 (REMIT) · Reg. UE 2024/1106 (REMIT II)</span></div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+1</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti standard e ordini su mercati organizzati — invio tramite RRM entro il giorno lavorativo successivo</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">1 mese</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti non-standard (bilaterali) — segnalazione entro un mese da conclusione, modifica o cessazione</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">CEREMP</span>
+      <span style="font-size:13px;color:var(--ink)">Registrazione del market participant presso ARERA — assegnazione del codice ACER</span>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;tema&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;chiaro&quot;,&quot;scuro&quot;],&quot;default&quot;:&quot;chiaro&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;},&quot;colorePrimario&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#0E5A75&quot;,&quot;options&quot;:[&quot;#0E5A75&quot;,&quot;#154F8C&quot;,&quot;#0C6B5D&quot;,&quot;#33546B&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;},&quot;coloreAccento&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#4C93C9&quot;,&quot;options&quot;:[&quot;#2FA37C&quot;,&quot;#3AA0A8&quot;,&quot;#4C93C9&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;}}">
 class Component extends DCLogic {
-  state = { screen: "login", theme: null, sso: null, dashOff: 0, saved: false, imported: false, gmeAuto: true, gmeOk: false, users: { mricci: "up", lbianchi: "ro", gverdi: "ro" }, extraUsers: [], nextU: 1, wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti", nomList: [{ punto: "PSV", ciclo: "R3", qta: "4.850", stato: "In corso" }, { punto: "Passo Gries", ciclo: "R2", qta: "3.100", stato: "Confermata" }, { punto: "Mazara del Vallo", ciclo: "R2", qta: "2.400", stato: "Confermata" }], nomPunto: "PSV", nomCiclo: "R4", nomQta: "", reps: { rg: true, rs: true, rr: false }, imports: [{ time: "17/07 · 06:15", file: "sbilancio_g20260716.xml", rec: "1.440", esito: "OK" }, { time: "16/07 · 06:12", file: "sbilancio_g20260715.xml", rec: "1.440", esito: "OK" }], cfg: { psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false, nEmail: true, nAlert: true, nReport: false, unit: "MWh", ciclo: "Intraday" } };
+  state = { screen: "login", theme: null, sso: null, dashOff: 0, saved: false, imported: false, gmeAuto: true, gmeOk: false, users: { mricci: "up", lbianchi: "ro", gverdi: "ro" }, extraUsers: [], nextU: 1, wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti", nomList: [{ punto: "PSV", ciclo: "R3", qta: "4.850", stato: "In corso" }, { punto: "Passo Gries", ciclo: "R2", qta: "3.100", stato: "Confermata" }, { punto: "Mazara del Vallo", ciclo: "R2", qta: "2.400", stato: "Confermata" }], nomPunto: "PSV", nomCiclo: "R4", nomQta: "", remList: [{ rif: "MGP-GAS 17/07 · lotto 42", tipo: "Standard", qta: "250", prezzo: "33,45", stato: "Accettata" }, { rif: "PSV-2026-0138 · bilaterale", tipo: "Non-standard", qta: "1.500", prezzo: "32,80", stato: "Inviata" }, { rif: "MGP-GAS 16/07 · lotto 18", tipo: "Standard", qta: "400", prezzo: "33,61", stato: "Respinta" }, { rif: "PSV-2026-0141 · bilaterale", tipo: "Non-standard", qta: "800", prezzo: "33,10", stato: "Da inviare" }], remTipo: "Standard · mercato organizzato", remRif: "", remQta: "", remPrezzo: "", reps: { rg: true, rs: true, rr: false }, imports: [{ time: "17/07 · 06:15", file: "sbilancio_g20260716.xml", rec: "1.440", esito: "OK" }, { time: "16/07 · 06:12", file: "sbilancio_g20260715.xml", rec: "1.440", esito: "OK" }], cfg: { psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false, nEmail: true, nAlert: true, nReport: false, unit: "MWh", ciclo: "Intraday" } };
   go(s) { return () => this.setState({ screen: s }); }
   renderVals() {
     const p = this.props;
@@ -917,7 +999,8 @@ class Component extends DCLogic {
       bilancio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Bilanciamento" }],
       capacita: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Capacità & Contratti" }],
       stoccaggio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Stoccaggio" }],
-      report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }]
+      report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
+      remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT" }]
     })[s] || [];
     const crumbs = trail.map((c, i) => ({
       label: c.label, pre: i ? "›" : "",
@@ -960,7 +1043,8 @@ class Component extends DCLogic {
       { title: "Bilanciamento", desc: "Posizione fisica e commerciale, esposizione e azioni correttive.", stat: "−312", statLabel: "MWh previsti", primary: true, go: go("bilancio"), cursor: "pointer", border: "var(--line)" },
       { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
       { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
-      { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" }
+      { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
+      { title: "REMIT · Segnalazioni", desc: "Registro delle transazioni e obblighi di reporting verso ACER.", stat: "1", statLabel: "da inviare", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" }
     ];
     const off = this.state.dashOff;
     const fmtN = (n) => n.toLocaleString("it-IT");
@@ -1130,12 +1214,24 @@ class Component extends DCLogic {
       m, genH: Math.round(gen / 61 * 100) + "%", costoH: Math.round(costo / 61 * 100) + "%"
     }));
     const repProg = [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState(st => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-    const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli" };
+    const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli" };
+    const remStatoC = { "Accettata": OK, "Inviata": RUN, "Da inviare": WAIT, "Respinta": NEG };
+    const remRows = this.state.remList.map((r, i) => ({ ...r, bg: (remStatoC[r.stato] || WAIT).bg, fg: (remStatoC[r.stato] || WAIT).fg, daInviare: r.stato === "Da inviare", invia: () => this.setState(st => ({ remList: st.remList.map((x, j) => j === i ? { ...x, stato: "Inviata" } : x) })) }));
+    const remN = (s) => this.state.remList.filter(r => r.stato === s).length;
+    const remKpis = [
+      { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+1", dBg: WAIT.bg, dFg: WAIT.fg },
+      { label: "Inviate · mese", value: String(remN("Inviata") + remN("Accettata")), unit: "tramite RRM", delta: "flusso regolare", dBg: RUN.bg, dFg: RUN.fg },
+      { label: "Respinte", value: String(remN("Respinta")), unit: "da correggere", delta: "verifica i campi", dBg: NEG.bg, dFg: NEG.fg }
+    ];
+    const addRem = () => this.setState(st => ({ remList: [{ rif: st.remRif || "PSV-2026-0142", tipo: st.remTipo.startsWith("Standard") ? "Standard" : "Non-standard", qta: st.remQta || "500", prezzo: st.remPrezzo || "\u2014", stato: "Da inviare" }, ...st.remList], remRif: "", remQta: "", remPrezzo: "" }));
     return {
       hasBack: !!backMap[s], goBack: go(backMap[s] || "hub"), hubCards,
       theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
       primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-      loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report",
+      loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit",
+      remAcer: "A0045821W.IT", remAcerVal: "A0045821W.IT", setRemAcer: () => {}, remKpis, remRows, addRem,
+      remTipo: this.state.remTipo, remRif: this.state.remRif, remQta: this.state.remQta, remPrezzo: this.state.remPrezzo,
+      setRemTipo: (e) => this.setState({ remTipo: e.target.value }), setRemRif: (e) => this.setState({ remRif: e.target.value }), setRemQta: (e) => this.setState({ remQta: e.target.value }), setRemPrezzo: (e) => this.setState({ remPrezzo: e.target.value }),
       doLogin: go("hub"), logout: go("login"), goHub: go("hub"), goModuli: go("moduli"), goDash: go("dash"),
       doSSO: () => { this.setState({ sso: "redirect" }); setTimeout(() => this.setState(st => st.sso ? { sso: "pick" } : {}), 1100); },
       ssoCancel: () => this.setState({ sso: null }),

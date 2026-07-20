@@ -363,6 +363,65 @@ test("demo: i permessi di scena di Bianchi e Verdi sono sola lettura", () => {
   assert.equal(verdi.opts[0].bg, "var(--surface)");
 });
 
+test("REMIT pulito: registro vuoto, KPI a zero, codice da configurare", () => {
+  const app = new App();
+  app.setState({ screen: "remit" });
+  const v = app.renderVals();
+  assert.equal(v.screenRemit, true);
+  assert.equal(v.remRows.length, 0);
+  assert.deepEqual(v.remKpis.map((k) => k.value), ["0", "0", "0"]);
+  assert.equal(v.remAcer, "da configurare");
+});
+
+test("REMIT: registra una segnalazione, poi segnala l'invio (persistito)", () => {
+  const app = new App();
+  app.setState({ screen: "remit" });
+  let v = app.renderVals();
+  v.setRemRif(ev("PSV-2026-0142"));
+  app.renderVals().setRemQta(ev("500"));
+  app.renderVals().setRemPrezzo(ev("33,50"));
+  app.renderVals().addRem();
+  v = app.renderVals();
+  assert.equal(v.remRows.length, 1);
+  assert.equal(v.remRows[0].stato, "Da inviare");
+  assert.equal(v.remRows[0].daInviare, true);
+  assert.equal(v.remKpis[0].value, "1");
+  assert.ok("remList" in app._pending, "remList persistita");
+  v.remRows[0].invia();
+  v = app.renderVals();
+  assert.equal(v.remRows[0].stato, "Inviata");
+  assert.equal(v.remKpis[1].value, "1");
+  clearTimeout(app._syncTimer);
+});
+
+test("REMIT demo: scenografia in coda alle righe reali, mai salvata", () => {
+  const app = new App();
+  app.setState({ screen: "remit", demoMode: true });
+  let v = app.renderVals();
+  assert.equal(v.remRows.length, 4); // solo scena
+  assert.equal(v.remAcer, "A0045821W.IT");
+  assert.deepEqual(v.remKpis.map((k) => k.value), ["1", "2", "1"]);
+  // una riga reale si mette DAVANTI alla scena
+  v.setRemRif(ev("REALE-01"));
+  app.renderVals().addRem();
+  v = app.renderVals();
+  assert.equal(v.remRows.length, 5);
+  assert.equal(v.remRows[0].rif, "REALE-01");
+  assert.equal(app.state.remList.length, 1); // la scena non entra nello stato
+  clearTimeout(app._syncTimer);
+});
+
+test("REMIT: il codice ACER si salva in cfg e compare nel chip", () => {
+  const app = new App();
+  app.setState({ screen: "remit" });
+  app.renderVals().setRemAcer(ev("A0099999X.IT"));
+  const v = app.renderVals();
+  assert.equal(app.state.cfg.acer, "A0099999X.IT");
+  assert.equal(v.remAcer, "A0099999X.IT");
+  assert.ok("cfg" in app._pending);
+  clearTimeout(app._syncTimer);
+});
+
 test("limiti: nomina e punto troncati ai cap del backend", () => {
   const app = new App();
   app.setState({ screen: "nomine" });

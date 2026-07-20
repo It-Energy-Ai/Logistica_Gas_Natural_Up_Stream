@@ -32,7 +32,7 @@
   const PERSIST = [
     "nomList", "cfg", "hiddenPunti", "extraPunti", "nextP",
     "users", "extraUsers", "disabled", "nextU",
-    "reps", "gmeAuto", "gmeOk", "demoMode",
+    "reps", "gmeAuto", "gmeOk", "demoMode", "remList",
   ];
 
   // Tronca ai limiti accettati dai validatori del backend: un valore fuori
@@ -49,6 +49,7 @@
         wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
         nomList: [],
         nomPunto: "PSV", nomCiclo: "R4", nomQta: "",
+        remList: [], remTipo: "Standard · mercato organizzato", remRif: "", remQta: "", remPrezzo: "",
         reps: { rg: true, rs: true, rr: false },
         cfg: {
           psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false,
@@ -193,6 +194,7 @@
         capacita: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Capacità & Contratti" }],
         stoccaggio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Stoccaggio" }],
         report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
+        remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -236,6 +238,7 @@
         { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
         { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
+        { title: "REMIT · Segnalazioni", desc: "Registro delle transazioni e obblighi di reporting verso ACER.", stat: "1", statLabel: "da inviare", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
       ];
       if (!demoOn) for (const m of moduli) m.stat = "—"; // i numeri delle card sono scenografia
       const off = this.state.dashOff;
@@ -442,7 +445,40 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli" };
+
+      // --- REMIT: registro reale dell'utente + scenografia demo separata ---
+      const remStatoC = { "Accettata": OK, "Inviata": RUN, "Da inviare": WAIT, "Respinta": NEG };
+      const remDemo = !demoOn ? [] : [
+        { rif: "MGP-GAS 17/07 · lotto 42", tipo: "Standard", qta: "250", prezzo: "33,45", stato: "Accettata" },
+        { rif: "PSV-2026-0138 · bilaterale", tipo: "Non-standard", qta: "1.500", prezzo: "32,80", stato: "Inviata" },
+        { rif: "MGP-GAS 16/07 · lotto 18", tipo: "Standard", qta: "400", prezzo: "33,61", stato: "Respinta" },
+        { rif: "PSV-2026-0141 · bilaterale", tipo: "Non-standard", qta: "800", prezzo: "33,10", stato: "Da inviare" },
+      ];
+      const colora = (r) => ({ ...r, bg: (remStatoC[r.stato] || WAIT).bg, fg: (remStatoC[r.stato] || WAIT).fg });
+      // le righe reali hanno l'azione "Segna inviata"; quelle demo sono solo scena
+      const remRows = [
+        ...this.state.remList.map((r, i) => ({
+          ...colora(r), daInviare: r.stato === "Da inviare",
+          invia: () => this.setState((st) => ({ remList: st.remList.map((x, j) => (j === i ? { ...x, stato: "Inviata" } : x)) })),
+        })),
+        ...remDemo.map((r) => ({ ...colora(r), daInviare: r.stato === "Da inviare", invia: () => {} })),
+      ];
+      const remN = (s2) => remRows.filter((r) => r.stato === s2).length;
+      const remKpis = [
+        { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+1", dBg: WAIT.bg, dFg: WAIT.fg },
+        { label: "Inviate · mese", value: String(remN("Inviata") + remN("Accettata")), unit: "tramite RRM", delta: demoOn ? "flusso regolare" : "dal tuo registro", dBg: RUN.bg, dFg: RUN.fg },
+        { label: "Respinte", value: String(remN("Respinta")), unit: "da correggere", delta: demoOn ? "verifica i campi" : "nessun esito negativo", dBg: remN("Respinta") ? NEG.bg : "var(--surface2)", dFg: remN("Respinta") ? NEG.fg : "var(--ink3)" },
+      ];
+      const addRem = () => this.setState((st) => ({
+        remList: [{
+          rif: cap((st.remRif || "").trim() || "(senza riferimento)", 120),
+          tipo: st.remTipo.startsWith("Standard") ? "Standard" : "Non-standard",
+          qta: cap(st.remQta || "\u2014", 120), prezzo: cap(st.remPrezzo || "\u2014", 120),
+          stato: "Da inviare",
+        }, ...st.remList].slice(0, 500),
+        remRif: "", remQta: "", remPrezzo: "",
+      }));
 
       const doLogin = () => {
         const email = (this.state.loginEmail || "").trim();
@@ -460,7 +496,16 @@
         hasBack: !!backMap[s], goBack: go(backMap[s] || "hub"), hubCards,
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit",
+        remAcer: demoOn ? "A0045821W.IT" : (cfg.acer || "da configurare"),
+        remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
+        setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 63) } })),
+        remKpis, remRows, addRem,
+        remTipo: this.state.remTipo, remRif: this.state.remRif, remQta: this.state.remQta, remPrezzo: this.state.remPrezzo,
+        setRemTipo: (e) => this.setSilent({ remTipo: e.target.value }),
+        setRemRif: (e) => this.setSilent({ remRif: e.target.value }),
+        setRemQta: (e) => this.setSilent({ remQta: e.target.value }),
+        setRemPrezzo: (e) => this.setSilent({ remPrezzo: e.target.value }),
         doLogin, logout, goHub: go("hub"),
         loginEmail: this.state.loginEmail, loginPass: this.state.loginPass,
         setLoginEmail: (e) => this.setSilent({ loginEmail: e.target.value }),

@@ -2,6 +2,13 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.2.0] — 2026-07-20
+
+### Aggiunto
+- **Modulo REMIT · Segnalazioni**: nuova area di lavoro in Logistica Gas con registro delle transazioni da segnalare (persistito), ciclo di vita degli invii (Da inviare → Inviata, con esiti Accettata/Respinta in demo), KPI calcolati dal proprio registro, codice ACER configurabile e card dei riferimenti normativi (Reg. UE 1227/2011 e 2024/1106: standard T+1 via RRM, non-standard entro 1 mese, registrazione CEREMP/ARERA).
+- La schermata nasce nel design (fonte di verità) con la stessa pipeline delle altre; l'anteprima del canvas resta funzionante.
+- Test: 4 nuovi test node sul modulo + validazione backend di `remList`.
+
 ## [1.1.3] — 2026-07-20
 
 Da una revisione profonda finale (7 lenti + browser reale + critico di completezza).
@@ -70,6 +77,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.2.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.0
 [1.1.3]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.3
 [1.1.2]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.2
 [1.1.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.1

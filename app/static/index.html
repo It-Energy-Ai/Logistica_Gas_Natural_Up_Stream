@@ -919,6 +919,88 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenRemit }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Remit" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">REMIT · Segnalazioni</h1>
+      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Transaction reporting verso ACER — Reg. UE 1227/2011 e 2024/1106</p>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Codice ACER · {{ remAcer }}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
+    <sc-for list="{{ remKpis }}" as="k" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
+        <div style="display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
+          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
+        </div>
+        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nuova segnalazione</h3><span style="font-size:12px;color:var(--ink3)">Transazione da registrare nel registro REMIT</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo di contratto
+        <select value="{{ remTipo }}" onChange="{{ setRemTipo }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13px;outline:none">
+          <option>Standard · mercato organizzato</option><option>Non-standard · bilaterale</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento contratto
+        <input type="text" value="{{ remRif }}" onChange="{{ setRemRif }}" placeholder="Es. PSV-2026-0142" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità · MWh
+          <input type="text" value="{{ remQta }}" onChange="{{ setRemQta }}" placeholder="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prezzo · €/MWh
+          <input type="text" value="{{ remPrezzo }}" onChange="{{ setRemPrezzo }}" placeholder="33,50" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
+        </label>
+      </div>
+      <button onClick="{{ addRem }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" data-vh="3">Registra segnalazione</button>
+      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">Standard: invio tramite RRM entro il giorno lavorativo successivo. Non-standard: entro un mese.</span>
+      <div style="height:1px;background:var(--line)"></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Il tuo codice ACER
+        <input type="text" value="{{ remAcerVal }}" onChange="{{ setRemAcer }}" placeholder="Es. A0045821W.IT" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" data-vf="2">
+      </label>
+    </div>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Registro segnalazioni</h3><span style="font-size:12px;color:var(--ink3)">Dalla più recente</span></div>
+      <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
+        <span>RIFERIMENTO</span><span>TIPO</span><span style="text-align:right">MWh</span><span style="text-align:right">€/MWh</span><span style="text-align:right">STATO</span><span></span>
+      </div>
+      <sc-for list="{{ remRows }}" as="rr" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;align-items:center;min-height:46px;padding:2px 0;border-bottom:1px solid var(--line)">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ rr.rif }}</span>
+          <span style="font-size:12px;color:var(--ink2)">{{ rr.tipo }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.qta }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.prezzo }}</span>
+          <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ rr.bg }};color:{{ rr.fg }}">{{ rr.stato }}</span></span>
+          <span style="text-align:right"><sc-if value="{{ rr.daInviare }}" hint-placeholder-val="{{ false }}"><button onClick="{{ rr.invia }}" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s" data-vh="8">Segna inviata</button></sc-if></span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Scadenze e riferimenti</h3><span style="font-size:12px;color:var(--ink3)">Reg. UE 1227/2011 (REMIT) · Reg. UE 2024/1106 (REMIT II)</span></div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+1</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti standard e ordini su mercati organizzati — invio tramite RRM entro il giorno lavorativo successivo</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">1 mese</span>
+      <span style="font-size:13px;color:var(--ink)">Contratti non-standard (bilaterali) — segnalazione entro un mese da conclusione, modifica o cessazione</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">CEREMP</span>
+      <span style="font-size:13px;color:var(--ink)">Registrazione del market participant presso ARERA — assegnazione del codice ACER</span>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 </div>
 </template>
 <script src="/static/runtime.js"></script>

@@ -19,7 +19,7 @@ def test_index_contiene_template_e_schermate(client):
     for label in [
         "Login", "Hub moduli", "Logistica Gas", "Dashboard", "Nomine e Programmazione",
         "Bilanciamento", "Capacita e Contratti", "Stoccaggio", "Report e Analisi",
-        "Impostazioni", "Configuratore", "Sistema",
+        "Impostazioni", "Configuratore", "Sistema", "Remit",
     ]:
         assert f'data-screen-label="{label}"' in r.text, label
     assert 'id="app-template"' in r.text
@@ -75,6 +75,16 @@ def test_validazione_chiavi_e_forme(client):
     # righe utenti a 3 elementi non ammesse (il frontend ne pretende 4)
     assert client.put("/api/state", json={"extraUsers": [["wu1", "AF", "Anna"]]}).status_code == 422
     assert client.put("/api/state", json={"extraPunti": [["a", "b", "c", "d"]]}).status_code == 422
+
+
+def test_remlist_roundtrip_e_validazione(client):
+    client.post("/api/login", json={})
+    riga = {"rif": "PSV-2026-0142", "tipo": "Standard", "qta": "500", "prezzo": "33,50", "stato": "Da inviare"}
+    assert client.put("/api/state", json={"remList": [riga]}).status_code == 200
+    assert client.get("/api/state").json()["remList"] == [riga]
+    # forma sbagliata respinta
+    assert client.put("/api/state", json={"remList": [{"rif": "x"}]}).status_code == 422
+    assert client.put("/api/state", json={"remList": [{**riga, "extra": "no"}]}).status_code == 422
 
 
 def test_email_non_valida_ripiega_su_identita_neutra(client):
