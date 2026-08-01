@@ -458,6 +458,107 @@ test("PDR: schermata e profilo separano readiness da credenziali", () => {
   assert.equal(v.pdrTestAccess, true);
   assert.equal("password" in app.state.pdr, false);
 });
+
+test("PDR: le ricevute restano associate al report e non sono mai presentate come verificate", () => {
+  const app = new App();
+  app.setState({
+    screen: "pdr",
+    pdrReceiptReportId: "report-1",
+    remReports: [{
+      id: "report-1", status: "xml_validato_xsd",
+      data: { source_ref: "PSV-2026-0142", report_kind: "gas_standard", quantity_mwh: "500" },
+    }],
+    pdrReceipts: [{
+      id: "receipt-1", report_id: "report-1", filename: "FA_20260801_REMITTable1_V3_A0045821WIT_1.xml",
+      outcome: "pdr_partial", source: "pdr", load_code: "LOAD-42", reported_at: "2026-08-01T12:20:00Z", detail: "Partial dichiarato dalla ricevuta GME",
+    }],
+  });
+  const v = app.renderVals();
+  assert.equal(v.pdrReceiptReportOptions[0].id, "report-1");
+  assert.equal(v.pdrReceiptRows.length, 1);
+  assert.equal(v.pdrReceiptRows[0].outcomeLabel, "PDR · Partial dichiarato");
+  assert.equal(v.pdrReceiptRows[0].source, "PDR GME");
+  assert.equal(v.pdrReceiptRows[0].provenance, "Importata manualmente · non verificata dal connettore");
+  assert.ok(v.pdrReceiptOutcomes.some((outcome) => outcome.value === "pdr_partial"));
+  v.pdrReceiptSetLoadCode(ev("12A345678"));
+  assert.equal(app.state.pdrReceiptLoadCode, "123456");
+  clearTimeout(app._syncTimer);
+});
+
+test("PDR: l'import invia file Base64 e metadata al solo endpoint locale delle ricevute", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    if (url === "/api/pdr/receipts/import") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ receipt: {
+          id: "receipt-2", report_id: "report-2", filename: "FA_file.xml", outcome: "pdr_accepted", source: "pdr",
+          load_code: "123456", reported_at: "2026-08-01T12:25:00Z", detail: "Accept dichiarato",
+        } }),
+        text: async () => "",
+      };
+    }
+    return FETCH_OK(url, opts);
+  };
+  try {
+    const app = new App();
+    app.setState({
+      screen: "pdr", pdrReceiptReportId: "report-2", pdrReceiptOutcome: "pdr_accepted", pdrReceiptSource: "pdr",
+      pdrReceiptLoadCode: "123456", pdrReceiptReportedAt: "2026-08-01T12:25", pdrReceiptDetailText: "Accept dichiarato",
+      pdrReceiptFile: { name: "FA_file.xml", arrayBuffer: async () => new Uint8Array([79, 75]).buffer },
+      pdrReceiptFileName: "FA_file.xml",
+    });
+    await app.renderVals().importaRicevuta();
+    const request = calls.find((call) => call.url === "/api/pdr/receipts/import");
+    assert.ok(request, "POST alla sola API locale delle ricevute");
+    assert.equal(request.opts.method, "POST");
+    const body = JSON.parse(request.opts.body);
+    assert.deepEqual(body, {
+      report_id: "report-2", outcome: "pdr_accepted", source: "pdr", load_code: "123456",
+      reported_at: new Date("2026-08-01T12:25").toISOString(), detail: "Accept dichiarato", filename: "FA_file.xml", mime_type: "application/octet-stream", content_base64: "T0s=",
+    });
+    const v = app.renderVals();
+    assert.equal(v.pdrReceiptRows[0].outcomeLabel, "PDR · Accept dichiarato");
+    assert.match(v.pdrReceiptInfo, /non verificata dal connettore/);
+    assert.equal(v.pdrReceiptFileName, "Nessun file selezionato");
+    clearTimeout(app._syncTimer);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("PDR: selezione e download ricevuta usano gli endpoint dedicati", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url, opts });
+    if (url === "/api/pdr/receipts?report_id=report-3") {
+      return { ok: true, status: 200, json: async () => ({ receipts: [{ id: "receipt-3", report_id: "report-3", filename: "return.zip", outcome: "acer_accepted", source: "acer" }] }), text: async () => "" };
+    }
+    if (url === "/api/pdr/receipts/receipt-3/download") {
+      return { ok: true, status: 200, text: async () => "" };
+    }
+    return FETCH_OK(url, opts);
+  };
+  try {
+    const app = new App();
+    app.setState({ screen: "pdr" });
+    await app.renderVals().pdrReceiptSetReport(ev("report-3"));
+    let v = app.renderVals();
+    assert.equal(v.pdrReceiptRows[0].outcomeLabel, "ACER · accettazione dichiarata");
+    await v.pdrReceiptRows[0].download();
+    assert.ok(calls.some((call) => call.url === "/api/pdr/receipts?report_id=report-3"));
+    assert.ok(calls.some((call) => call.url === "/api/pdr/receipts/receipt-3/download"));
+    assert.match(app.state.pdrReceiptInfo, /non verificato dal connettore/);
+    clearTimeout(app._syncTimer);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("REMIT: il codice ACER si salva in cfg e compare nel chip", () => {
   const app = new App();
   app.setState({ screen: "remit" });

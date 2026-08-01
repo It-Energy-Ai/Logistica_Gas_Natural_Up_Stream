@@ -263,6 +263,52 @@ def _crea_evento(
     return {**evento, "prev_hash": precedente, "hash": event_hash}
 
 
+def registra_ricevuta_pdr_importata(
+    conn,
+    email: str,
+    report_id: str,
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    """Aggiunge all'audit il solo fatto dell'import manuale della ricevuta.
+
+    L'evento non promuove lo stato della segnalazione e non equivale a una
+    prova di upload, di consegna PDR o di accettazione ACER: tali evidenze
+    richiedono un connettore autorizzato e relative credenziali/risposte.
+    Il dettaglio libero non viene duplicato nella catena audit; se necessario
+    resta consultabile nell'artefatto ricevuta, indicizzato dalla sua impronta.
+    """
+
+    report = db.leggi_report_remit(conn, email, report_id)
+    if not report:
+        raise RemitError("Segnalazione non trovata.")
+    error_detail = str(receipt.get("error_detail") or "")
+    return _crea_evento(
+        conn,
+        email=email,
+        report_id=report_id,
+        actor=email,
+        event_type="PDR_RECEIPT_IMPORTED",
+        from_status=report.get("status"),
+        to_status=report.get("status"),
+        detail={
+            "receipt_id": receipt["id"],
+            "artifact_id": receipt["artifact_id"],
+            "artifact_sha256": receipt["artifact_sha256"],
+            "receipt_sha256": receipt["sha256"],
+            "source": receipt["source"],
+            "outcome": receipt["outcome"],
+            "load_code": receipt.get("load_code"),
+            "reported_at": receipt["reported_at"],
+            "filename": receipt["filename"],
+            "mime_type": receipt["mime_type"],
+            "error_detail_sha256": hashlib.sha256(error_detail.encode("utf-8")).hexdigest(),
+            "connector_verified": False,
+            "verification_state": "manual_import_unverified",
+            "parser_version": receipt.get("parser_version"),
+        },
+    )
+
+
 def _presenta(record: dict[str, Any]) -> dict[str, Any]:
     validato, errors = valida(record)
     return {

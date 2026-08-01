@@ -12,7 +12,8 @@ Bozza server-side
   → validazione contro XSD ACER fissato nel repository
   → nome file conforme alla convenzione PDR
   → preflight PDR locale
-  → upload PDR e ricevute (operazione esterna)
+  → eventuale import manuale e immutabile delle ricevute PDR/ACER
+  → upload PDR e verifica live delle ricevute (operazione esterna)
 ```
 
 Gli artefatti sono tracciati con hash SHA-256 e con una catena di audit locale.
@@ -100,6 +101,27 @@ né archiviare segreti di autenticazione in SQLite. Quando i prerequisiti
 saranno disponibili, il connettore dovrà usare un secret store, inviare solo
 gli artefatti passati dal preflight e registrare le ricevute ufficiali senza
 mai convertire un errore di rete in uno stato di successo.
+
+## Ricevute PDR e ACER
+
+L'[Implementation Guide PDR](https://www.mercatoelettrico.org/portals/0/Documents/it-it/20241001_PDR_Implementation_Guide.pdf)
+documenta due evidenze per ogni report: la ricevuta GME
+`FA_NomeFileInviato.xml` e la ricevuta ACER contenuta nell'archivio
+`NomeFileInviato.zip`. La ricevuta GME usa `PIPEFunctionalAcknowledgement` e
+può riportare `Accept`, `Reject` o `Partial`; una ricevuta ACER negativa può
+essere rappresentata da un file `Receipt_…XML` nell'archivio.
+
+L'app consente di importare manualmente il file ricevuto e lo associa in modo
+immutabile all'XML ACER esportato tramite report, nome e SHA-256. Conserva
+anche Load Code, data dell'esito, fonte, dettagli di errore e un evento audit.
+La ricevuta resta etichettata come **importata, non verificata dal
+connettore**: il file è preservato, ma il progetto non può attestare da solo
+che sia stato scaricato da PDR o che il suo esito sia definitivo.
+
+Per una ricevuta GME XML riconoscibile, il sistema estrae lo stato tecnico e
+gli eventuali motivi di rigetto. Non deduce invece un'accettazione ACER dal
+solo nome di uno ZIP: tale esito deve provenire dalla ricevuta o dal futuro
+canale PDR autorizzato.
 
 ## Verifica locale
 

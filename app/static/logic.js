@@ -39,6 +39,46 @@
   // misura farebbe respingere l'intera patch (422) e perdere la persistenza.
   const cap = (s, n) => String(s ?? "").slice(0, n);
 
+  // Le ricevute PDR sono importate come file binari. L'API locale riceve il
+  // contenuto Base64, così il browser non invia mai il file a un servizio
+  // esterno. Il percorso arrayBuffer è disponibile nei browser moderni e
+  // permette anche test frontend senza simulare FileReader.
+  const fileToBase64 = async (file) => {
+    if (!file) throw new Error("seleziona prima il file della ricevuta");
+    let bytes;
+    if (typeof file.arrayBuffer === "function") {
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } else if (typeof FileReader !== "undefined") {
+      bytes = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("impossibile leggere il file della ricevuta"));
+        reader.onload = () => resolve(new Uint8Array(reader.result));
+        reader.readAsArrayBuffer(file);
+      });
+    } else {
+      throw new Error("lettura file non disponibile in questo ambiente");
+    }
+    let binary = "";
+    // Evita di superare il limite di argomenti di fromCharCode per ricevute
+    // ZIP/XML di dimensioni significative.
+    for (let start = 0; start < bytes.length; start += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+    }
+    if (typeof btoa === "function") return btoa(binary);
+    if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+    throw new Error("codifica Base64 non disponibile in questo ambiente");
+  };
+
+  // ``datetime-local`` non include un fuso orario. Lo interpreta come orario
+  // locale dell'operatore e lo serializza in ISO 8601 UTC prima del salvataggio
+  // immutabile, evitando timestamp ambigui nel registro di audit.
+  const localDateTimeToIso = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) throw new Error("data-ora della ricevuta non valida");
+    return date.toISOString();
+  };
+
   class App {
     constructor() {
       this.state = this._nuovoStato();
@@ -64,6 +104,8 @@
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
         pdr: { environment: "test", channel: "portal", gme_operator_code: "", pdr_contract_reference: "", test_access_requested: false, two_factor_ready: false, registered_acer_code: "" },
         pdrCaricamento: false, pdrErrore: "", pdrInfo: "", pdrCheck: null, pdrFees: null, pdrSchemas: [],
+        pdrReceiptReportId: "", pdrReceipts: [], pdrReceiptCaricamento: false, pdrReceiptImporting: false, pdrReceiptErrore: "", pdrReceiptInfo: "", pdrReceiptOpen: null,
+        pdrReceiptFile: null, pdrReceiptFileName: "", pdrReceiptOutcome: "unknown", pdrReceiptSource: "pdr", pdrReceiptLoadCode: "", pdrReceiptReportedAt: "", pdrReceiptDetailText: "",
         reps: { rg: true, rs: true, rr: false },
         cfg: {
           psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false,
@@ -619,6 +661,7 @@
           export: () => esportaRemit(r),
           audit: () => apriAuditRemit(r),
           pdr: () => verificaPdr(r),
+          receipts: () => apriRicevutePdr(r),
         };
       });
       const remN = (status) => remRows.filter((r) => r.status === status).length;
@@ -739,6 +782,221 @@
         }
       };
 
+      // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
+      const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
+      const receiptField = (receipt, ...keys) => {
+        const candidates = [receipt, receipt?.metadata, receipt?.data, receipt?.receipt];
+        for (const candidate of candidates) {
+          if (!candidate || typeof candidate !== "object") continue;
+          for (const key of keys) {
+            if (candidate[key] != null && candidate[key] !== "") return candidate[key];
+          }
+        }
+        return "";
+      };
+      const sameId = (left, right) => String(left ?? "") === String(right ?? "");
+      const outcomeStyle = {
+        pdr_accepted: { label: "PDR · Accept dichiarato", ...OK },
+        pdr_rejected: { label: "PDR · Reject dichiarato", ...NEG },
+        pdr_partial: { label: "PDR · Partial dichiarato", ...WARN },
+        acer_transmitted: { label: "ACER · trasmissione dichiarata", ...RUN },
+        acer_accepted: { label: "ACER · accettazione dichiarata", ...OK },
+        acer_rejected: { label: "ACER · rifiuto dichiarato", ...NEG },
+        technical_retry: { label: "Ritentare tecnicamente", ...WARN },
+        unknown: { label: "Esito non classificato", ...WAIT },
+      };
+      const sourceLabel = {
+        pdr: "PDR GME",
+        acer: "Ritorno ACER",
+        pdr_portal: "Portale PDR GME",
+        pdr_web_service: "Web service PDR GME",
+        manual: "Importazione manuale",
+        other: "Altra fonte",
+      };
+      const listaRicevute = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.receipts)) return payload.receipts;
+        if (Array.isArray(payload?.items)) return payload.items;
+        return [];
+      };
+      const caricaRicevute = async (reportId) => {
+        if (!reportId) {
+          this.setState({ pdrReceipts: [], pdrReceiptReportId: "", pdrReceiptOpen: null });
+          return;
+        }
+        this.setState({ pdrReceiptReportId: String(reportId), pdrReceiptCaricamento: true, pdrReceiptErrore: "", pdrReceiptInfo: "", pdrReceiptOpen: null });
+        try {
+          // Il filtro resta qui, in un punto solo, per agevolare un eventuale
+          // adattamento dell'API senza toccare il flusso di import/download.
+          const payload = await this._json(`/api/pdr/receipts?report_id=${encodeURIComponent(reportId)}`);
+          this.setState({ pdrReceipts: listaRicevute(payload), pdrReceiptCaricamento: false });
+        } catch (error) {
+          this.setState({ pdrReceiptCaricamento: false, pdrReceiptErrore: `Ricevute PDR non disponibili: ${error.message}` });
+        }
+      };
+      const selezionaRicevuteReport = (event) => caricaRicevute(event.target.value);
+      const apriRicevutePdr = async (record) => {
+        this.setState({ screen: "pdr" });
+        await caricaRicevute(record.id);
+      };
+      const setPdrReceiptFile = (event) => {
+        const file = event?.target?.files?.[0] || null;
+        this.setState({ pdrReceiptFile: file, pdrReceiptFileName: file?.name || "", pdrReceiptErrore: "", pdrReceiptInfo: "" });
+      };
+      const pdrReceiptSet = (key) => (event) => this.setSilent({ [key]: event.target.value });
+      const pdrReceiptSetLoadCode = (event) => this.setSilent({
+        pdrReceiptLoadCode: String(event.target.value || "").replace(/\D/g, "").slice(0, 6),
+      });
+      const importaRicevuta = async () => {
+        const reportId = this.state.pdrReceiptReportId;
+        const file = this.state.pdrReceiptFile;
+        if (!reportId) {
+          this.setState({ pdrReceiptErrore: "Seleziona prima il record REMIT a cui associare la ricevuta." });
+          return;
+        }
+        if (!file) {
+          this.setState({ pdrReceiptErrore: "Seleziona il file della ricevuta PDR o ACER." });
+          return;
+        }
+        if (!this.state.pdrReceiptReportedAt) {
+          this.setState({ pdrReceiptErrore: "Indica la data-ora dichiarata nella ricevuta." });
+          return;
+        }
+        if (this.state.pdrReceiptLoadCode && !/^\d{6}$/.test(this.state.pdrReceiptLoadCode)) {
+          this.setState({ pdrReceiptErrore: "Il codice di carico PDR deve contenere esattamente 6 cifre." });
+          return;
+        }
+        this.setState({ pdrReceiptErrore: "", pdrReceiptInfo: "", pdrReceiptImporting: true });
+        try {
+          const contentBase64 = await fileToBase64(file);
+          const payload = await this._json("/api/pdr/receipts/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              report_id: reportId,
+              outcome: this.state.pdrReceiptOutcome,
+              source: this.state.pdrReceiptSource,
+              load_code: cap(this.state.pdrReceiptLoadCode, 6),
+              reported_at: localDateTimeToIso(this.state.pdrReceiptReportedAt),
+              detail: cap(this.state.pdrReceiptDetailText, 4000),
+              filename: cap(file.name || this.state.pdrReceiptFileName || "ricevuta-pdr", 255),
+              // Alcuni browser non valorizzano File.type per XML/ZIP: il
+              // contenuto resta comunque immutabile e l'API conserva un
+              // media type esplicito senza rifiutare una ricevuta valida.
+              mime_type: cap(file.type || "application/octet-stream", 120),
+              content_base64: contentBase64,
+            }),
+          });
+          const saved = payload.receipt || payload;
+          this.setState((st) => ({
+            pdrReceipts: [saved, ...(st.pdrReceipts || []).filter((item) => !sameId(receiptId(item), receiptId(saved)))],
+            pdrReceiptImporting: false,
+            pdrReceiptFile: null,
+            pdrReceiptFileName: "",
+            pdrReceiptOutcome: "unknown",
+            pdrReceiptSource: "pdr",
+            pdrReceiptLoadCode: "",
+            pdrReceiptReportedAt: "",
+            pdrReceiptDetailText: "",
+            // Un import è una conservazione probatoria locale: non è la
+            // conferma di un connettore PDR/ACER.
+            pdrReceiptInfo: "Ricevuta importata: non verificata dal connettore.",
+          }));
+        } catch (error) {
+          this.setState({ pdrReceiptImporting: false, pdrReceiptErrore: `Importazione ricevuta non completata: ${error.message}` });
+        }
+      };
+      const apriRicevuta = async (receipt) => {
+        const id = receiptId(receipt);
+        if (!id) {
+          this.setState({ pdrReceiptErrore: "Ricevuta senza identificativo locale: non posso aprirne il dettaglio." });
+          return;
+        }
+        this.setState({ pdrReceiptErrore: "", pdrReceiptOpen: { id, loading: true, receipt: null } });
+        try {
+          const payload = await this._json(`/api/pdr/receipts/${encodeURIComponent(id)}`);
+          const detailed = payload.receipt || payload;
+          this.setState((st) => ({
+            pdrReceiptOpen: { id, loading: false, receipt: detailed },
+            pdrReceipts: (st.pdrReceipts || []).map((item) => sameId(receiptId(item), id) ? { ...item, ...detailed } : item),
+          }));
+        } catch (error) {
+          this.setState({ pdrReceiptErrore: `Dettaglio ricevuta non disponibile: ${error.message}`, pdrReceiptOpen: null });
+        }
+      };
+      const scaricaRicevuta = async (receipt) => {
+        const id = receiptId(receipt);
+        if (!id) {
+          this.setState({ pdrReceiptErrore: "Ricevuta senza identificativo locale: download non disponibile." });
+          return;
+        }
+        this.setState({ pdrReceiptErrore: "" });
+        try {
+          const response = await fetch(`/api/pdr/receipts/${encodeURIComponent(id)}/download`, { credentials: "same-origin" });
+          if (!response.ok) throw new Error(`download ${response.status}`);
+          // Nei test (senza DOM) la chiamata resta osservabile senza cercare di
+          // creare un anchor; nel browser il file originale viene scaricato.
+          if (typeof document !== "undefined" && typeof URL !== "undefined" && URL.createObjectURL) {
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = String(receiptField(receipt, "filename", "original_filename", "file_name") || "ricevuta-pdr");
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+          }
+          this.setState({ pdrReceiptInfo: "Download della ricevuta avviato. Il contenuto resta importato e non verificato dal connettore." });
+        } catch (error) {
+          this.setState({ pdrReceiptErrore: `Download ricevuta non completato: ${error.message}` });
+        }
+      };
+      const pdrReceiptReportOptions = remRows.map((record) => ({ id: String(record.id), label: `${record.rif} · ${record.tipo}` }));
+      const pdrReceiptReportId = this.state.pdrReceiptReportId || "";
+      const pdrReceiptRows = (this.state.pdrReceipts || [])
+        .filter((receipt) => {
+          const linkedReport = receiptField(receipt, "report_id", "remit_report_id");
+          return !linkedReport || !pdrReceiptReportId || sameId(linkedReport, pdrReceiptReportId);
+        })
+        .map((receipt) => {
+          const outcome = String(receiptField(receipt, "outcome", "status") || "unknown");
+          const visual = outcomeStyle[outcome] || outcomeStyle.unknown;
+          return {
+            ...receipt,
+            id: receiptId(receipt),
+            filename: String(receiptField(receipt, "filename", "original_filename", "file_name") || "ricevuta senza nome"),
+            outcomeLabel: visual.label,
+            outcomeBg: visual.bg,
+            outcomeFg: visual.fg,
+            source: sourceLabel[receiptField(receipt, "source")] || String(receiptField(receipt, "source") || "Fonte non indicata"),
+            loadCode: String(receiptField(receipt, "load_code", "pdr_load_code", "reference") || "—"),
+            reportedAt: String(receiptField(receipt, "reported_at", "published_at", "created_at") || "—"),
+            detail: String(receiptField(receipt, "detail", "error_detail", "message", "notes") || "Nessun dettaglio dichiarato."),
+            provenance: "Importata manualmente · non verificata dal connettore",
+            view: () => apriRicevuta(receipt),
+            download: () => scaricaRicevuta(receipt),
+          };
+        });
+      const pdrReceiptOpenRow = this.state.pdrReceiptOpen?.receipt
+        ? pdrReceiptRows.find((row) => sameId(row.id, receiptId(this.state.pdrReceiptOpen.receipt)))
+          || (() => {
+            const receipt = this.state.pdrReceiptOpen.receipt;
+            const outcome = String(receiptField(receipt, "outcome", "status") || "unknown");
+            const visual = outcomeStyle[outcome] || outcomeStyle.unknown;
+            return {
+              filename: String(receiptField(receipt, "filename", "original_filename", "file_name") || "ricevuta senza nome"),
+              outcomeLabel: visual.label,
+              outcomeBg: visual.bg,
+              outcomeFg: visual.fg,
+              source: sourceLabel[receiptField(receipt, "source")] || String(receiptField(receipt, "source") || "Fonte non indicata"),
+              loadCode: String(receiptField(receipt, "load_code", "pdr_load_code", "reference") || "—"),
+              reportedAt: String(receiptField(receipt, "reported_at", "published_at", "created_at") || "—"),
+              detail: String(receiptField(receipt, "detail", "error_detail", "message", "notes") || "Nessun dettaglio dichiarato."),
+            };
+          })()
+        : null;
+
       const doLogin = async () => {
         const email = (this.state.loginEmail || "").trim();
         await this._apriSessione(email);
@@ -842,6 +1100,31 @@
         pdrFeeAnnual: this.state.pdrFees ? `${this.state.pdrFees.external_upload_annual_eur} €/anno` : "—",
         pdrCheck: this.state.pdrCheck, pdrCheckOpen: !!this.state.pdrCheck, pdrCheckLoading: !!this.state.pdrCheck?.loading, pdrIssues: this.state.pdrCheck?.issues ?? [], pdrCheckReport: this.state.pdrCheck?.report_id ?? "",
         pdrRows: remRows, pdrSchemas: this.state.pdrSchemas || [], goPdr: go("pdr"),
+        pdrReceiptReportOptions, pdrReceiptReportId, pdrReceiptRows,
+        pdrReceiptCaricamento: !!this.state.pdrReceiptCaricamento, pdrReceiptImporting: !!this.state.pdrReceiptImporting,
+        pdrReceiptErrore: this.state.pdrReceiptErrore, pdrReceiptInfo: this.state.pdrReceiptInfo,
+        pdrReceiptFileName: this.state.pdrReceiptFileName || "Nessun file selezionato",
+        pdrReceiptOutcome: this.state.pdrReceiptOutcome, pdrReceiptSource: this.state.pdrReceiptSource,
+        pdrReceiptLoadCode: this.state.pdrReceiptLoadCode, pdrReceiptReportedAt: this.state.pdrReceiptReportedAt, pdrReceiptDetailText: this.state.pdrReceiptDetailText,
+        pdrReceiptOutcomes: [
+          { value: "unknown", label: "Non classificato" },
+          { value: "pdr_accepted", label: "PDR · Accept" },
+          { value: "pdr_rejected", label: "PDR · Reject" },
+          { value: "pdr_partial", label: "PDR · Partial" },
+          { value: "acer_transmitted", label: "ACER · trasmesso" },
+          { value: "acer_accepted", label: "ACER · accettato" },
+          { value: "acer_rejected", label: "ACER · respinto" },
+          { value: "technical_retry", label: "Ritentare tecnicamente" },
+        ],
+        pdrReceiptSources: [
+          { value: "pdr", label: "PDR GME" },
+          { value: "acer", label: "Ritorno ACER" },
+        ],
+        pdrReceiptSetReport: selezionaRicevuteReport, pdrReceiptSetFile: setPdrReceiptFile,
+        pdrReceiptSetOutcome: pdrReceiptSet("pdrReceiptOutcome"), pdrReceiptSetSource: pdrReceiptSet("pdrReceiptSource"),
+        pdrReceiptSetLoadCode, pdrReceiptSetReportedAt: pdrReceiptSet("pdrReceiptReportedAt"), pdrReceiptSetDetail: pdrReceiptSet("pdrReceiptDetailText"),
+        importaRicevuta, pdrReceiptEmpty: !!pdrReceiptReportId && !this.state.pdrReceiptCaricamento && pdrReceiptRows.length === 0,
+        pdrReceiptOpen: !!this.state.pdrReceiptOpen, pdrReceiptOpenLoading: !!this.state.pdrReceiptOpen?.loading, pdrReceiptOpenRow, closePdrReceipt: () => this.setState({ pdrReceiptOpen: null }),
       };
     }
   }

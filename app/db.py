@@ -88,6 +88,50 @@ CREATE TABLE IF NOT EXISTS pdr_progressivo (
     prossimo INTEGER NOT NULL,
     PRIMARY KEY (data_file, schema_nome, schema_versione, codice_acer)
 );
+
+-- Una ricevuta non è una nota modificabile: il documento originale, il suo
+-- hash e il collegamento all'XML ACER restano immutabili dopo l'import.
+-- ``contenuto`` è un BLOB: il JSON usa base64 solo per il trasporto HTTP.
+CREATE TABLE IF NOT EXISTS pdr_ricevuta (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    report_id TEXT NOT NULL,
+    artifact_id TEXT NOT NULL,
+    artifact_sha256 TEXT NOT NULL,
+    fonte TEXT NOT NULL CHECK (fonte IN ('pdr', 'acer')),
+    esito TEXT NOT NULL CHECK (esito IN (
+        'pdr_rejected', 'pdr_accepted', 'pdr_partial', 'acer_transmitted',
+        'acer_accepted', 'acer_rejected', 'technical_retry', 'unknown'
+    )),
+    codice_carico TEXT CHECK (
+        codice_carico IS NULL OR codice_carico GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'
+    ),
+    segnalata_il TEXT NOT NULL,
+    nome_file TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    dettaglio_errore TEXT NOT NULL DEFAULT '',
+    contenuto BLOB NOT NULL,
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    parser_version TEXT,
+    parser_metadata TEXT NOT NULL DEFAULT '{}',
+    connettore_verificato INTEGER NOT NULL DEFAULT 0 CHECK (connettore_verificato = 0),
+    importata_il TEXT NOT NULL,
+    UNIQUE (email, report_id, sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_pdr_ricevuta_email_report
+    ON pdr_ricevuta(email, report_id, importata_il DESC);
+
+CREATE TRIGGER IF NOT EXISTS pdr_ricevuta_no_update
+BEFORE UPDATE ON pdr_ricevuta
+BEGIN
+    SELECT RAISE(ABORT, 'Le ricevute PDR sono immutabili');
+END;
+
+CREATE TRIGGER IF NOT EXISTS pdr_ricevuta_no_delete
+BEFORE DELETE ON pdr_ricevuta
+BEGIN
+    SELECT RAISE(ABORT, 'Le ricevute PDR sono immutabili');
+END;
 """
 
 
@@ -479,3 +523,127 @@ def prossimo_progressivo_pdr(
     ).fetchone()
     assert row is not None
     return int(row["progressivo"])
+
+
+def crea_ricevuta_pdr(
+    conn: sqlite3.Connection,
+    *,
+    receipt_id: str,
+    email: str,
+    report_id: str,
+    artifact_id: str,
+    artifact_sha256: str,
+    source: str,
+    outcome: str,
+    load_code: str | None,
+    reported_at: str,
+    filename: str,
+    media_type: str,
+    error_detail: str,
+    content: bytes,
+    sha256: str,
+    parser_version: str | None,
+    parser_metadata: dict,
+    imported_at: str,
+) -> None:
+    """Registra una ricevuta non modificabile associata a un XML ACER."""
+
+    conn.execute(
+        "INSERT INTO pdr_ricevuta "
+        "(id, email, report_id, artifact_id, artifact_sha256, fonte, esito, codice_carico, "
+        "segnalata_il, nome_file, media_type, dettaglio_errore, contenuto, sha256, "
+        "parser_version, parser_metadata, connettore_verificato, importata_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
+        (
+            receipt_id,
+            email,
+            report_id,
+            artifact_id,
+            artifact_sha256,
+            source,
+            outcome,
+            load_code,
+            reported_at,
+            filename,
+            media_type,
+            error_detail,
+            sqlite3.Binary(content),
+            sha256,
+            parser_version,
+            json.dumps(parser_metadata, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            imported_at,
+        ),
+    )
+
+
+def _deserializza_ricevuta(row: sqlite3.Row) -> dict:
+    try:
+        parser_metadata = json.loads(row["parser_metadata"])
+    except (TypeError, json.JSONDecodeError):
+        parser_metadata = {}
+    if not isinstance(parser_metadata, dict):
+        parser_metadata = {}
+    content = row["contenuto"]
+    return {
+        "id": row["id"],
+        "report_id": row["report_id"],
+        "artifact_id": row["artifact_id"],
+        "artifact_sha256": row["artifact_sha256"],
+        "source": row["fonte"],
+        "outcome": row["esito"],
+        "load_code": row["codice_carico"],
+        "reported_at": row["segnalata_il"],
+        "filename": row["nome_file"],
+        "mime_type": row["media_type"],
+        "error_detail": row["dettaglio_errore"],
+        "content": bytes(content),
+        "sha256": row["sha256"],
+        "parser_version": row["parser_version"],
+        "parser_metadata": parser_metadata,
+        "connector_verified": bool(row["connettore_verificato"]),
+        "imported_at": row["importata_il"],
+    }
+
+
+_RICEVUTA_COLUMNS = (
+    "id, report_id, artifact_id, artifact_sha256, fonte, esito, codice_carico, segnalata_il, "
+    "nome_file, media_type, dettaglio_errore, contenuto, sha256, parser_version, parser_metadata, "
+    "connettore_verificato, importata_il"
+)
+
+
+def leggi_ricevuta_pdr(conn: sqlite3.Connection, email: str, receipt_id: str) -> dict | None:
+    row = conn.execute(
+        f"SELECT {_RICEVUTA_COLUMNS} FROM pdr_ricevuta WHERE email = ? AND id = ?",
+        (email, receipt_id),
+    ).fetchone()
+    return _deserializza_ricevuta(row) if row else None
+
+
+def leggi_ricevuta_pdr_per_report_hash(
+    conn: sqlite3.Connection, email: str, report_id: str, sha256: str
+) -> dict | None:
+    row = conn.execute(
+        f"SELECT {_RICEVUTA_COLUMNS} FROM pdr_ricevuta "
+        "WHERE email = ? AND report_id = ? AND sha256 = ?",
+        (email, report_id, sha256),
+    ).fetchone()
+    return _deserializza_ricevuta(row) if row else None
+
+
+def lista_ricevute_pdr(
+    conn: sqlite3.Connection, email: str, report_id: str | None = None
+) -> list[dict]:
+    if report_id:
+        rows = conn.execute(
+            f"SELECT {_RICEVUTA_COLUMNS} FROM pdr_ricevuta "
+            "WHERE email = ? AND report_id = ? ORDER BY importata_il DESC, id DESC",
+            (email, report_id),
+        )
+    else:
+        rows = conn.execute(
+            f"SELECT {_RICEVUTA_COLUMNS} FROM pdr_ricevuta "
+            "WHERE email = ? ORDER BY importata_il DESC, id DESC",
+            (email,),
+        )
+    return [_deserializza_ricevuta(row) for row in rows]

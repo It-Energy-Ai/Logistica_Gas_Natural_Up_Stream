@@ -1,3 +1,4 @@
+import base64
 import sqlite3
 
 import pytest
@@ -402,6 +403,195 @@ def test_pdr_preflight_lega_xml_codice_abilitato_e_blocca_linvio_reale(client):
     assert "PDR_ACCESS_UNVERIFIED" in {issue["code"] for issue in check.json()["issues"]}
     assert check.json()["artifact"]["filename"] == exported["artifact"]["filename"]
     assert client.post(f"/api/pdr/reports/{report['id']}/submit").status_code == 409
+
+
+def _esporta_report_per_ricevuta(client):
+    report = client.post("/api/remit/reports", json=_remit_valida()).json()
+    return _esporta(client, _valida(client, report))
+
+
+def _payload_ricevuta(report, artifact, content: bytes, **extra):
+    payload = {
+        "report_id": report["id"],
+        "source": "pdr_portal",
+        "outcome": "pdr_accepted",
+        "load_code": "123456",
+        "reported_at": "2026-08-01T10:15:00+02:00",
+        "detail": "Esito importato dal portale PDR.",
+        "filename": f"FA_{artifact['filename']}",
+        "mime_type": "application/xml",
+        "content_base64": base64.b64encode(content).decode("ascii"),
+    }
+    payload.update(extra)
+    return payload
+
+
+def test_ricevuta_pdr_importata_immutabile_idempotente_e_senza_raw_nelle_api(client):
+    from app import db
+
+    client.post("/api/login", json={"email": "ricevute@azienda.it"})
+    exported = _esporta_report_per_ricevuta(client)
+    report, artifact = exported["report"], exported["artifact"]
+    raw = b"raw-receipt-secret-4e282ef2"
+    payload = _payload_ricevuta(report, artifact, raw)
+
+    created = client.post("/api/pdr/receipts/import", json=payload)
+    assert created.status_code == 201, created.text
+    body = created.json()
+    receipt = body["receipt"]
+    assert body["idempotent"] is False
+    assert body["connector_verified"] is False
+    assert receipt["source"] == "pdr"
+    assert receipt["outcome"] == "pdr_accepted"
+    assert receipt["artifact_id"] == artifact["id"]
+    assert receipt["artifact_sha256"] == artifact["sha256"]
+    assert receipt["load_code"] == "123456"
+    assert receipt["reported_at"].endswith("+02:00")
+    assert receipt["connector_verified"] is False
+    assert receipt["verification_state"] == "manual_import_unverified"
+    assert "content" not in receipt and "content_base64" not in receipt
+    # Il documento importato è una prova locale: non può promuovere il report
+    # a inviato/accettato senza un connettore PDR autorizzato.
+    assert client.get(f"/api/remit/reports/{report['id']}").json()["status"] == "xml_validato_xsd"
+
+    duplicate = client.post("/api/pdr/receipts/import", json=payload)
+    assert duplicate.status_code == 200
+    assert duplicate.json()["idempotent"] is True
+    assert duplicate.json()["receipt"]["id"] == receipt["id"]
+
+    listed = client.get(f"/api/pdr/receipts?report_id={report['id']}")
+    assert listed.status_code == 200
+    assert [row["id"] for row in listed.json()["receipts"]] == [receipt["id"]]
+    assert raw.decode("ascii") not in listed.text
+    detail = client.get(f"/api/pdr/receipts/{receipt['id']}")
+    assert detail.status_code == 200
+    assert raw.decode("ascii") not in detail.text
+    assert "content" not in detail.json()["receipt"]
+
+    downloaded = client.get(f"/api/pdr/receipts/{receipt['id']}/download")
+    assert downloaded.status_code == 200
+    assert downloaded.content == raw
+    assert downloaded.headers["content-type"].startswith("application/xml")
+    assert "filename*=UTF-8''FA_" in downloaded.headers["content-disposition"]
+
+    audit = client.get(f"/api/remit/reports/{report['id']}/audit").json()["events"]
+    imported = [event for event in audit if event["event_type"] == "PDR_RECEIPT_IMPORTED"]
+    assert len(imported) == 1
+    assert imported[0]["detail"]["receipt_id"] == receipt["id"]
+    assert imported[0]["detail"]["connector_verified"] is False
+    assert imported[0]["detail"]["error_detail_sha256"]
+
+    # Il database impedisce modifiche e cancellazioni anche se una chiamata
+    # interna provasse a bypassare l'API HTTP.
+    with db.connect() as conn:
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute("UPDATE pdr_ricevuta SET esito = 'acer_accepted' WHERE id = ?", (receipt["id"],))
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute("DELETE FROM pdr_ricevuta WHERE id = ?", (receipt["id"],))
+
+
+def test_ricevuta_pdr_parser_gme_prevale_sull_esito_manuale_e_rileva_partial(client):
+    client.post("/api/login", json={"email": "parser@azienda.it"})
+    exported = _esporta_report_per_ricevuta(client)
+    report, artifact = exported["report"], exported["artifact"]
+    acknowledgement = (
+        '<PIPEFunctionalAcknowledgement xmlns="urn:XML-PIPE" Status="Partial" '
+        f'OriginalReferenceNumber="{artifact["filename"]}" '
+        'CreationDate="2026-08-01T10:16:00Z">'
+        '<RejectInformation><ReasonText>Riga 3 da ritrasmettere</ReasonText></RejectInformation>'
+        '</PIPEFunctionalAcknowledgement>'
+    ).encode("utf-8")
+    imported = client.post(
+        "/api/pdr/receipts/import",
+        json=_payload_ricevuta(report, artifact, acknowledgement, outcome="unknown", detail="ignorato dal parser"),
+    )
+    assert imported.status_code == 201, imported.text
+    receipt = imported.json()["receipt"]
+    assert receipt["outcome"] == "pdr_partial"
+    assert receipt["reported_at"] == "2026-08-01T10:16:00Z"
+    assert receipt["error_detail"] == "Riga 3 da ritrasmettere"
+    assert receipt["parser_version"] == "gme-pdr-functional-ack/1"
+    assert receipt["parser_metadata"]["original_reference_matches_artifact"] is True
+    assert receipt["parser_metadata"]["outcome_derived"] is True
+
+    rejected_ack = acknowledgement.replace(b'Status="Partial"', b'Status="Reject"')
+    conflict = client.post(
+        "/api/pdr/receipts/import",
+        json=_payload_ricevuta(
+            report,
+            artifact,
+            rejected_ack,
+            outcome="pdr_accepted",
+            filename="FA_conflict.xml",
+        ),
+    )
+    assert conflict.status_code == 422
+    assert "non coincide" in conflict.json()["errore"]
+
+
+def test_ricevute_richiedono_xml_corretto_validano_campi_e_isolano_utenti(monkeypatch, client):
+    from app import pdr
+    from app.main import app
+
+    client.post("/api/login", json={"email": "prima-ricevute@azienda.it"})
+    incomplete = client.post("/api/remit/reports", json=_remit_valida()).json()
+    bare = _payload_ricevuta(incomplete, {"filename": "unused.xml"}, b"receipt")
+    assert client.post("/api/pdr/receipts/import", json=bare).status_code == 422
+
+    exported = _esporta_report_per_ricevuta(client)
+    report, artifact = exported["report"], exported["artifact"]
+    invalid_code = _payload_ricevuta(report, artifact, b"invalid-code", load_code="12345")
+    assert client.post("/api/pdr/receipts/import", json=invalid_code).status_code == 422
+    unicode_code = _payload_ricevuta(report, artifact, b"unicode-code", load_code="١٢٣٤٥٦")
+    assert client.post("/api/pdr/receipts/import", json=unicode_code).status_code == 422
+    invalid_time = _payload_ricevuta(report, artifact, b"invalid-time", reported_at="2026-08-01T10:15:00")
+    assert client.post("/api/pdr/receipts/import", json=invalid_time).status_code == 422
+    wrong_artifact = _payload_ricevuta(report, artifact, b"wrong-artifact", artifact_id="not-the-report-artifact")
+    assert client.post("/api/pdr/receipts/import", json=wrong_artifact).status_code == 422
+    assert client.post(
+        "/api/pdr/receipts/import",
+        json=_payload_ricevuta(report, artifact, b"not-base64", content_base64="***"),
+    ).status_code == 422
+    monkeypatch.setattr(pdr, "MAX_RECEIPT_BYTES", 4)
+    too_large = _payload_ricevuta(report, artifact, b"12345")
+    assert client.post("/api/pdr/receipts/import", json=too_large).status_code == 422
+    monkeypatch.setattr(pdr, "MAX_RECEIPT_BYTES", 2 * 1024 * 1024)
+
+    valid = client.post(
+        "/api/pdr/receipts/import", json=_payload_ricevuta(report, artifact, b"isolated-receipt")
+    )
+    assert valid.status_code == 201
+    receipt_id = valid.json()["receipt"]["id"]
+
+    with TestClient(app) as other:
+        other.post("/api/login", json={"email": "seconda-ricevute@azienda.it"})
+        assert other.get("/api/pdr/receipts").json()["receipts"] == []
+        # Un ID altrui non deve rivelare se la ricevuta esiste.
+        assert other.get(f"/api/pdr/receipts/{receipt_id}").status_code == 404
+        assert other.get(f"/api/pdr/receipts/{receipt_id}/download").status_code == 404
+        assert other.get(f"/api/pdr/receipts?report_id={report['id']}").status_code == 404
+
+
+def test_import_ricevuta_e_audit_sono_atomici(monkeypatch, client):
+    from app import db, pdr, remit
+
+    email = "atomic-ricevuta@azienda.it"
+    client.post("/api/login", json={"email": email})
+    exported = _esporta_report_per_ricevuta(client)
+    report, artifact = exported["report"], exported["artifact"]
+    payload = _payload_ricevuta(report, artifact, b"rollback-receipt")
+
+    def audit_failure(*args, **kwargs):
+        raise RuntimeError("audit non disponibile")
+
+    monkeypatch.setattr(remit, "registra_ricevuta_pdr_importata", audit_failure)
+    with db.connect() as conn:
+        with pytest.raises(RuntimeError, match="audit non disponibile"):
+            pdr.importa_ricevuta(conn, email, payload)
+    with db.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM pdr_ricevuta").fetchone()[0] == 0
+        events = db.leggi_eventi_remit(conn, email, report["id"])
+        assert not [event for event in events if event["event_type"] == "PDR_RECEIPT_IMPORTED"]
 
 
 def test_email_non_valida_ripiega_su_identita_neutra(client):

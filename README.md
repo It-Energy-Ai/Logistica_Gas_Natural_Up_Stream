@@ -106,6 +106,8 @@ Il progetto genera file XML per i tracciati **ACER REMITTable1 V3** (TradeReport
 
 Questo non equivale a una ricevuta GME o ACER. L'upload PDR resta disabilitato finché non sono disponibili contratto/abilitazione, credenziali di test a due livelli, specifiche del web service e un collaudo con ricevute reali. Il tracciato GasCapacity/EDIG@S per il trasporto gas è esplicitamente bloccato, non simulato.
 
+Le ricevute scaricate dall'operatore possono però essere **importate e tracciate**: il file XML/ZIP originale, la sua impronta SHA-256, il record REMIT e l'artefatto ACER associato restano immutabili, con evento di audit. Una ricevuta GME XML riconoscibile può fornire lo stato tecnico `Accept`/`Reject`/`Partial`; ogni importazione resta comunque marcata come manuale e non verificata dal connettore, finché non sarà configurato il canale PDR autorizzato.
+
 Istruzioni, fonti ufficiali, versioni degli schemi e prerequisiti di esercizio sono in [docs/remit-pdr.md](docs/remit-pdr.md).
 
 ## Test e qualità

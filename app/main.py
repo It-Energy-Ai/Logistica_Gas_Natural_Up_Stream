@@ -9,6 +9,7 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
@@ -160,6 +161,11 @@ def _risposta_remit_error(error: remit.RemitError):
     if error.errors:
         body["errors"] = error.errors
     return JSONResponse(body, status_code=status)
+
+
+def _risposta_pdr_error(error: pdr.PdrError):
+    status = 404 if isinstance(error, pdr.PdrNotFoundError) else 422
+    return JSONResponse({"errore": str(error)}, status_code=status)
 
 
 @app.get("/")
@@ -417,6 +423,90 @@ async def put_pdr_profile(request: Request):
         except pdr.PdrError as error:
             return JSONResponse({"errore": str(error)}, status_code=422)
     return {"profile": profile, "stored_secrets": False}
+
+
+# --- Ricevute PDR/ACER: import manuale e archivio immutabile --------------
+# Non vi è alcuna affermazione di upload, consegna o accettazione remota: il
+# documento viene solo associato all'XML ACER del report e conservato per audit.
+
+
+@app.post("/api/pdr/receipts/import")
+async def import_pdr_receipt(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    with db.connect() as conn:
+        try:
+            receipt, idempotent = pdr.importa_ricevuta(conn, email, payload)
+        except pdr.PdrError as error:
+            return _risposta_pdr_error(error)
+    return JSONResponse(
+        {
+            "receipt": receipt,
+            "idempotent": idempotent,
+            "connector_verified": False,
+            "notice": (
+                "Ricevuta importata manualmente: non prova un upload PDR, una consegna ACER "
+                "o una verifica eseguita dal connettore."
+            ),
+        },
+        status_code=200 if idempotent else 201,
+    )
+
+
+@app.get("/api/pdr/receipts")
+def get_pdr_receipts(request: Request, report_id: str | None = None):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        try:
+            receipts = pdr.lista_ricevute(conn, email, report_id)
+        except pdr.PdrError as error:
+            return _risposta_pdr_error(error)
+    return {
+        "receipts": receipts,
+        "connector_verified": False,
+        "notice": "L'elenco mostra documenti importati manualmente; il loro contenuto raw è disponibile solo nel download protetto.",
+    }
+
+
+@app.get("/api/pdr/receipts/{receipt_id}")
+def get_pdr_receipt(receipt_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        receipt = pdr.leggi_ricevuta(conn, email, receipt_id)
+    if not receipt:
+        return JSONResponse({"errore": "ricevuta non trovata"}, status_code=404)
+    return {
+        "receipt": pdr.presenta_ricevuta(receipt),
+        "connector_verified": False,
+        "notice": "La ricevuta è stata importata manualmente e non è verificata dal connettore.",
+    }
+
+
+@app.get("/api/pdr/receipts/{receipt_id}/download")
+def download_pdr_receipt(receipt_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        receipt = pdr.leggi_ricevuta(conn, email, receipt_id)
+    if not receipt:
+        return JSONResponse({"errore": "ricevuta non trovata"}, status_code=404)
+    # ``filename`` è validato al momento dell'import; il parametro RFC 5987
+    # evita comunque header injection e conserva i nomi UTF-8.
+    encoded_filename = quote(receipt["filename"], safe="")
+    return Response(
+        content=receipt["content"],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+        media_type=receipt["mime_type"],
+    )
 
 
 @app.post("/api/pdr/reports/{report_id}/preflight")
