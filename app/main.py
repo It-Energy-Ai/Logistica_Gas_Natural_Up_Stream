@@ -1,20 +1,21 @@
-"""Vettore — portale demo di logistica gas per shipper.
+"""Vettore — workspace locale per logistica gas e preparazione REMIT/PDR.
 
-Backend leggero: serve il frontend (generato dal file di design) e
-persiste su SQLite lo stato mutabile (nomine, configurazione, utenti).
-Le integrazioni reali (Snam, GME, SSO) sono scenografia demo nel frontend.
+Il backend serve il frontend generato e conserva stato, audit e artefatti XML
+localmente. Non dichiara integrazioni esterne concluse senza le relative
+ricevute ufficiali.
 """
 
 import re
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import db, pdr, remit
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -91,8 +92,6 @@ VALIDATORS = {
     "disabled": _is_str_map,
     "nextU": _is_int,
     "reps": _is_str_map,
-    "gmeAuto": _is_bool,
-    "gmeOk": _is_bool,
     "demoMode": _is_bool,
 }
 
@@ -136,9 +135,48 @@ def _sessione(request: Request) -> str | None:
         return db.email_sessione(conn, token)
 
 
+async def _body_object(request: Request, *, required: bool = False) -> dict | None:
+    """Legge un JSON oggetto senza trasformare un body vuoto in un 500."""
+    try:
+        body = await request.json()
+    except Exception:
+        if required:
+            return None
+        return {}
+    return body if isinstance(body, dict) else None
+
+
+def _versione_attesa(request: Request, payload: dict | None = None) -> int | None:
+    """Legge un If-Match numerico (o il fallback JSON per client semplici)."""
+    raw = request.headers.get("if-match", "").strip().removeprefix('W/').strip('"')
+    if raw.isdecimal():
+        return int(raw)
+    value = (payload or {}).get("version")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _risposta_remit_error(error: remit.RemitError):
+    status = 409 if isinstance(error, remit.ConflittoVersione) else 422 if error.errors else 409
+    body = {"errore": str(error)}
+    if error.errors:
+        body["errors"] = error.errors
+    return JSONResponse(body, status_code=status)
+
+
+def _risposta_pdr_error(error: pdr.PdrError):
+    status = 404 if isinstance(error, pdr.PdrNotFoundError) else 422
+    return JSONResponse({"errore": str(error)}, status_code=status)
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/healthz")
+def healthz():
+    """Sonda non autenticata per container e monitoraggio locale."""
+    return {"ok": True}
 
 
 @app.post("/api/login")
@@ -203,6 +241,298 @@ async def put_state(request: Request):
     with db.connect() as conn:
         db.scrivi_stato(conn, email, patch)
     return {"ok": True, "salvate": sorted(patch)}
+
+
+# --- Workspace REMIT e artefatti XML ACER ----------------------------------
+# I dati REMIT non passano dalla patch generica /api/state: il browser non può
+# assegnare da solo stati come "inviata" o "accettata". Le API generano XML
+# validato XSD, ma non effettuano né simulano alcun invio ACER/PDR.
+
+
+@app.get("/api/remit/reports")
+def get_remit_reports(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        imported = remit.importa_legacy_se_necessario(conn, email)
+        reports = remit.lista_report(conn, email)
+    return {
+        "mode": "local-acer-xml-generation",
+        "live_submission": False,
+        "legacy_imported": imported,
+        "reports": reports,
+        "notice": (
+            "Workspace REMIT locale: gli XML esportati sono validati XSD ma nessun invio "
+            "è stato effettuato verso ACER, GME/PDR, un RRM o un'IIP."
+        ),
+    }
+
+
+@app.post("/api/remit/reports")
+async def post_remit_report(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    with db.connect() as conn:
+        record = remit.crea_report(conn, email, payload)
+    return JSONResponse(record, status_code=201)
+
+
+@app.get("/api/remit/reports/{report_id}")
+def get_remit_report(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = remit.leggi_report(conn, email, report_id)
+    if not record:
+        return JSONResponse({"errore": "segnalazione non trovata"}, status_code=404)
+    return record
+
+
+@app.patch("/api/remit/reports/{report_id}")
+async def patch_remit_report(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    version = _versione_attesa(request, payload)
+    if version is None:
+        return JSONResponse({"errore": "If-Match con la versione corrente obbligatorio"}, status_code=428)
+    with db.connect() as conn:
+        try:
+            record = remit.aggiorna_bozza(conn, email, report_id, payload, version)
+        except remit.RemitError as error:
+            return _risposta_remit_error(error)
+    return record
+
+
+@app.post("/api/remit/reports/{report_id}/validate")
+async def validate_remit_report(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    version = _versione_attesa(request, payload)
+    if version is None:
+        return JSONResponse({"errore": "If-Match con la versione corrente obbligatorio"}, status_code=428)
+    with db.connect() as conn:
+        try:
+            record = remit.valida_report(conn, email, report_id, payload, version)
+        except remit.RemitError as error:
+            return _risposta_remit_error(error)
+    return record
+
+
+@app.post("/api/remit/reports/{report_id}/export")
+async def export_remit_report(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    version = _versione_attesa(request)
+    if version is None:
+        return JSONResponse({"errore": "If-Match con la versione corrente obbligatorio"}, status_code=428)
+    with db.connect() as conn:
+        try:
+            record, artifact = remit.esporta_report(conn, email, report_id, version)
+        except remit.RemitError as error:
+            return _risposta_remit_error(error)
+    return {"report": record, "artifact": artifact}
+
+
+@app.get("/api/remit/reports/{report_id}/audit")
+def get_remit_audit(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        try:
+            events = remit.eventi_report(conn, email, report_id)
+        except remit.RemitError as error:
+            return JSONResponse({"errore": str(error)}, status_code=404)
+    return {"report_id": report_id, "events": events}
+
+
+@app.get("/api/remit/artifacts/{artifact_id}")
+def get_remit_artifact(artifact_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        artifact = remit.leggi_artifact(conn, email, artifact_id)
+        if artifact:
+            try:
+                remit.verifica_integrita_artifact(conn, email, artifact)
+            except remit.RemitError as error:
+                return JSONResponse({"errore": f"Artefatto non scaricabile: {error}"}, status_code=409)
+    if not artifact or artifact["content"] is None:
+        return JSONResponse({"errore": "artefatto non trovato"}, status_code=404)
+    return Response(
+        content=artifact["content"],
+        headers={"Content-Disposition": f'attachment; filename="{artifact["filename"]}"'},
+        media_type=artifact["media_type"],
+    )
+
+
+@app.post("/api/remit/reports/{report_id}/submit")
+def submit_remit_report(report_id: str, request: Request):
+    """Endpoint esplicito che impedisce di scambiare l'export per un invio."""
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        if not remit.leggi_report(conn, email, report_id):
+            return JSONResponse({"errore": "segnalazione non trovata"}, status_code=404)
+    try:
+        remit.richiesta_invio_reale()
+    except remit.RemitError as error:
+        return JSONResponse({"errore": str(error)}, status_code=409)
+
+
+# --- PDR GME: configurazione preparatoria, nessuna credenziale o invio ------
+
+
+@app.get("/api/pdr")
+def get_pdr_status(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return pdr.stato(conn, email)
+
+
+@app.put("/api/pdr/profile")
+async def put_pdr_profile(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    with db.connect() as conn:
+        try:
+            profile = pdr.salva_profile(conn, email, payload)
+        except pdr.PdrError as error:
+            return JSONResponse({"errore": str(error)}, status_code=422)
+    return {"profile": profile, "stored_secrets": False}
+
+
+# --- Ricevute PDR/ACER: import manuale e archivio immutabile --------------
+# Non vi è alcuna affermazione di upload, consegna o accettazione remota: il
+# documento viene solo associato all'XML ACER del report e conservato per audit.
+
+
+@app.post("/api/pdr/receipts/import")
+async def import_pdr_receipt(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    with db.connect() as conn:
+        try:
+            receipt, idempotent = pdr.importa_ricevuta(conn, email, payload)
+        except pdr.PdrError as error:
+            return _risposta_pdr_error(error)
+    return JSONResponse(
+        {
+            "receipt": receipt,
+            "idempotent": idempotent,
+            "connector_verified": False,
+            "notice": (
+                "Ricevuta importata manualmente: non prova un upload PDR, una consegna ACER "
+                "o una verifica eseguita dal connettore."
+            ),
+        },
+        status_code=200 if idempotent else 201,
+    )
+
+
+@app.get("/api/pdr/receipts")
+def get_pdr_receipts(request: Request, report_id: str | None = None):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        try:
+            receipts = pdr.lista_ricevute(conn, email, report_id)
+        except pdr.PdrError as error:
+            return _risposta_pdr_error(error)
+    return {
+        "receipts": receipts,
+        "connector_verified": False,
+        "notice": "L'elenco mostra documenti importati manualmente; il loro contenuto raw è disponibile solo nel download protetto.",
+    }
+
+
+@app.get("/api/pdr/receipts/{receipt_id}")
+def get_pdr_receipt(receipt_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        receipt = pdr.leggi_ricevuta(conn, email, receipt_id)
+    if not receipt:
+        return JSONResponse({"errore": "ricevuta non trovata"}, status_code=404)
+    return {
+        "receipt": pdr.presenta_ricevuta(receipt),
+        "connector_verified": False,
+        "notice": "La ricevuta è stata importata manualmente e non è verificata dal connettore.",
+    }
+
+
+@app.get("/api/pdr/receipts/{receipt_id}/download")
+def download_pdr_receipt(receipt_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        receipt = pdr.leggi_ricevuta(conn, email, receipt_id)
+    if not receipt:
+        return JSONResponse({"errore": "ricevuta non trovata"}, status_code=404)
+    # ``filename`` è validato al momento dell'import; il parametro RFC 5987
+    # evita comunque header injection e conserva i nomi UTF-8.
+    encoded_filename = quote(receipt["filename"], safe="")
+    return Response(
+        content=receipt["content"],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+        media_type=receipt["mime_type"],
+    )
+
+
+@app.post("/api/pdr/reports/{report_id}/preflight")
+def post_pdr_preflight(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        try:
+            return pdr.preflight(conn, email, report_id)
+        except pdr.PdrError as error:
+            return JSONResponse({"errore": str(error)}, status_code=404)
+
+
+@app.post("/api/pdr/reports/{report_id}/submit")
+def post_pdr_submit(report_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        if not remit.leggi_report(conn, email, report_id):
+            return JSONResponse({"errore": "segnalazione non trovata"}, status_code=404)
+    try:
+        pdr.invio_reale_non_configurato()
+    except pdr.PdrError as error:
+        return JSONResponse({"errore": str(error)}, status_code=409)
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

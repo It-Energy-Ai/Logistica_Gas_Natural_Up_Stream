@@ -4,7 +4,24 @@ Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://k
 
 ## [Non rilasciato]
 
+### Aggiunto
+- **REMIT XML ACER**: generazione deterministica di `REMITTable1 V3` (TradeReport) e `REMITTable2 V1` (non-standard a prezzo fisso), con validazione XSD reale, impronta SHA-256 degli schemi e artefatto XML scaricabile.
+- **Nomenclatura PDR**: progressivo atomico in SQLite e nomi `YYYYMMDD_SCHEMANAME_SCHEMAVERSION_CODICEACER_PROGRESSIVO.XML` per gli artefatti supportati.
+- **Preflight PDR GME**: controllo di XML, dimensione, nome file, codice ACER abilitato, ambiente, canale, accesso test, contratto di produzione e autenticazione a due livelli, senza memorizzare password/PIN/OTP.
+- **Registro ricevute PDR/ACER**: import manuale di XML e ZIP, associato in modo immutabile al report REMIT e all'artefatto XML ACER; conserva file originale, SHA-256, Load Code, timestamp, esito e audit. Le ricevute GME `PIPEFunctionalAcknowledgement` riconosciute estraggono `Accept`, `Reject` o `Partial` senza trasformare l'import in una verifica live.
+- Documentazione operativa in `docs/remit-pdr.md`, con fonti ACER/GME, versioni degli XSD, prerequisiti dell'invio reale e ambito esplicito del rilascio.
+
+### Cambiato
+- Il vecchio export JSON REMIT è sostituito da XML validato XSD; lo stato `xml_validato_xsd` non equivale a una ricevuta GME o ACER.
+- Rimossi gli stati demo che facevano sembrare configurata un'integrazione GME; il percorso PDR espone solo readiness e preflight.
+- Il tracciato GasCapacity/EDIG@S per trasporto gas è bloccato esplicitamente finché non viene implementato il set completo di dati specifici, invece di generare un file non conforme.
+
 ### Corretto
+- **Confine PDR**: il preflight non può più dichiarare un file pronto all'upload sulla sola base di attestazioni manuali; mantiene `upload_ready=false` finché non esistono accesso e ricevute GME verificati.
+- **Progressivi PDR**: la numerazione è ora condivisa per data/schema/versione/codice ACER, così utenti distinti non possono produrre lo stesso nome file. I contatori sperimentali per utente vengono migrati conservando il valore massimo.
+- **Integrità REMIT**: download e preflight riverificano SHA-256 e XSD dell'artefatto, bloccando XML corrotti o alterati dopo l'export.
+- **Date regolatorie**: le date di transazione Table 1 e del contratto Table 2 future sono respinte prima dell'export.
+- **Interfaccia**: rimossa una sezione REMIT residua fuori dalla relativa schermata.
 - **Isolamento dei dati**: ogni email ha ora il proprio stato SQLite; nomine, configurazione, utenti e segnalazioni di un account non sono più visibili o sovrascrivibili da un altro.
 - **Cambio account e login offline**: logout e login successivo ripartono da uno stato pulito, mentre l'hub non viene più aperto se il backend non conferma l'accesso.
 - **Sync**: una sola richiesta di salvataggio resta in volo alla volta, così una risposta fuori ordine non può ripristinare un valore precedente.
@@ -13,6 +30,7 @@ Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://k
 ### Sicurezza
 - Aggiunti CSP, intestazioni anti-framing e anti-MIME-sniffing, policy per le API non memorizzabili in cache e normalizzazione dell'email di sessione.
 - SQLite usa WAL e un timeout di attesa per ridurre gli errori di lock nei salvataggi ravvicinati.
+- Le API delle ricevute non restituiscono mai il contenuto raw nei metadati, isolano i documenti per utente, limitano l'import a 2 MiB e usano un parser XML senza DTD/entità/rete. Il download dell'originale è disponibile solo tramite endpoint autenticato.
 
 ### Note di aggiornamento
 - Un database creato con le versioni precedenti conserva il vecchio stato globale in `stato_legacy`, senza attribuirlo automaticamente a un account. Per importarlo una sola volta all'account corretto, avvia l'app con `VETTORE_LEGACY_EMAIL=nome@azienda.it`; il backup verrà poi rimosso.

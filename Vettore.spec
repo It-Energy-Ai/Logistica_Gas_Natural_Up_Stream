@@ -1,10 +1,10 @@
 # Spec PyInstaller multipiattaforma: `pyinstaller Vettore.spec`
 from PyInstaller.utils.hooks import collect_all
 
-datas = [("app/static", "app/static")]
+datas = [("app/static", "app/static"), ("app/schemas", "app/schemas")]
 binaries = []
 hiddenimports = []
-for pacchetto in ("uvicorn", "fastapi", "starlette"):
+for pacchetto in ("uvicorn", "fastapi", "starlette", "lxml"):
     d, b, h = collect_all(pacchetto)
     datas += d
     binaries += b
