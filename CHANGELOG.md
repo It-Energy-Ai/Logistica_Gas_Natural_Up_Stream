@@ -2,6 +2,21 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [Non rilasciato]
+
+### Corretto
+- **Isolamento dei dati**: ogni email ha ora il proprio stato SQLite; nomine, configurazione, utenti e segnalazioni di un account non sono più visibili o sovrascrivibili da un altro.
+- **Cambio account e login offline**: logout e login successivo ripartono da uno stato pulito, mentre l'hub non viene più aperto se il backend non conferma l'accesso.
+- **Sync**: una sola richiesta di salvataggio resta in volo alla volta, così una risposta fuori ordine non può ripristinare un valore precedente.
+- **Release macOS**: un fallimento consultivo dello smoke test aggiorna un'unica issue diagnostica invece di aprirne una per ogni esecuzione.
+
+### Sicurezza
+- Aggiunti CSP, intestazioni anti-framing e anti-MIME-sniffing, policy per le API non memorizzabili in cache e normalizzazione dell'email di sessione.
+- SQLite usa WAL e un timeout di attesa per ridurre gli errori di lock nei salvataggi ravvicinati.
+
+### Note di aggiornamento
+- Un database creato con le versioni precedenti conserva il vecchio stato globale in `stato_legacy`, senza attribuirlo automaticamente a un account. Per importarlo una sola volta all'account corretto, avvia l'app con `VETTORE_LEGACY_EMAIL=nome@azienda.it`; il backup verrà poi rimosso.
+
 ## [1.2.1] — 2026-07-20
 
 ### Aggiunto

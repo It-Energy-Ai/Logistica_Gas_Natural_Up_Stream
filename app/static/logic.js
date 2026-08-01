@@ -41,12 +41,22 @@
 
   class App {
     constructor() {
-      this.state = {
-        screen: "login", theme: store.getItem("vt-theme"), sso: null, dashOff: 0,
-        loginEmail: "", loginPass: "", utenteEmail: "", demoMode: false,
+      this.state = this._nuovoStato();
+      this._pending = {};
+      this._syncTimer = null;
+      this._flushing = false;
+      this._sessionEmail = null;
+      this._sessionEpoch = 0;
+      this._loginInCorso = false;
+    }
+
+    _nuovoStato(theme = store.getItem("vt-theme")) {
+      return {
+        screen: "login", theme, sso: null, dashOff: 0,
+        loginEmail: "", loginPass: "", loginErrore: "", utenteEmail: "", demoMode: false,
         saved: false, gmeAuto: true, gmeOk: false,
         users: {}, extraUsers: [], nextU: 1,
-        wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
+        wiz: null, disabled: {}, hiddenPunti: [], extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
         nomList: [],
         nomPunto: "PSV", nomCiclo: "R4", nomQta: "",
         remList: [], remTipo: "Standard · mercato organizzato", remRif: "", remQta: "", remPrezzo: "",
@@ -56,8 +66,6 @@
           nEmail: true, nAlert: true, nReport: false, unit: "MWh", ciclo: "Intraday",
         },
       };
-      this._pending = {};
-      this._syncTimer = null;
     }
 
     setState(patch, opts) {
@@ -86,33 +94,49 @@
     // al login (sessione scaduta) conservando la coda per il dopo-login;
     // su 422 la scarta con errore in console (dato non salvabile).
     async _flush() {
+      // Una sola richiesta in volo conserva l'ordine delle modifiche: due PUT
+      // concorrenti potrebbero arrivare al server in ordine inverso e
+      // ripristinare un valore ormai superato.
+      if (this._flushing || this._sospesa || Object.keys(this._pending).length === 0) return;
       const patch = this._pending;
+      const epoca = this._sessionEpoch;
+      let ritardoSuccessivo = 250;
       this._pending = {};
+      this._flushing = true;
       try {
         const r = await fetch("/api/state", {
           method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
         if (r.ok) return;
+        // La risposta appartiene a una sessione precedente (logout o nuovo
+        // login): non deve modificare la nuova schermata né riaccodare dati
+        // dell'utente precedente.
+        if (epoca !== this._sessionEpoch) return;
         if (r.status === 401) {
           // sospende la sync (niente loop di retry contro un 401 permanente):
           // login() la riattiva e svuota la coda conservata
           this._sospesa = true;
           this._riaccoda(patch);
           console.warn("sessione scaduta: torno al login, modifiche in coda");
-          this.setState({ screen: "login" });
+          this.setState({ screen: "login", loginErrore: "La sessione è scaduta. Accedi di nuovo per salvare le modifiche in coda." });
           return;
         }
-        if (r.status === 422) {
+        if (r.status === 400 || r.status === 422) {
           console.error("sync respinta dal server (dati non validi), patch scartata:", await r.text());
           return;
         }
         this._riaccoda(patch);
-        this._scheduleSync(3000);
+        ritardoSuccessivo = 3000;
       } catch (e) {
-        this._riaccoda(patch);
-        console.warn("sync fallita (rete), ritento tra 3s", e);
-        this._scheduleSync(3000);
+        if (epoca === this._sessionEpoch) {
+          this._riaccoda(patch);
+          console.warn("sync fallita (rete), ritento tra 3s", e);
+          ritardoSuccessivo = 3000;
+        }
+      } finally {
+        this._flushing = false;
+        if (epoca === this._sessionEpoch) this._scheduleSync(ritardoSuccessivo);
       }
     }
 
@@ -126,22 +150,21 @@
       }
     }
 
-    // Ritorna l'email COME NORMALIZZATA DAL SERVER (fonte di verità): è quella
-    // che il boot rileggerà da /api/state, quindi l'identità mostrata resta
-    // coerente dopo un refresh anche se l'input era vuoto o malformato.
+    // Ritorna l'email normalizzata dal server. Non considera completato
+    // l'accesso finché non riceve una risposta 2xx con un'identità valida.
     async login(email) {
       try {
         const r = await fetch("/api/login", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
-        this._sospesa = false;
-        this._scheduleSync(); // svuota la coda accumulata durante la sessione scaduta
-        const dati = await r.json().catch(() => ({}));
-        return dati.email || email;
+        if (!r.ok) throw new Error(`login HTTP ${r.status}`);
+        const dati = await r.json();
+        if (!dati || typeof dati.email !== "string" || !dati.email) throw new Error("risposta login non valida");
+        return dati.email;
       } catch (e) {
         console.warn("login API non raggiungibile", e);
-        return email;
+        return null;
       }
     }
 
@@ -149,10 +172,71 @@
 
     // Idrata lo stato dal payload di /api/state: separa l'identità (email)
     // dallo stato persistito e, se c'è una sessione, salta il login.
-    idrata(saved) {
-      if (!saved) return;
+    idrata(saved, { mantieniCoda = false } = {}) {
+      if (!saved || typeof saved !== "object" || typeof saved.email !== "string") return false;
       const { email, ...stato } = saved;
-      this.state = { ...this.state, ...stato, utenteEmail: email || "", screen: "hub" };
+      const pulito = this._nuovoStato(this.state.theme);
+      for (const chiave of PERSIST) {
+        if (mantieniCoda && chiave in this._pending) {
+          pulito[chiave] = this.state[chiave];
+        } else if (chiave in stato) {
+          pulito[chiave] = stato[chiave];
+        }
+      }
+      this.state = { ...pulito, utenteEmail: email, screen: "hub" };
+      this._sessionEmail = email;
+      return true;
+    }
+
+    async _leggiStato() {
+      try {
+        const r = await fetch("/api/state");
+        if (!r.ok) throw new Error(`stato HTTP ${r.status}`);
+        const saved = await r.json();
+        if (!saved || typeof saved.email !== "string") throw new Error("risposta stato non valida");
+        return saved;
+      } catch (e) {
+        console.warn("stato API non raggiungibile", e);
+        return null;
+      }
+    }
+
+    async _apriSessione(email) {
+      if (this._loginInCorso) return false;
+      this._loginInCorso = true;
+      this.setState({ loginErrore: "" });
+      try {
+        const confermata = await this.login(email);
+        if (!confermata) {
+          this.setState({ loginErrore: "Accesso non riuscito. Verifica la connessione e riprova." });
+          return false;
+        }
+        const riprendiCoda = this._sospesa && this._sessionEmail === confermata;
+        const saved = await this._leggiStato();
+        if (!saved) {
+          this.setState({ loginErrore: "Sessione creata, ma non riesco a leggere i dati. Riprova." });
+          return false;
+        }
+        if (!riprendiCoda) this._pending = {};
+        this._sospesa = false;
+        this._sessionEpoch += 1;
+        this.idrata(saved, { mantieniCoda: riprendiCoda });
+        this._scheduleSync();
+        if (this._vt) this._vt.render();
+        return true;
+      } finally {
+        this._loginInCorso = false;
+      }
+    }
+
+    _reimpostaDopoLogout() {
+      clearTimeout(this._syncTimer);
+      this._pending = {};
+      this._sospesa = false;
+      this._sessionEmail = null;
+      this._sessionEpoch += 1;
+      this.state = this._nuovoStato(this.state.theme);
+      if (this._vt) this._vt.render();
     }
 
     // Identità mostrata nell'interfaccia, derivata dall'email di login.
@@ -480,16 +564,13 @@
         remRif: "", remQta: "", remPrezzo: "",
       }));
 
-      const doLogin = () => {
+      const doLogin = async () => {
         const email = (this.state.loginEmail || "").trim();
-        // l'identità mostrata è quella normalizzata dal server (fonte di verità),
-        // così un refresh la ripesca identica da /api/state
-        this.login(email).then((confermata) => this.setState({ utenteEmail: confermata }));
-        this.setState({ screen: "hub", loginPass: "", utenteEmail: email });
+        await this._apriSessione(email);
       };
       const logout = () => {
         fetch("/api/logout", { method: "POST" }).catch(() => {});
-        this.setState({ screen: "login" });
+        this._reimpostaDopoLogout();
       };
 
       return {
@@ -508,12 +589,17 @@
         setRemPrezzo: (e) => this.setSilent({ remPrezzo: e.target.value }),
         doLogin, logout, goHub: go("hub"),
         loginEmail: this.state.loginEmail, loginPass: this.state.loginPass,
+        loginErrore: this.state.loginErrore,
         setLoginEmail: (e) => this.setSilent({ loginEmail: e.target.value }),
         setLoginPass: (e) => this.setSilent({ loginPass: e.target.value }),
-        loginKey: (e) => { if (e.key === "Enter") doLogin(); },
+        loginKey: (e) => (e.key === "Enter" ? doLogin() : undefined),
         doSSO: () => { this.setState({ sso: "redirect" }); setTimeout(() => this.setState((st) => (st.sso ? { sso: "pick" } : {})), 1100); },
         ssoCancel: () => this.setState({ sso: null }),
-        ssoPick: () => { this.login("m.rossi@azienda1.it"); this.setState({ sso: "auth", utenteEmail: "m.rossi@azienda1.it" }); setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900); },
+        ssoPick: async () => {
+          if (!await this._apriSessione("m.rossi@azienda1.it")) return;
+          this.setState({ sso: "auth" });
+          setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900);
+        },
         ssoRedirect: this.state.sso === "redirect", ssoPickStep: this.state.sso === "pick", ssoAuth: this.state.sso === "auth", ssoOpen: !!this.state.sso,
         toggleTheme: () => { const t = theme === "dark" ? "light" : "dark"; store.setItem("vt-theme", t); this.setState({ theme: t }); },
         crumbs, moduli, kpis, days, cicli, rows, punti, notifiche, unitOpts, cicloOpts, cfgCards, servizi, logs,
