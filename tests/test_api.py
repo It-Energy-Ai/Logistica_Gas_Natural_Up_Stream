@@ -26,6 +26,11 @@ def test_index_contiene_template_e_schermate(client):
     assert "style-hover" not in r.text  # pseudo-stili convertiti dal builder
     assert 'value="{{ loginEmail }}"' in r.text  # campi login controllati (builder)
     assert r.text.count('onKeyDown="{{ loginKey }}"') == 2
+    assert 'value="{{ loginErrore }}"' in r.text
+    assert r.headers["cache-control"] == "no-store"
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
 
 
 def test_static_serviti(client):
@@ -54,6 +59,21 @@ def test_login_e_persistenza_stato(client):
     assert stato["nomList"] == [nomina]
     assert stato["gmeOk"] is True
     assert stato["nextU"] == 2
+
+
+def test_stato_isolato_per_utente(client):
+    from app.main import app
+
+    client.post("/api/login", json={"email": "prima@azienda.it"})
+    assert client.put("/api/state", json={"gmeOk": True}).status_code == 200
+
+    # Due client simulano browser diversi sulla stessa base SQLite.
+    with TestClient(app) as altro:
+        altro.post("/api/login", json={"email": "seconda@azienda.it"})
+        assert altro.get("/api/state").json() == {"email": "seconda@azienda.it"}
+        assert altro.put("/api/state", json={"gmeOk": False}).status_code == 200
+
+    assert client.get("/api/state").json()["gmeOk"] is True
 
 
 def test_validazione_chiavi_e_forme(client):
@@ -132,3 +152,42 @@ def test_extra_punti_e_utenti_roundtrip(client):
     stato = client.get("/api/state").json()
     stato.pop("email")
     assert stato == patch
+
+
+def test_migrazione_stato_globale_conserva_un_backup(tmp_path, monkeypatch):
+    monkeypatch.setenv("VETTORE_DB", str(tmp_path / "legacy.db"))
+    from app import db
+
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE stato (chiave TEXT PRIMARY KEY, valore TEXT NOT NULL, aggiornata_il TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO stato (chiave, valore, aggiornata_il) VALUES ('gmeOk', 'true', datetime('now'))"
+        )
+    db.init_db()
+    with db.connect() as conn:
+        colonne = {r["name"] for r in conn.execute("PRAGMA table_info(stato)")}
+        assert colonne >= {"email", "chiave", "valore"}
+        assert conn.execute("SELECT valore FROM stato_legacy WHERE chiave = 'gmeOk'").fetchone()[0] == "true"
+        assert db.leggi_stato(conn, "nuovo@azienda.it") == {}
+
+
+def test_migrazione_stato_globale_importa_solo_per_proprietario_esplicito(tmp_path, monkeypatch):
+    monkeypatch.setenv("VETTORE_DB", str(tmp_path / "legacy-import.db"))
+    monkeypatch.setenv("VETTORE_LEGACY_EMAIL", "Proprietario@Azienda.it")
+    from app import db
+
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE stato (chiave TEXT PRIMARY KEY, valore TEXT NOT NULL, aggiornata_il TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO stato (chiave, valore, aggiornata_il) VALUES ('gmeOk', 'true', datetime('now'))"
+        )
+    db.init_db()
+    with db.connect() as conn:
+        assert db.leggi_stato(conn, "proprietario@azienda.it") == {"gmeOk": True}
+        assert conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'stato_legacy'"
+        ).fetchone() is None

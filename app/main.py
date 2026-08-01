@@ -106,6 +106,28 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Vettore", lifespan=lifespan)
 
 
+@app.middleware("http")
+async def proteggi_risposte(request: Request, call_next):
+    """Applica difese browser anche se l'app viene avviata fuori da Docker."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    )
+    if request.url.path == "/" or request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 def _sessione(request: Request) -> str | None:
     token = request.cookies.get(COOKIE)
     if not token:
@@ -127,13 +149,20 @@ async def login(request: Request, response: Response):
         body = {}
     # Su email assente o malformata si ripiega su un'identità NEUTRA, mai su
     # quella di scena (Marco Rossi), che contaminerebbe la modalità pulita.
-    email = str(body.get("email") or "").strip()[:120]
+    email = str(body.get("email") or "").strip().lower()[:120]
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         email = "utente@locale"
     token = secrets.token_urlsafe(32)
     with db.connect() as conn:
         db.crea_sessione(conn, token, email)
-    response.set_cookie(COOKIE, token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30)
+    response.set_cookie(
+        COOKIE,
+        token,
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+        path="/",
+    )
     return {"ok": True, "email": email}
 
 
@@ -143,7 +172,7 @@ def logout(request: Request, response: Response):
     if token:
         with db.connect() as conn:
             db.elimina_sessione(conn, token)
-    response.delete_cookie(COOKIE)
+    response.delete_cookie(COOKIE, path="/")
     return {"ok": True}
 
 
@@ -154,12 +183,13 @@ def get_state(request: Request):
         return JSONResponse({"errore": "sessione assente"}, status_code=401)
     with db.connect() as conn:
         # "email" è l'identità della sessione: il client la separa dallo stato.
-        return {"email": email, **db.leggi_stato(conn)}
+        return {"email": email, **db.leggi_stato(conn, email)}
 
 
 @app.put("/api/state")
 async def put_state(request: Request):
-    if not _sessione(request):
+    email = _sessione(request)
+    if not email:
         return JSONResponse({"errore": "sessione assente"}, status_code=401)
     try:
         patch = await request.json()
@@ -171,7 +201,7 @@ async def put_state(request: Request):
     if respinte:
         return JSONResponse({"errore": f"chiavi non valide: {', '.join(sorted(respinte))}"}, status_code=422)
     with db.connect() as conn:
-        db.scrivi_stato(conn, patch)
+        db.scrivi_stato(conn, email, patch)
     return {"ok": True, "salvate": sorted(patch)}
 
 

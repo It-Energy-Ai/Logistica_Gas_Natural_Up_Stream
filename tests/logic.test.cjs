@@ -9,7 +9,18 @@ const ev = (value) => ({ target: { value } });
 
 // In Node la fetch verso URL relativi fallisce sempre e il retry della sync
 // terrebbe vivo il processo: stub che risponde sempre 200.
-const FETCH_OK = async () => ({ ok: true, status: 200, text: async () => "" });
+let emailSessione = "utente@locale";
+const FETCH_OK = async (url, opts = {}) => {
+  if (url === "/api/login") {
+    const body = JSON.parse(opts.body || "{}");
+    emailSessione = String(body.email || "utente@locale").trim().toLowerCase() || "utente@locale";
+    return { ok: true, status: 200, json: async () => ({ ok: true, email: emailSessione }), text: async () => "" };
+  }
+  if (url === "/api/state" && !opts.method) {
+    return { ok: true, status: 200, json: async () => ({ email: emailSessione }), text: async () => "" };
+  }
+  return { ok: true, status: 200, text: async () => "" };
+};
 global.fetch = FETCH_OK;
 
 test("stato iniziale: schermata di login", () => {
@@ -58,11 +69,11 @@ test("modalità demo: l'interruttore popola la scenografia del canvas", () => {
   assert.equal(app.state.nomList.length, 0);
 });
 
-test("identità derivata dall'email di login", () => {
+test("identità derivata dall'email di login", async () => {
   const app = new App();
   const v = app.renderVals();
   v.setLoginEmail(ev("davide.bellini@itenergy.ai"));
-  app.renderVals().doLogin();
+  await app.renderVals().doLogin();
   const v2 = app.renderVals();
   assert.equal(v2.utenteNome, "Davide Bellini");
   assert.equal(v2.utenteIniziali, "DB");
@@ -244,12 +255,12 @@ test("sync: solo chiavi persistite finiscono in _pending", () => {
   assert.deepEqual(app._pending, {});
 });
 
-test("login: campi controllati e Invio", () => {
+test("login: campi controllati e Invio", async () => {
   const app = new App();
   let v = app.renderVals();
   v.setLoginEmail(ev("davide@itenergy.ai"));
   assert.equal(app.state.loginEmail, "davide@itenergy.ai");
-  app.renderVals().loginKey({ key: "Enter" });
+  await app.renderVals().loginKey({ key: "Enter" });
   v = app.renderVals();
   assert.equal(v.screenHub, true);
   assert.equal(app.state.loginPass, ""); // password azzerata dopo l'accesso
@@ -296,6 +307,7 @@ test("sync: il retry non riporta indietro un valore già superato", async () => 
 test("sync: 401 sospende (niente loop), il login riprende e svuota la coda", async () => {
   const app = new App();
   app.setState({ screen: "nomine" });
+  app._sessionEmail = "operazioni@gasadriatica.it";
   app.state.gmeOk = true; // valore corrente che _riaccoda deve conservare
   global.fetch = async () => ({ ok: false, status: 401, text: async () => "" });
   app._pending = { gmeOk: true };
@@ -307,15 +319,63 @@ test("sync: 401 sospende (niente loop), il login riprende e svuota la coda", asy
   assert.equal(app._syncTimer, timerPrima); // NESSUN nuovo retry programmato
   // il login riattiva la sync e svuota la coda
   let inviate = null;
-  global.fetch = async (url, opts) => {
-    if (url === "/api/state" && opts && opts.method === "PUT") inviate = JSON.parse(opts.body);
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/login") return { ok: true, status: 200, json: async () => ({ email: "operazioni@gasadriatica.it" }) };
+    if (url === "/api/state" && !opts.method) return { ok: true, status: 200, json: async () => ({ email: "operazioni@gasadriatica.it", gmeOk: false }) };
+    if (url === "/api/state" && opts.method === "PUT") inviate = JSON.parse(opts.body);
     return { ok: true, status: 200, text: async () => "" };
   };
-  await app.login("operazioni@gasadriatica.it");
+  await app._apriSessione("operazioni@gasadriatica.it");
   assert.equal(app._sospesa, false);
   await new Promise((r) => setTimeout(r, 300)); // debounce 250ms
   assert.deepEqual(inviate, { gmeOk: true });
   assert.deepEqual(app._pending, {});
+  global.fetch = FETCH_OK;
+});
+
+test("login: non apre l'hub se l'API non risponde", async () => {
+  const app = new App();
+  global.fetch = async () => { throw new Error("offline"); };
+  app.renderVals().setLoginEmail(ev("operazioni@gasadriatica.it"));
+  await app.renderVals().doLogin();
+  assert.equal(app.state.screen, "login");
+  assert.match(app.state.loginErrore, /Accesso non riuscito/);
+  global.fetch = FETCH_OK;
+});
+
+test("logout e nuovo login non conservano i dati dell'utente precedente", async () => {
+  const app = new App();
+  app.idrata({ email: "prima@azienda.it", nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Inviata" }] });
+  app._reimpostaDopoLogout();
+  assert.equal(app.state.screen, "login");
+  assert.deepEqual(app.state.nomList, []);
+  emailSessione = "seconda@azienda.it";
+  await app._apriSessione("seconda@azienda.it");
+  assert.equal(app.state.utenteEmail, "seconda@azienda.it");
+  assert.deepEqual(app.state.nomList, []);
+});
+
+test("sync: serializza i salvataggi e conserva l'ultima modifica", async () => {
+  const app = new App();
+  app._sessionEmail = "operazioni@gasadriatica.it";
+  app.state.gmeOk = false;
+  let risolviPrima;
+  const invii = [];
+  global.fetch = async (_url, opts) => {
+    invii.push(JSON.parse(opts.body));
+    if (invii.length === 1) return new Promise((resolve) => { risolviPrima = () => resolve({ ok: true, status: 200, text: async () => "" }); });
+    return { ok: true, status: 200, text: async () => "" };
+  };
+  app._pending = { gmeOk: false };
+  const primo = app._flush();
+  app.setState({ gmeOk: true });
+  await app._flush();
+  assert.equal(invii.length, 1, "non invia una seconda PUT mentre la prima è in volo");
+  risolviPrima();
+  await primo;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.deepEqual(invii, [{ gmeOk: false }, { gmeOk: true }]);
+  clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
 });
 
@@ -433,4 +493,3 @@ test("limiti: nomina e punto troncati ai cap del backend", () => {
   app.renderVals().addPunto();
   assert.equal(app.state.extraPunti[0][0].length, 160);
 });
-

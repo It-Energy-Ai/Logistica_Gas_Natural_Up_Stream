@@ -31,6 +31,15 @@ def main() -> None:
         sys.exit("template del design non trovato")
     template = html[start : end + len("</div>")]
 
+    # Un errore di rete o un errore HTTP nel login non deve lasciare l'utente
+    # su un hub solo apparentemente autenticato: la logica espone un messaggio
+    # e il template lo rende accessibile agli screen reader.
+    login_button = '<button onClick="{{ doLogin }}" style="width:100%;padding:13px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:14.5px;font-weight:600;cursor:pointer;transition:filter .15s" style-hover="filter:brightness(1.12)">Accedi</button>'
+    login_feedback = '<sc-if value="{{ loginErrore }}"><p role="alert" style="margin:0;font-size:12px;line-height:1.45;color:#C05B4D">{{ loginErrore }}</p></sc-if>'
+    if template.count(login_button) != 1:
+        sys.exit("anchor pulsante login non univoco")
+    template = template.replace(login_button, login_button + login_feedback)
+
     # style-hover / style-focus -> attributi data-vh / data-vf + regole CSS.
     rules: dict[tuple[str, str], int] = {}
 

@@ -107,7 +107,15 @@ jobs:
             echo "--- stack (sample) se catturato:"; head -100 sample.txt 2>/dev/null || echo "(assente)"
             echo '```'
           } > diagnosi.md
-          gh issue create --title "Diagnostica smoke macOS · run ${{ github.run_id }}" --body-file diagnosi.md || true
+          # Il problema è noto nell'immagine macOS del runner: manteniamo una
+          # sola issue di diagnostica aggiornata invece di aprirne una a ogni
+          # release consultiva fallita.
+          ISSUE=$(gh issue list --repo "${{ github.repository }}" --state open --search 'Diagnostica smoke macOS in:title' --limit 1 --json number --jq '.[0].number')
+          if [ -n "$ISSUE" ]; then
+            gh issue comment "$ISSUE" --repo "${{ github.repository }}" --body-file diagnosi.md || true
+          else
+            gh issue create --title "Diagnostica smoke macOS" --body-file diagnosi.md || true
+          fi
 
       - name: Rinomina il prodotto
         shell: bash
