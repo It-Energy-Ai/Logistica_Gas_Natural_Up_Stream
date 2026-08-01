@@ -26,6 +26,7 @@ jobs:
       - name: Test API (pytest)
         run: |
           pip install -r requirements-dev.txt
+          pip check
           pytest -q
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7

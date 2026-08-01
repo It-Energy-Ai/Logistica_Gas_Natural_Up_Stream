@@ -99,7 +99,7 @@ input::placeholder{color:var(--ink3)}
   <sc-if value="{{ ssoOpen }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;animation:vtFade .18s ease">
       <div style="position:absolute;inset:0;background:rgba(6,14,20,.55);backdrop-filter:blur(2px)"></div>
-      <div style="position:relative;width:400px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.35);padding:26px 28px;display:flex;flex-direction:column;gap:18px">
+      <div role="dialog" aria-modal="true" aria-label="Accesso SSO aziendale" style="position:relative;width:400px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.35);padding:26px 28px;display:flex;flex-direction:column;gap:18px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="width:28px;height:28px;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 12%,transparent);border-radius:8px;color:var(--primText);font-size:11px;font-weight:700">ID</span>
           <span style="display:flex;flex-direction:column;line-height:1.3">
@@ -117,15 +117,15 @@ input::placeholder{color:var(--ink3)}
         <sc-if value="{{ ssoPickStep }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;gap:10px">
             <span style="font-size:13.5px;font-weight:600">Scegli un account</span>
-            <div onClick="{{ ssoPick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s" style-hover="border-color:color-mix(in oklab,var(--prim) 45%,var(--line));background:color-mix(in oklab,var(--prim) 5%,var(--surface))">
+            <button type="button" onClick="{{ ssoPickMarco }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background:var(--surface);color:var(--ink);font-family:inherit;text-align:left" style-hover="border-color:color-mix(in oklab,var(--prim) 45%,var(--line));background:color-mix(in oklab,var(--prim) 5%,var(--surface))">
               <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:color-mix(in oklab,var(--prim) 14%,transparent);color:var(--primText);font-size:12px;font-weight:700">MR</span>
               <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:600">Marco Rossi</span><span style="font-size:11px;color:var(--ink3)">m.rossi@azienda1.it</span></span>
-            </div>
-            <div onClick="{{ ssoPick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s" style-hover="border-color:color-mix(in oklab,var(--prim) 45%,var(--line));background:color-mix(in oklab,var(--prim) 5%,var(--surface))">
+            </button>
+            <button type="button" onClick="{{ ssoPickLaura }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:border-color .15s,background:var(--surface);color:var(--ink);font-family:inherit;text-align:left" style-hover="border-color:color-mix(in oklab,var(--prim) 45%,var(--line));background:color-mix(in oklab,var(--prim) 5%,var(--surface))">
               <span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);color:var(--ink2);font-size:12px;font-weight:700">LB</span>
               <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:600">Laura Bianchi</span><span style="font-size:11px;color:var(--ink3)">l.bianchi@azienda1.it</span></span>
-            </div>
-            <span style="font-size:12px;color:var(--primText);font-weight:600;cursor:pointer;padding:4px 2px" style-hover="text-decoration:underline">Usa un altro account</span>
+            </button>
+            <button type="button" onClick="{{ ssoCancel }}" style="font-size:12px;color:var(--primText);font-weight:600;cursor:pointer;padding:4px 2px;border:none;background:transparent;font-family:inherit;text-align:left" style-hover="text-decoration:underline">Usa un altro account</button>
           </div>
         </sc-if>
         <sc-if value="{{ ssoAuth }}" hint-placeholder-val="{{ false }}">
@@ -441,31 +441,13 @@ input::placeholder{color:var(--ink3)}
       </sc-for>
     </div>
 
-    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px">
-        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Credenziali API GME</h3><span style="font-size:12px;color:var(--ink3)">Download dei dati di sbilancio giornaliero</span></div>
-        <sc-if value="{{ gmeOk }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#259372;background:rgba(47,163,124,.15);padding:5px 10px;border-radius:99px">Connessione verificata ✓</span></sc-if>
+    <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;gap:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">PDR · GME</h3><span style="font-size:12px;color:var(--ink3)">Readiness e preflight per il servizio di Data Reporting</span></div>
+        <span style="font-size:11px;font-weight:600;color:var(--ink2);background:var(--surface2);padding:5px 10px;border-radius:99px">Nessun segreto salvato</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Endpoint
-          <input type="text" placeholder="https://api.mercatoelettrico.org/sbilancio" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-        </label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Client ID
-            <input type="text" placeholder="AZ1-GME-01" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-          </label>
-          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Client secret
-            <input type="password" placeholder="••••••••••••" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-          </label>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 0">
-          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;font-weight:600">Download automatico</span><span style="font-size:11px;color:var(--ink3)">Ogni giorno alle 06:15, dopo la pubblicazione GME</span></span>
-          <span onClick="{{ gmeToggle }}" style="width:38px;height:22px;border-radius:99px;background:{{ gmeKBg }};border:1px solid var(--line);position:relative;cursor:pointer;transition:background .2s;flex:none;box-sizing:border-box">
-            <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transform:{{ gmeKX }};transition:transform .2s"></span>
-          </span>
-        </div>
-        <button onClick="{{ verifyGme }}" style="width:100%;padding:10px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" style-hover="filter:brightness(1.12)">Verifica e salva credenziali</button>
-      </div>
+      <p style="margin:0;font-size:12.5px;line-height:1.55;color:var(--ink2)">Le credenziali GME e l'autenticazione a due livelli non sono gestite qui. Apri il workspace PDR per configurare ambiente di test, requisiti e controlli preliminari.</p>
+      <button onClick="{{ goPdr }}" style="width:100%;padding:10px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" style-hover="filter:brightness(1.12)">Apri PDR · GME</button>
     </div>
     <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px"><h3 style="margin:0;font-size:15px;font-weight:600">Utenti e privilegi</h3><span style="font-size:12px;color:var(--ink3)">Chi può caricare file e chi può solo consultare</span></div>
@@ -898,391 +880,47 @@ input::placeholder{color:var(--ink3)}
 <sc-if value="{{ screenRemit }}" hint-placeholder-val="{{ false }}">
 <section data-screen-label="Remit" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">REMIT · Segnalazioni</h1>
-      <p style="margin:0;font-size:13.5px;color:var(--ink2)">Transaction reporting verso ACER — Reg. UE 1227/2011 e 2024/1106</p>
-    </div>
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">REMIT · XML ACER</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Bozza → controlli → XML XSD → preflight PDR GME</p></div>
     <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Codice ACER · {{ remAcer }}</span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">
-    <sc-for list="{{ remKpis }}" as="k" hint-placeholder-count="3">
-      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px">
-        <span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span>
-        <div style="display:flex;align-items:baseline;gap:7px">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:-.01em">{{ k.value }}</span>
-          <span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span>
-        </div>
-        <span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span>
-      </div>
-    </sc-for>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:16px;align-items:start">
-    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
-      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nuova segnalazione</h3><span style="font-size:12px;color:var(--ink3)">Transazione da registrare nel registro REMIT</span></div>
-      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo di contratto
-        <select value="{{ remTipo }}" onChange="{{ setRemTipo }}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:inherit;font-size:13px;outline:none">
-          <option>Standard · mercato organizzato</option><option>Non-standard · bilaterale</option>
-        </select>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento contratto
-        <input type="text" value="{{ remRif }}" onChange="{{ setRemRif }}" placeholder="Es. PSV-2026-0142" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-      </label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità · MWh
-          <input type="text" value="{{ remQta }}" onChange="{{ setRemQta }}" placeholder="500" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prezzo · €/MWh
-          <input type="text" value="{{ remPrezzo }}" onChange="{{ setRemPrezzo }}" placeholder="33,50" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-        </label>
-      </div>
-      <button onClick="{{ addRem }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .15s" style-hover="filter:brightness(1.12)">Registra segnalazione</button>
-      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">Standard: invio tramite RRM entro due giorni lavorativi (T+2). Non-standard: entro dieci (T+10).</span>
-      <div style="height:1px;background:var(--line)"></div>
-      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Il tuo codice ACER
-        <input type="text" value="{{ remAcerVal }}" onChange="{{ setRemAcer }}" placeholder="Es. A0045821W.IT" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" style-focus="border-color:var(--prim);box-shadow:0 0 0 3px color-mix(in oklab,var(--prim) 16%,transparent)">
-      </label>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="color:var(--primText)">Confine operativo</strong><span>L'XML è validato contro lo XSD ACER incluso. Non è un invio né una ricevuta: upload PDR, ricevute GME ed esito ACER restano esterni e verificabili.</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px"><sc-for list="{{ remKpis }}" as="k" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px"><span style="font-size:12px;font-weight:600;color:var(--ink2)">{{ k.label }}</span><div style="display:flex;align-items:baseline;gap:7px"><span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600">{{ k.value }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ k.unit }}</span></div><span style="align-self:flex-start;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:{{ k.dBg }};color:{{ k.dFg }}">{{ k.delta }}</span></div></sc-for></div>
+  <div style="display:grid;grid-template-columns:minmax(340px,1.15fr) minmax(430px,1.85fr);gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nuovo record ACER</h3><span style="font-size:12px;color:var(--ink3)">Compila i campi richiesti dal tracciato selezionato.</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Codice ACER/CEREMP<input type="text" value="{{ remAcerVal }}" onChange="{{ setRemAcer }}" maxlength="12" placeholder="A0045821W.IT" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tracciato<select value="{{ remTipo }}" onChange="{{ setRemTipo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="gas_standard">Table 1 V3 · standard</option><option value="gas_nonstandard">Table 2 V1 · non-standard</option></select></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Azione<select value="{{ remAzione }}" onChange="{{ setRemAzione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="new">Nuovo · N</option><option value="modify">Modifica · M</option><option value="cancel">Cancellazione · C</option><option value="error">Errore · E</option></select></label></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento interno<input type="text" value="{{ remRif }}" onChange="{{ setRemRif }}" placeholder="PSV-2026-0142" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Data evento<input type="date" value="{{ remData }}" onChange="{{ setRemData }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Contract ID ACER<input type="text" value="{{ remContractId }}" onChange="{{ setRemContractId }}" maxlength="50" placeholder="Identificativo formale" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      <div style="display:grid;grid-template-columns:.7fr 1.3fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo controparte<select value="{{ remControparteTipo }}" onChange="{{ setRemControparteTipo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="ace">ACE</option><option value="lei">LEI</option><option value="bic">BIC</option><option value="eic">EIC</option><option value="gln">GLN</option></select></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Identificativo controparte<input type="text" value="{{ remControparte }}" onChange="{{ setRemControparte }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Lato<select value="{{ remLato }}" onChange="{{ setRemLato }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="buy">Acquisto · B</option><option value="sell">Vendita · S</option><option value="cross">Cross · C</option></select></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Capacità<select value="{{ remCapacita }}" onChange="{{ setRemCapacita }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="P">Principale · P</option><option value="A">Agente · A</option></select></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Unità<select value="{{ remUnita }}" onChange="{{ setRemUnita }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option>MWh</option><option>GWh</option><option>KWh</option><option>Therm</option></select></label></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità<input type="text" value="{{ remQta }}" onChange="{{ setRemQta }}" placeholder="1250,50" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prezzo / valuta<div style="display:grid;grid-template-columns:1fr 60px;gap:6px"><input type="text" value="{{ remPrezzo }}" onChange="{{ setRemPrezzo }}" placeholder="33,50" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"><select value="{{ remValuta }}" onChange="{{ setRemValuta }}" style="padding:10px 4px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option>EUR</option><option>USD</option><option>GBP</option></select></div></label></div>
+      <div style="display:flex;flex-direction:column;gap:9px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)"><span style="font-size:11.5px;font-weight:700;color:var(--primText)">Campi Table 2 V1 · obbligatori solo per non-standard</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Data contratto<input type="date" value="{{ remContractDate }}" onChange="{{ setRemContractDate }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Tipo / commodity<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><select value="{{ remContractType }}" onChange="{{ setRemContractType }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"><option>SP</option><option>FW</option><option>FU</option><option>OT</option></select><select value="{{ remCommodity }}" onChange="{{ setRemCommodity }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"><option>NG</option><option>LG</option></select></div></label></div><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">EIC punto/zona di consegna<input type="text" value="{{ remPunto }}" onChange="{{ setRemPunto }}" maxlength="16" placeholder="21YIT-SNAMP-S-PS" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><div style="display:grid;grid-template-columns:1fr 1fr 74px;gap:8px"><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Inizio<input type="date" value="{{ remDeliveryStart }}" onChange="{{ setRemDeliveryStart }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Fine<input type="date" value="{{ remDeliveryEnd }}" onChange="{{ setRemDeliveryEnd }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"></label><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Sett.<select value="{{ remSettlement }}" onChange="{{ setRemSettlement }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"><option>P</option><option>C</option><option>O</option></select></label></div></div>
+      <div style="display:flex;flex-direction:column;gap:9px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)"><span style="font-size:11.5px;font-weight:700;color:var(--primText)">Campi Table 1 V3 · obbligatori solo per standard</span><div style="display:grid;grid-template-columns:.7fr 1.3fr;gap:9px"><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Tipo mercato<select value="{{ remMarketplaceTipo }}" onChange="{{ setRemMarketplaceTipo }}" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)"><option value="mic">MIC</option><option value="ace">ACE</option><option value="lei">LEI</option><option value="bil">BIL</option></select></label><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">ID mercato<input type="text" value="{{ remMarketplaceId }}" onChange="{{ setRemMarketplaceId }}" placeholder="XGAS" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label></div><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">Data-ora transazione ISO con fuso<input type="text" value="{{ remTransactionAt }}" onChange="{{ setRemTransactionAt }}" placeholder="2026-08-01T10:15:00Z" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><label style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink2)">UTI / ID transazione<input type="text" value="{{ remTransactionId }}" onChange="{{ setRemTransactionId }}" maxlength="100" style="padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label></div>
+      <button onClick="{{ addRem }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Salva bozza regolatoria</button><sc-if value="{{ remErrore }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#B42318">{{ remErrore }}</span></sc-if><sc-if value="{{ remInfo }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--primText)">{{ remInfo }}</span></sc-if>
     </div>
     <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
-      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Registro segnalazioni</h3><span style="font-size:12px;color:var(--ink3)">Dalla più recente</span></div>
-      <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)">
-        <span>RIFERIMENTO</span><span>TIPO</span><span style="text-align:right">MWh</span><span style="text-align:right">€/MWh</span><span style="text-align:right">STATO</span><span></span>
-      </div>
-      <sc-for list="{{ remRows }}" as="rr" hint-placeholder-count="4">
-        <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .7fr .9fr 1fr;gap:12px;align-items:center;min-height:46px;padding:2px 0;border-bottom:1px solid var(--line)">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ rr.rif }}</span>
-          <span style="font-size:12px;color:var(--ink2)">{{ rr.tipo }}</span>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.qta }}</span>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right">{{ rr.prezzo }}</span>
-          <span style="text-align:right"><span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:{{ rr.bg }};color:{{ rr.fg }}">{{ rr.stato }}</span></span>
-          <span style="text-align:right"><sc-if value="{{ rr.daInviare }}" hint-placeholder-val="{{ false }}"><button onClick="{{ rr.invia }}" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s" style-hover="background:color-mix(in oklab,var(--prim) 8%,transparent)">Segna inviata</button></sc-if></span>
-        </div>
-      </sc-for>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px"><div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Registro e artefatti</h3><span style="font-size:12px;color:var(--ink3)">La validazione XSD è eseguita prima del download XML.</span></div><button onClick="{{ goPdr }}" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer">PDR · GME</button></div>
+      <sc-for list="{{ remRows }}" as="rr" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:1.25fr .8fr .5fr .9fr;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ rr.rif }}</span><span style="font-size:12px;color:var(--ink2)">{{ rr.tipo }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right">{{ rr.qta }}</span><span style="text-align:right"><span style="font-size:11px;font-weight:600;padding:4px 8px;border-radius:99px;background:{{ rr.bg }};color:{{ rr.fg }}">{{ rr.stato }}</span></span><span style="grid-column:1 / -1;font-size:11px;color:{{ rr.errFg }}">{{ rr.errLabel }}</span><span style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap"><sc-if value="{{ rr.canValidate }}" hint-placeholder-val="{{ false }}"><button onClick="{{ rr.validate }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Valida</button></sc-if><sc-if value="{{ rr.canExport }}" hint-placeholder-val="{{ false }}"><button onClick="{{ rr.export }}" style="padding:6px 9px;border:none;border-radius:7px;background:var(--prim);color:#fff;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Genera XML</button></sc-if><button onClick="{{ rr.pdr }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--ink2);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Preflight PDR</button><button onClick="{{ rr.audit }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--ink2);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Audit</button></span></div></sc-for>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:16px">
-    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Scadenze e riferimenti</h3><span style="font-size:12px;color:var(--ink3)">Reg. UE 1227/2011 (REMIT) · Reg. UE 2024/1106 (REMIT II) · recast Implementing Regulation 2026</span></div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+2</span>
-      <span style="font-size:13px;color:var(--ink)">Contratti standard e ordini su mercati organizzati — invio tramite RRM entro due giorni lavorativi (recast IR, in vigore dal 29/04/2026)</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">T+10</span>
-      <span style="font-size:13px;color:var(--ink)">Contratti non-standard (bilaterali) — segnalazione entro dieci giorni lavorativi da conclusione, modifica o cessazione</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">CEREMP</span>
-      <span style="font-size:13px;color:var(--ink)">Registrazione del market participant presso ARERA — assegnazione del codice ACER</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">ARIS</span>
-      <span style="font-size:13px;color:var(--ink)">Le segnalazioni viaggiano dall'RRM ad ARIS (il sistema REMIT di ACER); ogni file genera una ricevuta firmata con esito di accettazione o rifiuto (MoP on data reporting)</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">UMM</span>
-      <span style="font-size:13px;color:var(--ink)">Informazioni privilegiate (art. 4 REMIT): pubblicazione tramite Inside Information Platform con feed web — schema Annex VIII del MoP (evento, indisponibilità, capacità tecnica/disponibile/indisponibile, zona di bilanciamento)</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">Table 3-4</span>
-      <span style="font-size:13px;color:var(--ink)">Nel perimetro del reporting anche i contratti di trasporto: formati Table 3 (elettricità) e Table 4 (gas — capacità e nomine)</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;min-height:44px;padding:2px 0;border-top:1px solid var(--line)">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--primText);font-weight:600;width:92px;flex:none">ACER</span>
-      <span style="font-size:13px;color:var(--ink)">TRUM, Manual of Procedures e guidance ufficiali — <a href="https://www.acer.europa.eu/remit-documents" target="_blank" rel="noopener">acer.europa.eu/remit-documents</a></span>
-    </div>
+  <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:16px"><h3 style="margin:0 0 7px;font-size:15px;font-weight:600">Ambito del rilascio</h3><span style="font-size:12.5px;line-height:1.55;color:var(--ink2)">Table 1 V3 e Table 2 V1 sono generati e validati XSD. Il trasporto gas (GasCapacity / EDIG@S) resta intenzionalmente bloccato: richiede dati di asta, TSO, punto di connessione, capacità e periodi non raccolti da questo form.</span><span style="font-size:11.5px;color:var(--ink3);margin-top:10px">Fonti: <a href="https://www.acer.europa.eu/remit-documents/remit-reporting-guidance" target="_blank" rel="noopener">schemi ACER</a> · <a href="https://www.acer.europa.eu/transaction-reporting-user-manual-trum" target="_blank" rel="noopener">TRUM</a> · <a href="https://www.mercatoelettrico.org/it-it/Home/Monitoraggio-e-REMIT/PDR/ComeOperare" target="_blank" rel="noopener">PDR GME</a></span></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenPdr }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="PDR · GME" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">PDR · GME</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Preflight dei file ACER prima dell'upload sul servizio PDR.</p></div><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">{{ pdrEndpoint }}</span></div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,#B54708 32%,var(--line));background:color-mix(in oklab,#B54708 7%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="color:#B54708">Nessun upload automatico</strong><span>Il progetto non conserva password, PIN o OTP e non dichiara l'invio riuscito. Il web service sarà attivabile solo con specifiche e credenziali di test GME.</span></div>
+  <div style="display:grid;grid-template-columns:minmax(330px,1fr) minmax(420px,1.5fr);gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px"><div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Profilo operativo PDR</h3><span style="font-size:12px;color:var(--ink3)">Sono ammessi solo dati non segreti.</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Ambiente<select value="{{ pdrEnvironment }}" onChange="{{ pdrSetEnvironment }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="test">Test</option><option value="production">Produzione</option></select></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Canale<select value="{{ pdrChannel }}" onChange="{{ pdrSetChannel }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="portal">Portale</option><option value="web_service">Web service</option></select></label></div><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Identificativo operatore GME<input type="text" value="{{ pdrOperator }}" onChange="{{ pdrSetOperator }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Codice ACER/CEREMP abilitato PDR<input type="text" value="{{ pdrRegisteredAcer }}" onChange="{{ pdrSetRegisteredAcer }}" maxlength="12" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento contratto PDR (produzione)<input type="text" value="{{ pdrContract }}" onChange="{{ pdrSetContract }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label><button onClick="{{ pdrToggleTestAccess }}" aria-pressed="{{ pdrTestAccess }}" style="padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-align:left">Credenziali test richieste · {{ pdrTestAccess }}</button><button onClick="{{ pdrToggleTwoFactor }}" aria-pressed="{{ pdrTwoFactor }}" style="padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-align:left">Autenticazione due livelli pronta · {{ pdrTwoFactor }}</button><button onClick="{{ salvaPdr }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Salva profilo PDR</button><sc-if value="{{ pdrErrore }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#B42318">{{ pdrErrore }}</span></sc-if><sc-if value="{{ pdrInfo }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--primText)">{{ pdrInfo }}</span></sc-if></div>
+    <div style="display:flex;flex-direction:column;gap:16px"><div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px"><h3 style="margin:0 0 7px;font-size:15px;font-weight:600">Schemi inclusi e fissati</h3><sc-for list="{{ pdrSchemas }}" as="ps" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--primText);width:125px">{{ ps.schema_name }} {{ ps.schema_version }}</span><span style="font-size:12px;color:var(--ink2);flex:1">{{ ps.label }}</span><span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:99px;background:var(--surface2);color:var(--ink2)">{{ ps.enabled }}</span></div></sc-for></div><div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px"><h3 style="margin:0 0 7px;font-size:15px;font-weight:600">Preflight per artefatto</h3><sc-for list="{{ pdrRows }}" as="rr" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;flex:1">{{ rr.rif }}</span><span style="font-size:11px;color:var(--ink3)">{{ rr.stato }}</span><button onClick="{{ rr.pdr }}" style="padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Esegui preflight</button></div></sc-for><sc-if value="{{ pdrCheckOpen }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><span style="font-size:12px;font-weight:700;color:var(--ink)">Report {{ pdrCheckReport }}</span><sc-if value="{{ pdrCheckLoading }}" hint-placeholder-val="{{ false }}"><span style="display:block;font-size:12px;color:var(--ink3);margin-top:6px">Controllo in corso…</span></sc-if><sc-for list="{{ pdrIssues }}" as="issue" hint-placeholder-count="2"><div style="margin-top:6px;font-size:12px;color:#B42318"><strong>{{ issue.code }}</strong> · {{ issue.message }}</div></sc-for></div></sc-if></div></div>
   </div>
+  <span style="display:block;margin-top:14px;font-size:11.5px;color:var(--ink3)">Corrispettivo indicativo PDR 2026 per upload esterno: {{ pdrFeeAnnual }}. Verifica sempre condizioni, contratto e documentazione GME vigenti.</span>
 </section>
 </sc-if>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;tema&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;chiaro&quot;,&quot;scuro&quot;],&quot;default&quot;:&quot;chiaro&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;},&quot;colorePrimario&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#0E5A75&quot;,&quot;options&quot;:[&quot;#0E5A75&quot;,&quot;#154F8C&quot;,&quot;#0C6B5D&quot;,&quot;#33546B&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;},&quot;coloreAccento&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#4C93C9&quot;,&quot;options&quot;:[&quot;#2FA37C&quot;,&quot;#3AA0A8&quot;,&quot;#4C93C9&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aspetto&quot;}}">
-class Component extends DCLogic {
-  state = { screen: "login", theme: null, sso: null, dashOff: 0, saved: false, imported: false, gmeAuto: true, gmeOk: false, users: { mricci: "up", lbianchi: "ro", gverdi: "ro" }, extraUsers: [], nextU: 1, wiz: null, disabled: {}, extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti", nomList: [{ punto: "PSV", ciclo: "R3", qta: "4.850", stato: "In corso" }, { punto: "Passo Gries", ciclo: "R2", qta: "3.100", stato: "Confermata" }, { punto: "Mazara del Vallo", ciclo: "R2", qta: "2.400", stato: "Confermata" }], nomPunto: "PSV", nomCiclo: "R4", nomQta: "", remList: [{ rif: "MGP-GAS 17/07 · lotto 42", tipo: "Standard", qta: "250", prezzo: "33,45", stato: "Accettata" }, { rif: "PSV-2026-0138 · bilaterale", tipo: "Non-standard", qta: "1.500", prezzo: "32,80", stato: "Inviata" }, { rif: "MGP-GAS 16/07 · lotto 18", tipo: "Standard", qta: "400", prezzo: "33,61", stato: "Respinta" }, { rif: "PSV-2026-0141 · bilaterale", tipo: "Non-standard", qta: "800", prezzo: "33,10", stato: "Da inviare" }], remTipo: "Standard · mercato organizzato", remRif: "", remQta: "", remPrezzo: "", reps: { rg: true, rs: true, rr: false }, imports: [{ time: "17/07 · 06:15", file: "sbilancio_g20260716.xml", rec: "1.440", esito: "OK" }, { time: "16/07 · 06:12", file: "sbilancio_g20260715.xml", rec: "1.440", esito: "OK" }], cfg: { psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false, nEmail: true, nAlert: true, nReport: false, unit: "MWh", ciclo: "Intraday" } };
-  go(s) { return () => this.setState({ screen: s }); }
-  renderVals() {
-    const p = this.props;
-    const theme = this.state.theme ?? ((p.tema ?? "chiaro") === "scuro" ? "dark" : "light");
-    const s = this.state.screen;
-    const go = (x) => this.go(x);
-    const trail = ({
-      hub: [{ label: "Moduli" }],
-      moduli: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas" }],
-      dash: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Dashboard" }],
-      config: [{ label: "Moduli", t: "hub" }, { label: "Configuratore" }],
-      cfgSis: [{ label: "Moduli", t: "hub" }, { label: "Configuratore", t: "config" }, { label: "Sistema" }],
-      cfgImp: [{ label: "Moduli", t: "hub" }, { label: "Configuratore", t: "config" }, { label: "Impostazioni" }],
-      nomine: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Nomine & Programmazione" }],
-      bilancio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Bilanciamento" }],
-      capacita: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Capacità & Contratti" }],
-      stoccaggio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Stoccaggio" }],
-      report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
-      remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT" }]
-    })[s] || [];
-    const crumbs = trail.map((c, i) => ({
-      label: c.label, pre: i ? "›" : "",
-      go: c.t ? go(c.t) : () => {}, cur: c.t ? "pointer" : "default",
-      col: i === trail.length - 1 ? "var(--ink)" : "var(--ink2)",
-      fw: i === trail.length - 1 ? 600 : 400
-    }));
-    const OK = { bg: "rgba(47,163,124,.15)", fg: "#259372" };
-    const RUN = { bg: "rgba(62,150,180,.16)", fg: "#3E96B4" };
-    const WAIT = { bg: "var(--surface2)", fg: "var(--ink2)" };
-    const WARN = { bg: "rgba(196,140,42,.16)", fg: "#B0842E" };
-    const NEG = { bg: "rgba(197,96,80,.15)", fg: "#C05B4D" };
-    const cfg = this.state.cfg;
-    const tg = (k) => () => this.setState(st => ({ cfg: { ...st.cfg, [k]: !st.cfg[k] }, saved: false }));
-    const setC = (k, v) => () => this.setState(st => ({ cfg: { ...st.cfg, [k]: v }, saved: false }));
-    const knob = (on) => ({ on, kBg: on ? "var(--acc)" : "var(--surface2)", kX: on ? "translateX(16px)" : "translateX(0)" });
-    const basePunti = [["PSV", "Scambio virtuale", "psv"], ["Passo Gries", "Import · Svizzera", "gries"], ["Mazara del Vallo", "Import · Algeria", "mazara"], ["ReMi 34521301 · Milano Ovest", "Riconsegna", "remi"], ["Stogit", "Stoccaggio", "stogit"], ["Cavarzere · GNL", "Rigassificazione", "cavarzere"]];
-    const hiddenP = this.state.hiddenPunti || [];
-    const punti = [...basePunti.filter(p => !hiddenP.includes(p[2])), ...this.state.extraPunti].map(([name, tipo, k]) => ({
-      name, tipo, go: tg(k), ...knob(cfg[k]),
-      removable: true,
-      removeP: () => this.setState(st => st.extraPunti.some(p => p[2] === k)
-        ? { extraPunti: st.extraPunti.filter(p => p[2] !== k), saved: false }
-        : { hiddenPunti: [...(st.hiddenPunti || []), k], saved: false })
-    }));
-    const addPunto = () => this.setState(st => {
-      const name = (st.newPunto || "").trim();
-      if (!name) return {};
-      const k = "px" + st.nextP;
-      return { extraPunti: [...st.extraPunti, [name, "Riconsegna", k]], cfg: { ...st.cfg, [k]: true }, nextP: st.nextP + 1, newPunto: "", saved: false };
-    });
-    const notifiche = [["Email a chiusura ciclo", "Riepilogo esiti a ogni ciclo di rinomina", "nEmail"], ["Alert sbilanciamento", "Avviso quando la posizione supera la tolleranza", "nAlert"], ["Report giornaliero PDF", "Sintesi del giorno gas alle 06:30", "nReport"]].map(([name, desc, k]) => ({ name, desc, go: tg(k), ...knob(cfg[k]) }));
-    const seg = (key, opts) => opts.map(o => ({ label: o, go: setC(key, o), bg: cfg[key] === o ? "var(--surface)" : "transparent", fg: cfg[key] === o ? "var(--ink)" : "var(--ink2)", sh: cfg[key] === o ? "0 1px 2px rgba(16,34,45,.12)" : "none" }));
-    const unitOpts = seg("unit", ["MWh", "Smc"]);
-    const cicloOpts = seg("ciclo", ["D−1", "Intraday"]);
-    const nAbil = punti.filter(x => x.on).length;
-    const moduli = [
-      { title: "Dashboard", desc: "Posizione del giorno gas, sbilanciamento e prezzi PSV a colpo d'occhio.", stat: "G+0", statLabel: "giorno gas corrente", primary: true, go: go("dash"), cursor: "pointer", border: "color-mix(in oklab, var(--prim) 40%, var(--line))" },
-      { title: "Nomine & Programmazione", desc: "Invio e monitoraggio di nomine e rinomine sui punti della rete.", stat: "5", statLabel: "cicli oggi", primary: true, go: go("nomine"), cursor: "pointer", border: "var(--line)" },
-      { title: "Bilanciamento", desc: "Posizione fisica e commerciale, esposizione e azioni correttive.", stat: "−312", statLabel: "MWh previsti", primary: true, go: go("bilancio"), cursor: "pointer", border: "var(--line)" },
-      { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
-      { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
-      { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
-      { title: "REMIT · Segnalazioni", desc: "Registro delle transazioni e obblighi di reporting verso ACER.", stat: "1", statLabel: "da inviare", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" }
-    ];
-    const off = this.state.dashOff;
-    const fmtN = (n) => n.toLocaleString("it-IT");
-    const dNom = 12480 + off * 260;
-    const dAlloc = Math.round(dNom * 0.969);
-    const dSbil = -312 + off * 45;
-    const psvStr = (33.45 + off * 0.35).toFixed(2).replace(".", ",");
-    const bd = new Date(2026, 6, 17 + off);
-    const dashDate = String(bd.getDate()).padStart(2, "0") + "/" + String(bd.getMonth() + 1).padStart(2, "0") + "/" + bd.getFullYear();
-    const kpis = [
-      { label: "Nominato — giorno gas", value: fmtN(dNom), unit: "MWh", delta: "+3,2% vs G−1", dBg: OK.bg, dFg: OK.fg },
-      { label: "Allocato — G−1", value: fmtN(dAlloc), unit: "MWh", delta: "96,9% del nominato", dBg: "var(--surface2)", dFg: "var(--ink2)" },
-      { label: "Sbilanciamento previsto", value: (dSbil < 0 ? "−" : "+") + fmtN(Math.abs(dSbil)), unit: "MWh", delta: dSbil < 0 ? "Posizione corta" : "Posizione lunga", dBg: dSbil < 0 ? WARN.bg : OK.bg, dFg: dSbil < 0 ? WARN.fg : OK.fg },
-      { label: "PSV Day-Ahead", value: psvStr, unit: "€/MWh", delta: "−0,8% vs ieri", dBg: NEG.bg, dFg: NEG.fg }
-    ];
-    const dashCiclo = off === 0 ? { txt: "Ciclo R3 in corso · chiude 14:00", bg: "color-mix(in oklab,var(--prim) 10%,transparent)", fg: "var(--primText)" }
-      : off < 0 ? { txt: "Giorno chiuso · bilancio provvisorio", bg: "var(--surface2)", fg: "var(--ink2)" }
-      : { txt: "Programmazione · nomine aperte", bg: RUN.bg, fg: RUN.fg };
-    const raw = [["04",62,60],["05",65,64],["06",58,57],["07",71,70],["08",74,72],["09",69,69],["10",77,74],["11",60,59],["12",55,54],["13",79,77],["14",83,80],["15",76,75],["16",87,84],["17",89,86]];
-    const days = raw.map(([d, n, a], i) => ({ d, n: n + "%", a: a + "%", w: i === raw.length - 1 ? 700 : 500, lc: i === raw.length - 1 ? "var(--ink)" : "var(--ink3)" }));
-    const cicli = [
-      { name: "Nomina D−1", time: "ieri 14:00", stato: "Confermata", ...OK },
-      { name: "Rinomina R1", time: "06:00", stato: "Confermata", ...OK },
-      { name: "Rinomina R2", time: "10:00", stato: "Confermata", ...OK },
-      { name: "Rinomina R3", time: "14:00", stato: "In corso", ...RUN },
-      { name: "Rinomina R4", time: "17:00", stato: "In attesa", ...WAIT },
-      { name: "Rinomina R5", time: "20:00", stato: "In attesa", ...WAIT }
-    ];
-    const rows = [
-      { punto: "PSV", tipo: "Scambio virtuale", contratto: "CT-2026-114", nom: "4.850", alloc: "4.850", delta: "0,0%", dFg: "var(--ink2)", stato: "Confermata", sBg: OK.bg, sFg: OK.fg },
-      { punto: "Passo Gries", tipo: "Import · Svizzera", contratto: "TR-2025-088", nom: "3.100", alloc: "3.010", delta: "−2,9%", dFg: NEG.fg, stato: "Allocata", sBg: RUN.bg, sFg: RUN.fg },
-      { punto: "Mazara del Vallo", tipo: "Import · Algeria", contratto: "TR-2025-102", nom: "2.400", alloc: "2.355", delta: "−1,9%", dFg: NEG.fg, stato: "Allocata", sBg: RUN.bg, sFg: RUN.fg },
-      { punto: "ReMi 34521301 · Milano Ovest", tipo: "Riconsegna", contratto: "DI-2026-021", nom: "1.480", alloc: "1.480", delta: "0,0%", dFg: "var(--ink2)", stato: "Confermata", sBg: OK.bg, sFg: OK.fg },
-      { punto: "Stogit · Erogazione", tipo: "Stoccaggio", contratto: "ST-2026-007", nom: "650", alloc: "—", delta: "—", dFg: "var(--ink3)", stato: "In verifica", sBg: WARN.bg, sFg: WARN.fg }
-    ];
-    const dh = this.state.deckHover;
-    const mkHub = (key, code, title, sub, target) => {
-      const on = dh === key;
-      return { code, title, sub, go: go(target),
-        enter: () => this.setState({ deckHover: key }), leave: () => this.setState({ deckHover: null }),
-        t1: on ? "rotate(-13deg) translate(-36px,10px)" : "rotate(-7deg) translate(-12px,2px)",
-        t2: on ? "rotate(9deg) translate(32px,0px)" : "rotate(4deg) translate(10px,-2px)",
-        t3: on ? "translateY(16px) rotate(-3deg)" : "translateY(7px) rotate(-1deg)",
-        top: on ? "translateY(-14px) scale(1.03) rotate(.5deg)" : "none",
-        shadow: on ? "0 26px 52px color-mix(in oklab,var(--prim) 28%,transparent)" : "var(--shadow)" };
-    };
-    const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine · Bilanciamento · Stoccaggio", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
-    const cfgCards = [
-      { title: "Sistema", desc: "Stato dei servizi collegati, ambiente e attività recenti.", stat: "3", statLabel: "servizi collegati", go: go("cfgSis") },
-      { title: "Impostazioni", desc: "Anagrafica shipper, parametri di nomina, punti e notifiche.", stat: String(nAbil), statLabel: "punti abilitati", go: go("cfgImp") }
-    ];
-    const servizi = [
-      { name: "API Snam Rete Gas", desc: "Nomine e rinomine", stato: "Operativo", ...OK },
-      { name: "Feed PSV · GME", desc: "Prezzi day-ahead", stato: "Operativo", ...OK },
-      { name: "SSO aziendale", desc: "Autenticazione utenti", stato: "Operativo", ...OK }
-    ];
-    const sysInfo = [["Versione", "4.2.1 · build 8842"], ["Ambiente", "Produzione"], ["Ultimo rilascio", "12/07/2026 · 03:40"], ["Regione dati", "EU-South · Milano"]].map(([k, v]) => ({ k, v }));
-    const logs = [
-      { time: "11:42", who: "M. Rossi", txt: "Rinomina R2 inviata su PSV" },
-      { time: "10:15", who: "Sistema", txt: "Allocazioni G−1 ricevute da Snam" },
-      { time: "09:58", who: "L. Bianchi", txt: "Modificata tolleranza di sbilanciamento" },
-      { time: "06:02", who: "Sistema", txt: "Apertura giorno gas 17/07/2026" }
-    ];
-    const permOpt = (uk, val, label) => ({ label, go: () => this.setState(st => ({ users: { ...st.users, [uk]: val } })), bg: this.state.users[uk] === val ? "var(--surface)" : "transparent", fg: this.state.users[uk] === val ? "var(--ink)" : "var(--ink2)", sh: this.state.users[uk] === val ? "0 1px 2px rgba(16,34,45,.12)" : "none" });
-    const baseU = [["mricci", "MR", "Marco Rossi", "m.rossi@azienda1.it"], ["lbianchi", "LB", "Laura Bianchi", "l.bianchi@azienda1.it"], ["gverdi", "GV", "Giulio Verdi", "g.verdi@azienda1.it"]];
-    const utenti = [...baseU, ...this.state.extraUsers].map(([k, init, name, mail]) => {
-      const off = !!this.state.disabled[k];
-      return {
-        init, name, mail, opts: [permOpt(k, "ro", "Solo lettura"), permOpt(k, "up", "Lettura e scrittura")],
-        remove: () => this.setState(st => ({ extraUsers: st.extraUsers.filter(u => u[0] !== k) })),
-        removable: this.state.extraUsers.some(u => u[0] === k),
-        off, rowOp: off ? .45 : 1,
-        togDis: () => this.setState(st => ({ disabled: { ...st.disabled, [k]: !st.disabled[k] } })),
-        disLabel: off ? "Riabilita" : "Disabilita",
-        disBg: off ? "rgba(197,96,80,.14)" : "transparent",
-        disFg: off ? "#C05B4D" : "var(--ink2)",
-        disBorder: off ? "rgba(197,96,80,.4)" : "var(--line)"
-      };
-    });
-    const addUser = () => this.setState({ wiz: { step: 1, nome: "", cognome: "", email: "", perm: "ro" } });
-    const wiz = this.state.wiz;
-    const wSet = (k) => (e) => this.setState(st => ({ wiz: { ...st.wiz, [k]: e.target.value } }));
-    const wStep = (d) => () => this.setState(st => ({ wiz: { ...st.wiz, step: st.wiz.step + d } }));
-    const wizSteps = wiz ? [["Anagrafica", 1], ["Privilegi", 2], ["Conferma", 3]].map(([label, n]) => ({
-      n, label, bg: wiz.step >= n ? "var(--prim)" : "var(--surface2)", fg: wiz.step >= n ? "#fff" : "var(--ink3)",
-      lc: wiz.step === n ? "var(--ink)" : "var(--ink3)", lw: wiz.step === n ? 600 : 500
-    })) : [];
-    const wizPermOpts = wiz ? [["ro", "Solo lettura", "Consulta dashboard, nomine e report senza modificarli."], ["up", "Lettura e scrittura", "Può inviare nomine, caricare file e modificare i parametri."]].map(([v, t, d]) => ({
-      t, d, go: () => this.setState(st => ({ wiz: { ...st.wiz, perm: v } })),
-      border: wiz.perm === v ? "color-mix(in oklab,var(--prim) 55%,var(--line))" : "var(--line)",
-      bg: wiz.perm === v ? "color-mix(in oklab,var(--prim) 8%,var(--surface))" : "var(--surface)",
-      dot: wiz.perm === v ? "var(--prim)" : "transparent"
-    })) : [];
-    const wName = wiz ? [wiz.nome, wiz.cognome].filter(Boolean).join(" ") : "";
-    const wEmail = wiz ? (wiz.email || ((wiz.nome ? wiz.nome[0].toLowerCase() + "." : "") + (wiz.cognome || "utente").toLowerCase() + "@azienda1.it")) : "";
-    const wizFinish = () => this.setState(st => {
-      const n = st.nextU, k = "wu" + n;
-      const init = ((st.wiz.nome[0] || "N") + (st.wiz.cognome[0] || "U")).toUpperCase();
-      return { extraUsers: [...st.extraUsers, [k, init, wName || "Nuovo utente " + n, wEmail]], users: { ...st.users, [k]: st.wiz.perm }, nextU: n + 1, wiz: null };
-    });
-    const impRows = this.state.imports.map(r => ({ ...r, bg: OK.bg, fg: OK.fg }));
-    const nomStatoC = { "Confermata": OK, "In corso": RUN, "Inviata": RUN, "In attesa": WAIT };
-    const nomRows = this.state.nomList.map(r => ({ ...r, bg: (nomStatoC[r.stato] || WAIT).bg, fg: (nomStatoC[r.stato] || WAIT).fg }));
-    const addNomina = () => this.setState(st => ({ nomList: [{ punto: st.nomPunto, ciclo: st.nomCiclo, qta: st.nomQta || "500", stato: "Inviata" }, ...st.nomList], nomQta: "" }));
-    const oreSbil = [["04", 45], ["05", 28], ["06", -15], ["07", 62], ["08", 34], ["09", -48], ["10", 20], ["11", -25], ["12", 55], ["13", 12], ["14", -60], ["15", 38], ["16", -85], ["17", -87]].map(([h, v]) => ({ h, top: v > 0 ? Math.round(v * 0.9) + "%" : "0%", bot: v < 0 ? Math.round(-v * 0.9) + "%" : "0%", w: h === "17" ? 700 : 500, lc: h === "17" ? "var(--ink)" : "var(--ink3)" }));
-    const bilKpis = [
-      { label: "Posizione fisica prevista", value: "−312", unit: "MWh", delta: "Posizione corta", dBg: WARN.bg, dFg: WARN.fg },
-      { label: "Posizione commerciale", value: "+95", unit: "MWh", delta: "Coperta su MGP", dBg: OK.bg, dFg: OK.fg },
-      { label: "Esposizione stimata", value: "10.410", unit: "€", delta: "Prezzo sbil. 33,6 €/MWh", dBg: "var(--surface2)", dFg: "var(--ink2)" }
-    ];
-    const azioni = [
-      { txt: "Acquisto 250 MWh su MGP-GAS", sub: "Sessione AGS · entro 12:30", stato: "Suggerita", ...RUN },
-      { txt: "Rinomina R4 · +60 MWh su Gries", sub: "Apre alle 15:00", stato: "In valutazione", ...WAIT },
-      { txt: "Erogazione stoccaggio +100 MWh", sub: "Confermata da Stogit", stato: "Eseguita", ...OK }
-    ];
-    const capRows = [
-      { punto: "Passo Gries", tipo: "Continuo · annuale", conf: "3.500 MWh/g", uso: 88, scad: "30/09/2026", stato: "Attivo", ...OK },
-      { punto: "Mazara del Vallo", tipo: "Continuo · annuale", conf: "2.600 MWh/g", uso: 92, scad: "30/09/2026", stato: "Attivo", ...OK },
-      { punto: "ReMi 34521301 · Milano Ovest", tipo: "Uscita · annuale", conf: "1.600 MWh/g", uso: 93, scad: "30/09/2026", stato: "Attivo", ...OK },
-      { punto: "Tarvisio", tipo: "Continuo · trimestrale", conf: "1.200 MWh/g", uso: 0, scad: "01/10/2026", stato: "In firma", ...WARN },
-      { punto: "Stogit", tipo: "Stoccaggio · anno termico", conf: "180 GWh", uso: 61, scad: "31/03/2027", stato: "Attivo", ...OK }
-    ].map(r => ({ ...r, usoW: r.uso + "%", usoL: r.uso ? r.uso + "%" : "—" }));
-    const scadenze = [
-      { data: "05/08/2026", txt: "Asta PRISMA · capacità mensile settembre" },
-      { data: "15/09/2026", txt: "Rinnovo capacità annuale Gries e Mazara" },
-      { data: "30/09/2026", txt: "Chiusura anno termico 2025/26" }
-    ];
-    const stocKpis = [
-      { label: "Spazio conferito", value: "180", unit: "GWh", delta: "Modulazione Uniforme", dBg: "var(--surface2)", dFg: "var(--ink2)" },
-      { label: "Giacenza", value: "109,8", unit: "GWh", delta: "61% dello Spazio", dBg: OK.bg, dFg: OK.fg },
-      { label: "Spazio residuo", value: "70,2", unit: "GWh", delta: "Disponibile per iniezione", dBg: OK.bg, dFg: OK.fg },
-      { label: "Iniezione nominata · G+0", value: "+95", unit: "MWh", delta: "Ciclo diurno · conferma Stogit", dBg: RUN.bg, dFg: RUN.fg }
-    ];
-    const stocCap = [
-      { tipo: "Capacità di Iniezione", conf: "1.150", fatt: "0,82", disp: "943", dispW: "82%", note: "Limite: Spazio residuo 70,2 GWh", barCol: "var(--acc)" },
-      { tipo: "Capacità di Erogazione", conf: "1.600", fatt: "0,64", disp: "1.024", dispW: "64%", note: "Limite: Giacenza 109,8 GWh", barCol: "var(--prim)" }
-    ];
-    const stocMov = [["Lun", 95], ["Mar", 80], ["Mer", -45], ["Gio", 120], ["Ven", 60], ["Sab", -30], ["Dom", -70]].map(([h, v]) => ({ h, top: v > 0 ? Math.round(v / 1.4) + "%" : "0%", bot: v < 0 ? Math.round(-v / 1.4) + "%" : "0%" }));
-    const stocServ = [
-      { name: "Modulazione Uniforme", sub: "Stogit · Spazio 180 GWh · asta annuale", val: "61%", stato: "Attivo", ...OK },
-      { name: "Modulazione di punta", sub: "Stogit · CE aggiuntiva 40 MWh/g", val: "54%", stato: "Attivo", ...OK },
-      { name: "Prestazioni costanti · fast-cycle", sub: "Stogit · richiesta in corso d'anno", val: "—", stato: "In richiesta", ...WAIT }
-    ];
-    const repKpis = [
-      { label: "Invii programmati", value: "3", unit: "attivi", delta: "Prossimo 06:30", dBg: RUN.bg, dFg: RUN.fg },
-      { label: "Obblighi regolatori", value: "2", unit: "in scadenza", delta: "REMIT · ARERA", dBg: WARN.bg, dFg: WARN.fg },
-      { label: "Costo sbilancio · YTD", value: "84,2", unit: "k€", delta: "−18% vs 2025", dBg: OK.bg, dFg: OK.fg }
-    ];
-    const repCat = this.state.repCat;
-    const repCats = [["tutti", "Tutti"], ["op", "Operativi"], ["reg", "Regolatori"], ["mkt", "Mercato"]].map(([k, label]) => ({
-      label, go: () => this.setState({ repCat: k }),
-      bg: repCat === k ? "var(--prim)" : "transparent", fg: repCat === k ? "#fff" : "var(--ink2)",
-      bd: repCat === k ? "var(--prim)" : "var(--line)"
-    }));
-    const allRep = [
-      { name: "Bilancio giornaliero shipper", tipo: "PDF · giornaliero", upd: "17/07 · 06:31", cat: "op", tag: "Operativo" },
-      { name: "Estrazione nomine · luglio", tipo: "CSV · mensile", upd: "01/07 · 07:02", cat: "op", tag: "Operativo" },
-      { name: "Sbilanci e corrispettivi · S29", tipo: "XLSX · settimanale", upd: "16/07 · 07:10", cat: "op", tag: "Operativo" },
-      { name: "Utilizzo capacità per punto", tipo: "PDF · mensile", upd: "01/07 · 08:20", cat: "op", tag: "Operativo" },
-      { name: "Report REMIT · settimana 29", tipo: "XML · settimanale", upd: "14/07 · 09:15", cat: "reg", tag: "Regolatorio" },
-      { name: "Pacchetto ARERA · trimestre 2", tipo: "ZIP · trimestrale", upd: "05/07 · 11:00", cat: "reg", tag: "Regolatorio" },
-      { name: "Serie storiche PSV", tipo: "CSV · on demand", upd: "12/07 · 16:44", cat: "mkt", tag: "Mercato" },
-      { name: "Prezzi MGP-GAS vs sbilancio", tipo: "XLSX · settimanale", upd: "14/07 · 07:30", cat: "mkt", tag: "Mercato" }
-    ];
-    const repFiles = allRep.filter(r => repCat === "tutti" || r.cat === repCat);
-    const repTrend = [["Feb", 46, 31], ["Mar", 52, 38], ["Apr", 44, 27], ["Mag", 58, 35], ["Giu", 49, 22], ["Lug", 61, 18]].map(([m, gen, costo]) => ({
-      m, genH: Math.round(gen / 61 * 100) + "%", costoH: Math.round(costo / 61 * 100) + "%"
-    }));
-    const repProg = [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState(st => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-    const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli" };
-    const remStatoC = { "Accettata": OK, "Inviata": RUN, "Da inviare": WAIT, "Respinta": NEG };
-    const remRows = this.state.remList.map((r, i) => ({ ...r, bg: (remStatoC[r.stato] || WAIT).bg, fg: (remStatoC[r.stato] || WAIT).fg, daInviare: r.stato === "Da inviare", invia: () => this.setState(st => ({ remList: st.remList.map((x, j) => j === i ? { ...x, stato: "Inviata" } : x) })) }));
-    const remN = (s) => this.state.remList.filter(r => r.stato === s).length;
-    const remKpis = [
-      { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+2", dBg: WAIT.bg, dFg: WAIT.fg },
-      { label: "Inviate · mese", value: String(remN("Inviata") + remN("Accettata")), unit: "tramite RRM", delta: "flusso regolare", dBg: RUN.bg, dFg: RUN.fg },
-      { label: "Respinte", value: String(remN("Respinta")), unit: "da correggere", delta: "verifica i campi", dBg: NEG.bg, dFg: NEG.fg }
-    ];
-    const addRem = () => this.setState(st => ({ remList: [{ rif: st.remRif || "PSV-2026-0142", tipo: st.remTipo.startsWith("Standard") ? "Standard" : "Non-standard", qta: st.remQta || "500", prezzo: st.remPrezzo || "\u2014", stato: "Da inviare" }, ...st.remList], remRif: "", remQta: "", remPrezzo: "" }));
-    return {
-      hasBack: !!backMap[s], goBack: go(backMap[s] || "hub"), hubCards,
-      theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
-      primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-      loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit",
-      remAcer: "A0045821W.IT", remAcerVal: "A0045821W.IT", setRemAcer: () => {}, remKpis, remRows, addRem,
-      remTipo: this.state.remTipo, remRif: this.state.remRif, remQta: this.state.remQta, remPrezzo: this.state.remPrezzo,
-      setRemTipo: (e) => this.setState({ remTipo: e.target.value }), setRemRif: (e) => this.setState({ remRif: e.target.value }), setRemQta: (e) => this.setState({ remQta: e.target.value }), setRemPrezzo: (e) => this.setState({ remPrezzo: e.target.value }),
-      doLogin: go("hub"), logout: go("login"), goHub: go("hub"), goModuli: go("moduli"), goDash: go("dash"),
-      doSSO: () => { this.setState({ sso: "redirect" }); setTimeout(() => this.setState(st => st.sso ? { sso: "pick" } : {}), 1100); },
-      ssoCancel: () => this.setState({ sso: null }),
-      ssoPick: () => { this.setState({ sso: "auth" }); setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900); },
-      ssoRedirect: this.state.sso === "redirect", ssoPickStep: this.state.sso === "pick", ssoAuth: this.state.sso === "auth", ssoOpen: !!this.state.sso,
-      toggleTheme: () => this.setState({ theme: theme === "dark" ? "light" : "dark" }),
-      crumbs, moduli, kpis, days, cicli, rows, punti, notifiche, unitOpts, cicloOpts, cfgCards, servizi, sysInfo, logs,
-      dashDate, dashTotNom: fmtN(dNom), dashCicloTxt: dashCiclo.txt, dashCicloBg: dashCiclo.bg, dashCicloFg: dashCiclo.fg,
-      dashPrev: () => this.setState(st => ({ dashOff: Math.max(st.dashOff - 1, -7) })),
-      dashNext: () => this.setState(st => ({ dashOff: Math.min(st.dashOff + 1, 7) })),
-      dashNotToday: off !== 0, dashToday: () => this.setState({ dashOff: 0 }),
-      saveConfig: () => this.setState({ saved: true }), savedOk: !!this.state.saved,
-      utenti, addUser, impRows, importedOk: !!this.state.imported,
-      wizOpen: !!wiz, wizStep1: wiz?.step === 1, wizStep2: wiz?.step === 2, wizStep3: wiz?.step === 3,
-      wizSteps, wizPermOpts, wizClose: () => this.setState({ wiz: null }),
-      wizNext: wStep(1), wizBack: wStep(-1), wizFinish, wizCanBack: wiz ? wiz.step > 1 : false,
-      wizNome: wiz?.nome ?? "", wizCognome: wiz?.cognome ?? "", wizEmail: wiz?.email ?? "",
-      wizSetNome: wSet("nome"), wizSetCognome: wSet("cognome"), wizSetEmail: wSet("email"),
-      wizName: wName || "Nuovo utente", wizMail: wEmail, wizPermLabel: wiz?.perm === "up" ? "Lettura e scrittura" : "Solo lettura",
-      wizInit: wiz ? ((wiz.nome[0] || "N") + (wiz.cognome[0] || "U")).toUpperCase() : "NU",
-      addPunto, newPunto: this.state.newPunto,
-      setNewPunto: (e) => this.setState({ newPunto: e.target.value }),
-      newPuntoKey: (e) => { if (e.key === "Enter") addPunto(); },
-      nomRows, addNomina, nomPunto: this.state.nomPunto, nomCiclo: this.state.nomCiclo, nomQta: this.state.nomQta,
-      setNomPunto: (e) => this.setState({ nomPunto: e.target.value }),
-      setNomCiclo: (e) => this.setState({ nomCiclo: e.target.value }),
-      setNomQta: (e) => this.setState({ nomQta: e.target.value }),
-      oreSbil, bilKpis, azioni, capRows, scadenze, stocKpis, stocCap, stocMov, stocServ, repFiles, repProg, repKpis, repCats, repTrend,
-      gmeOk: !!this.state.gmeOk, verifyGme: () => this.setState({ gmeOk: true }),
-      gmeToggle: () => this.setState(st => ({ gmeAuto: !st.gmeAuto })),
-      gmeKBg: knob(this.state.gmeAuto).kBg, gmeKX: knob(this.state.gmeAuto).kX,
-      importNow: () => { if (!this.state.imported) this.setState(st => ({ imported: true, imports: [{ time: "17/07 · 11:58", file: "sbilancio_g20260717_prov.csv", rec: "288", esito: "OK" }, ...st.imports] })); }
-    };
-  }
-}
-</script>
 </body>
 </html>

@@ -32,7 +32,7 @@
   const PERSIST = [
     "nomList", "cfg", "hiddenPunti", "extraPunti", "nextP",
     "users", "extraUsers", "disabled", "nextU",
-    "reps", "gmeAuto", "gmeOk", "demoMode", "remList",
+    "reps", "demoMode",
   ];
 
   // Tronca ai limiti accettati dai validatori del backend: un valore fuori
@@ -54,12 +54,16 @@
       return {
         screen: "login", theme, sso: null, dashOff: 0,
         loginEmail: "", loginPass: "", loginErrore: "", utenteEmail: "", demoMode: false,
-        saved: false, gmeAuto: true, gmeOk: false,
+        saved: false,
         users: {}, extraUsers: [], nextU: 1,
         wiz: null, disabled: {}, hiddenPunti: [], extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
         nomList: [],
         nomPunto: "PSV", nomCiclo: "R4", nomQta: "",
-        remList: [], remTipo: "Standard · mercato organizzato", remRif: "", remQta: "", remPrezzo: "",
+        remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
+        remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
+        remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
+        pdr: { environment: "test", channel: "portal", gme_operator_code: "", pdr_contract_reference: "", test_access_requested: false, two_factor_ready: false, registered_acer_code: "" },
+        pdrCaricamento: false, pdrErrore: "", pdrInfo: "", pdrCheck: null, pdrFees: null, pdrSchemas: [],
         reps: { rg: true, rs: true, rr: false },
         cfg: {
           psv: true, gries: true, mazara: true, remi: true, stogit: true, cavarzere: false,
@@ -201,6 +205,49 @@
       }
     }
 
+    async _json(url, options = {}) {
+      const response = await fetch(url, options);
+      let body = {};
+      try { body = await response.json(); } catch (_) { /* risposta senza JSON */ }
+      if (!response.ok) throw new Error(body && body.errore ? body.errore : `richiesta HTTP ${response.status}`);
+      return body;
+    }
+
+    async _caricaRemit() {
+      if (!this._sessionEmail) return;
+      this.setState({ remCaricamento: true, remErrore: "" });
+      try {
+        const payload = await this._json("/api/remit/reports");
+        this.setState({
+          remReports: Array.isArray(payload.reports) ? payload.reports : [],
+          remCaricamento: false,
+          remInfo: payload.legacy_imported ? `${payload.legacy_imported} record storico importato come bozza da verificare.` : this.state.remInfo,
+        });
+      } catch (error) {
+        this.setState({ remCaricamento: false, remErrore: `Registro REMIT non disponibile: ${error.message}` });
+      }
+    }
+
+    async _caricaPdr() {
+      if (!this._sessionEmail) return;
+      this.setState({ pdrCaricamento: true, pdrErrore: "" });
+      try {
+        const payload = await this._json("/api/pdr");
+        this.setState({
+          pdr: payload.profile || this.state.pdr,
+          pdrFees: payload.fees || null,
+          pdrSchemas: Array.isArray(payload.schemas) ? payload.schemas : [],
+          pdrCaricamento: false,
+        });
+      } catch (error) {
+        this.setState({ pdrCaricamento: false, pdrErrore: `Configurazione PDR non disponibile: ${error.message}` });
+      }
+    }
+
+    async _caricaWorkspaceRegolatorio() {
+      await Promise.all([this._caricaRemit(), this._caricaPdr()]);
+    }
+
     async _apriSessione(email) {
       if (this._loginInCorso) return false;
       this._loginInCorso = true;
@@ -223,6 +270,7 @@
         this.idrata(saved, { mantieniCoda: riprendiCoda });
         this._scheduleSync();
         if (this._vt) this._vt.render();
+        await this._caricaWorkspaceRegolatorio();
         return true;
       } finally {
         this._loginInCorso = false;
@@ -279,6 +327,7 @@
         stoccaggio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Stoccaggio" }],
         report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
         remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT" }],
+        pdr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "PDR · GME" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -322,7 +371,8 @@
         { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
         { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
-        { title: "REMIT · Segnalazioni", desc: "Registro delle transazioni e obblighi di reporting verso ACER.", stat: "1", statLabel: "da inviare", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
+        { title: "REMIT · Workspace", desc: "Bozze, validazione locale, audit ed export per la revisione RRM.", stat: "0", statLabel: "invii reali simulati", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
+        { title: "PDR · GME", desc: "Readiness PDR, ambiente di test e preflight dei requisiti di upload.", stat: "test", statLabel: "nessuna credenziale locale", primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
       ];
       if (!demoOn) for (const m of moduli) m.stat = "—"; // i numeri delle card sono scenografia
       const off = this.state.dashOff;
@@ -529,40 +579,165 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli" };
 
-      // --- REMIT: registro reale dell'utente + scenografia demo separata ---
-      const remStatoC = { "Accettata": OK, "Inviata": RUN, "Da inviare": WAIT, "Respinta": NEG };
-      const remDemo = !demoOn ? [] : [
-        { rif: "MGP-GAS 17/07 · lotto 42", tipo: "Standard", qta: "250", prezzo: "33,45", stato: "Accettata" },
-        { rif: "PSV-2026-0138 · bilaterale", tipo: "Non-standard", qta: "1.500", prezzo: "32,80", stato: "Inviata" },
-        { rif: "MGP-GAS 16/07 · lotto 18", tipo: "Standard", qta: "400", prezzo: "33,61", stato: "Respinta" },
-        { rif: "PSV-2026-0141 · bilaterale", tipo: "Non-standard", qta: "800", prezzo: "33,10", stato: "Da inviare" },
-      ];
-      const colora = (r) => ({ ...r, bg: (remStatoC[r.stato] || WAIT).bg, fg: (remStatoC[r.stato] || WAIT).fg });
-      // le righe reali hanno l'azione "Segna inviata"; quelle demo sono solo scena
-      const remRows = [
-        ...this.state.remList.map((r, i) => ({
-          ...colora(r), daInviare: r.stato === "Da inviare",
-          invia: () => this.setState((st) => ({ remList: st.remList.map((x, j) => (j === i ? { ...x, stato: "Inviata" } : x)) })),
-        })),
-        ...remDemo.map((r) => ({ ...colora(r), daInviare: r.stato === "Da inviare", invia: () => {} })),
-      ];
-      const remN = (s2) => remRows.filter((r) => r.stato === s2).length;
+      // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
+      const remStatoC = {
+        bozza: WAIT,
+        validata_localmente: OK,
+        xml_validato_xsd: RUN,
+      };
+      const remStatoLabel = {
+        bozza: "Bozza",
+        validata_localmente: "Validata localmente",
+        xml_validato_xsd: "XML validato XSD",
+      };
+      const remTipoLabel = {
+        gas_standard: "Standard · gas",
+        gas_nonstandard: "Non-standard · gas",
+        gas_transport: "Trasporto gas",
+      };
+      const remRows = (this.state.remReports || []).map((r) => {
+        const dati = r.data || r;
+        const colore = remStatoC[r.status] || WAIT;
+        const errori = Array.isArray(r.validation_errors) ? r.validation_errors : [];
+        return {
+          ...r,
+          rif: dati.source_ref || "—",
+          tipo: remTipoLabel[dati.report_kind] || "Da classificare",
+          evento: dati.event_at || "—",
+          qta: dati.quantity_mwh || "—",
+          prezzo: dati.price_eur_mwh || "—",
+          stato: remStatoLabel[r.status] || "Da verificare",
+          bg: colore.bg,
+          fg: colore.fg,
+          errLabel: errori.length ? `${errori.length} campo/i da correggere` : "Controlli locali superati",
+          errFg: errori.length ? NEG.fg : "var(--ink3)",
+          canValidate: r.status === "bozza",
+          canExport: r.status === "validata_localmente",
+          validate: () => validaRemit(r),
+          export: () => esportaRemit(r),
+          audit: () => apriAuditRemit(r),
+          pdr: () => verificaPdr(r),
+        };
+      });
+      const remN = (status) => remRows.filter((r) => r.status === status).length;
       const remKpis = [
-        { label: "Da inviare", value: String(remN("Da inviare")), unit: "in coda", delta: "standard: T+2", dBg: WAIT.bg, dFg: WAIT.fg },
-        { label: "Inviate · mese", value: String(remN("Inviata") + remN("Accettata")), unit: "tramite RRM", delta: demoOn ? "flusso regolare" : "dal tuo registro", dBg: RUN.bg, dFg: RUN.fg },
-        { label: "Respinte", value: String(remN("Respinta")), unit: "da correggere", delta: demoOn ? "verifica i campi" : "nessun esito negativo", dBg: remN("Respinta") ? NEG.bg : "var(--surface2)", dFg: remN("Respinta") ? NEG.fg : "var(--ink3)" },
+        { label: "Bozze", value: String(remN("bozza")), unit: "da completare", delta: "nessun invio reale", dBg: WAIT.bg, dFg: WAIT.fg },
+        { label: "Validate", value: String(remN("validata_localmente")), unit: "localmente", delta: "pronte per export", dBg: OK.bg, dFg: OK.fg },
+        { label: "XML ACER", value: String(remN("xml_validato_xsd")), unit: "XSD validati", delta: "preflight PDR", dBg: RUN.bg, dFg: RUN.fg },
       ];
-      const addRem = () => this.setState((st) => ({
-        remList: [{
-          rif: cap((st.remRif || "").trim() || "(senza riferimento)", 120),
-          tipo: st.remTipo.startsWith("Standard") ? "Standard" : "Non-standard",
-          qta: cap(st.remQta || "\u2014", 120), prezzo: cap(st.remPrezzo || "\u2014", 120),
-          stato: "Da inviare",
-        }, ...st.remList].slice(0, 500),
-        remRif: "", remQta: "", remPrezzo: "",
+      const remPayload = () => ({
+        report_kind: this.state.remTipo,
+        action: this.state.remAzione,
+        source_ref: cap(this.state.remRif, 160),
+        event_at: cap(this.state.remData, 10),
+        delivery_point: cap(this.state.remPunto, 160),
+        counterparty: cap(this.state.remControparte, 160),
+        counterparty_scheme: this.state.remControparteTipo,
+        side: this.state.remLato,
+        quantity_mwh: cap(this.state.remQta, 40),
+        quantity_unit: this.state.remUnita,
+        price_eur_mwh: cap(this.state.remPrezzo, 40),
+        price_currency: this.state.remValuta,
+        acer_code: cap(cfg.acer || "", 12),
+        trading_capacity: this.state.remCapacita,
+        contract_id: cap(this.state.remContractId, 50),
+        contract_date: cap(this.state.remContractDate, 10),
+        contract_type: this.state.remContractType,
+        energy_commodity: this.state.remCommodity,
+        delivery_start_date: cap(this.state.remDeliveryStart, 10),
+        delivery_end_date: cap(this.state.remDeliveryEnd, 10),
+        settlement_method: this.state.remSettlement,
+        marketplace_scheme: this.state.remMarketplaceTipo,
+        marketplace_id: cap(this.state.remMarketplaceId, 32),
+        transaction_at: cap(this.state.remTransactionAt, 40),
+        transaction_id: cap(this.state.remTransactionId, 100),
+      });
+      const sostituisciReport = (record) => this.setState((st) => ({
+        remReports: (st.remReports || []).map((item) => item.id === record.id ? record : item),
       }));
+      const addRem = async () => {
+        this.setState({ remErrore: "", remInfo: "" });
+        try {
+          const record = await this._json("/api/remit/reports", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(remPayload()),
+          });
+          this.setState((st) => ({
+            remReports: [record, ...(st.remReports || [])],
+            remRif: "", remData: "", remPunto: "", remControparte: "", remQta: "", remPrezzo: "", remContractId: "", remContractDate: "", remDeliveryStart: "", remDeliveryEnd: "", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
+            remInfo: record.is_complete ? "Bozza salvata. Puoi eseguire la validazione locale." : "Bozza salvata: completa i campi richiesti e poi valida.",
+          }));
+        } catch (error) {
+          this.setState({ remErrore: `Impossibile salvare la bozza: ${error.message}` });
+        }
+      };
+      const validaRemit = async (record) => {
+        this.setState({ remErrore: "", remInfo: "" });
+        try {
+          const updated = await this._json(`/api/remit/reports/${record.id}/validate`, {
+            method: "POST", headers: { "Content-Type": "application/json", "If-Match": String(record.version) }, body: JSON.stringify({}),
+          });
+          sostituisciReport(updated);
+          this.setState({ remInfo: updated.is_complete ? "Controlli di completezza completati: puoi generare l'XML ACER validato XSD." : "La bozza resta da correggere: consulta i campi segnalati." });
+        } catch (error) {
+          this.setState({ remErrore: `Validazione non completata: ${error.message}` });
+        }
+      };
+      const scaricaArtifact = async (artifact) => {
+        if (typeof document === "undefined" || typeof URL === "undefined" || !URL.createObjectURL) return;
+        const response = await fetch(`/api/remit/artifacts/${artifact.id}`, { credentials: "same-origin" });
+        if (!response.ok) throw new Error(`download ${response.status}`);
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        link.href = url; link.download = artifact.filename; link.style.display = "none";
+        document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+      };
+      const esportaRemit = async (record) => {
+        this.setState({ remErrore: "", remInfo: "" });
+        try {
+          const result = await this._json(`/api/remit/reports/${record.id}/export`, {
+            method: "POST", headers: { "If-Match": String(record.version) },
+          });
+          sostituisciReport(result.report);
+          await scaricaArtifact(result.artifact);
+          this.setState({ remInfo: `XML ${result.artifact.filename} validato XSD (SHA-256 ${result.artifact.sha256.slice(0, 12)}…) e scaricato. Non è stato inviato a GME/PDR o ACER.` });
+        } catch (error) {
+          this.setState({ remErrore: `Export non completato: ${error.message}` });
+        }
+      };
+      const apriAuditRemit = async (record) => {
+        this.setState({ remErrore: "", remAudit: { title: record.id, loading: true, events: [] } });
+        try {
+          const payload = await this._json(`/api/remit/reports/${record.id}/audit`);
+          this.setState({ remAudit: { title: record.id, loading: false, events: payload.events || [] } });
+        } catch (error) {
+          this.setState({ remErrore: `Audit non disponibile: ${error.message}`, remAudit: null });
+        }
+      };
+      const verificaPdr = async (record) => {
+        this.setState({ screen: "pdr", pdrErrore: "", pdrInfo: "", pdrCheck: { report_id: record.id, loading: true, issues: [] } });
+        try {
+          const check = await this._json(`/api/pdr/reports/${record.id}/preflight`, { method: "POST" });
+          this.setState({ pdrCheck: check });
+        } catch (error) {
+          this.setState({ pdrErrore: `Preflight PDR non disponibile: ${error.message}`, pdrCheck: null });
+        }
+      };
+      const pdrProfile = this.state.pdr || {};
+      const pdrSet = (key) => (event) => this.setSilent((st) => ({ pdr: { ...st.pdr, [key]: event.target.value } }));
+      const pdrToggle = (key) => () => this.setState((st) => ({ pdr: { ...st.pdr, [key]: !st.pdr[key] } }));
+      const salvaPdr = async () => {
+        this.setState({ pdrErrore: "", pdrInfo: "" });
+        try {
+          const result = await this._json("/api/pdr/profile", {
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pdrProfile),
+          });
+          this.setState({ pdr: result.profile, pdrInfo: "Profilo PDR salvato. Nessuna credenziale è stata memorizzata." });
+        } catch (error) {
+          this.setState({ pdrErrore: `Profilo PDR non salvato: ${error.message}` });
+        }
+      };
 
       const doLogin = async () => {
         const email = (this.state.loginEmail || "").trim();
@@ -577,16 +752,38 @@
         hasBack: !!backMap[s], goBack: go(backMap[s] || "hub"), hubCards,
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit",
-        remAcer: demoOn ? "A0045821W.IT" : (cfg.acer || "da configurare"),
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr",
+        remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
-        setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 63) } })),
-        remKpis, remRows, addRem,
-        remTipo: this.state.remTipo, remRif: this.state.remRif, remQta: this.state.remQta, remPrezzo: this.state.remPrezzo,
+        setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
+        remKpis, remRows, addRem, remCaricamento: !!this.state.remCaricamento, remErrore: this.state.remErrore, remInfo: this.state.remInfo,
+        remAuditOpen: !!this.state.remAudit, remAuditTitle: this.state.remAudit?.title ?? "", remAuditLoading: !!this.state.remAudit?.loading, remAuditEvents: this.state.remAudit?.events ?? [], closeRemAudit: () => this.setState({ remAudit: null }),
+        remTipo: this.state.remTipo, remAzione: this.state.remAzione, remRif: this.state.remRif, remData: this.state.remData, remPunto: this.state.remPunto, remControparte: this.state.remControparte, remControparteTipo: this.state.remControparteTipo, remLato: this.state.remLato, remQta: this.state.remQta, remUnita: this.state.remUnita, remPrezzo: this.state.remPrezzo, remValuta: this.state.remValuta, remCapacita: this.state.remCapacita,
+        remContractId: this.state.remContractId, remContractDate: this.state.remContractDate, remContractType: this.state.remContractType, remCommodity: this.state.remCommodity, remDeliveryStart: this.state.remDeliveryStart, remDeliveryEnd: this.state.remDeliveryEnd, remSettlement: this.state.remSettlement, remMarketplaceTipo: this.state.remMarketplaceTipo, remMarketplaceId: this.state.remMarketplaceId, remTransactionAt: this.state.remTransactionAt, remTransactionId: this.state.remTransactionId,
         setRemTipo: (e) => this.setSilent({ remTipo: e.target.value }),
+        setRemAzione: (e) => this.setSilent({ remAzione: e.target.value }),
         setRemRif: (e) => this.setSilent({ remRif: e.target.value }),
+        setRemData: (e) => this.setSilent({ remData: e.target.value }),
+        setRemPunto: (e) => this.setSilent({ remPunto: e.target.value }),
+        setRemControparte: (e) => this.setSilent({ remControparte: e.target.value }),
+        setRemControparteTipo: (e) => this.setSilent({ remControparteTipo: e.target.value }),
+        setRemLato: (e) => this.setSilent({ remLato: e.target.value }),
         setRemQta: (e) => this.setSilent({ remQta: e.target.value }),
+        setRemUnita: (e) => this.setSilent({ remUnita: e.target.value }),
         setRemPrezzo: (e) => this.setSilent({ remPrezzo: e.target.value }),
+        setRemValuta: (e) => this.setSilent({ remValuta: e.target.value }),
+        setRemCapacita: (e) => this.setSilent({ remCapacita: e.target.value }),
+        setRemContractId: (e) => this.setSilent({ remContractId: e.target.value }),
+        setRemContractDate: (e) => this.setSilent({ remContractDate: e.target.value }),
+        setRemContractType: (e) => this.setSilent({ remContractType: e.target.value }),
+        setRemCommodity: (e) => this.setSilent({ remCommodity: e.target.value }),
+        setRemDeliveryStart: (e) => this.setSilent({ remDeliveryStart: e.target.value }),
+        setRemDeliveryEnd: (e) => this.setSilent({ remDeliveryEnd: e.target.value }),
+        setRemSettlement: (e) => this.setSilent({ remSettlement: e.target.value }),
+        setRemMarketplaceTipo: (e) => this.setSilent({ remMarketplaceTipo: e.target.value }),
+        setRemMarketplaceId: (e) => this.setSilent({ remMarketplaceId: e.target.value }),
+        setRemTransactionAt: (e) => this.setSilent({ remTransactionAt: e.target.value }),
+        setRemTransactionId: (e) => this.setSilent({ remTransactionId: e.target.value }),
         doLogin, logout, goHub: go("hub"),
         loginEmail: this.state.loginEmail, loginPass: this.state.loginPass,
         loginErrore: this.state.loginErrore,
@@ -595,8 +792,13 @@
         loginKey: (e) => (e.key === "Enter" ? doLogin() : undefined),
         doSSO: () => { this.setState({ sso: "redirect" }); setTimeout(() => this.setState((st) => (st.sso ? { sso: "pick" } : {})), 1100); },
         ssoCancel: () => this.setState({ sso: null }),
-        ssoPick: async () => {
+        ssoPickMarco: async () => {
           if (!await this._apriSessione("m.rossi@azienda1.it")) return;
+          this.setState({ sso: "auth" });
+          setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900);
+        },
+        ssoPickLaura: async () => {
+          if (!await this._apriSessione("l.bianchi@azienda1.it")) return;
           this.setState({ sso: "auth" });
           setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900);
         },
@@ -631,9 +833,15 @@
         giornoGas, vuotoDash: !demoOn && this.state.nomList.length === 0,
         utenteNome: ident.nome, utenteIniziali: ident.iniziali, utenteAzienda: ident.azienda,
         saluto: (new Date().getHours() < 13 ? "Buongiorno" : new Date().getHours() < 18 ? "Buon pomeriggio" : "Buonasera") + ", " + ident.nomeSaluto,
-        gmeOk: !!this.state.gmeOk, verifyGme: () => this.setState({ gmeOk: true }),
-        gmeToggle: () => this.setState((st) => ({ gmeAuto: !st.gmeAuto })),
-        gmeKBg: knob(this.state.gmeAuto).kBg, gmeKX: knob(this.state.gmeAuto).kX,
+        pdr: pdrProfile, pdrCaricamento: !!this.state.pdrCaricamento, pdrErrore: this.state.pdrErrore, pdrInfo: this.state.pdrInfo,
+        pdrSetEnvironment: pdrSet("environment"), pdrSetChannel: pdrSet("channel"), pdrSetOperator: pdrSet("gme_operator_code"), pdrSetContract: pdrSet("pdr_contract_reference"), pdrSetRegisteredAcer: pdrSet("registered_acer_code"),
+        pdrToggleTestAccess: pdrToggle("test_access_requested"), pdrToggleTwoFactor: pdrToggle("two_factor_ready"), salvaPdr,
+        pdrEnvironment: pdrProfile.environment || "test", pdrChannel: pdrProfile.channel || "portal", pdrOperator: pdrProfile.gme_operator_code || "", pdrContract: pdrProfile.pdr_contract_reference || "", pdrRegisteredAcer: pdrProfile.registered_acer_code || "",
+        pdrTestAccess: !!pdrProfile.test_access_requested, pdrTwoFactor: !!pdrProfile.two_factor_ready,
+        pdrEndpoint: pdrProfile.environment === "production" ? "https://pdr.ipex.it" : "https://provepdr.ipex.it",
+        pdrFeeAnnual: this.state.pdrFees ? `${this.state.pdrFees.external_upload_annual_eur} €/anno` : "—",
+        pdrCheck: this.state.pdrCheck, pdrCheckOpen: !!this.state.pdrCheck, pdrCheckLoading: !!this.state.pdrCheck?.loading, pdrIssues: this.state.pdrCheck?.issues ?? [], pdrCheckReport: this.state.pdrCheck?.report_id ?? "",
+        pdrRows: remRows, pdrSchemas: this.state.pdrSchemas || [], goPdr: go("pdr"),
       };
     }
   }
@@ -647,8 +855,9 @@
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
       .then((saved) => {
-        app.idrata(saved);
+        const sessioneRipristinata = app.idrata(saved);
         VT.mount(document.getElementById("app"), document.getElementById("app-template"), app);
+        if (sessioneRipristinata) app._caricaWorkspaceRegolatorio();
       });
   }
 })();

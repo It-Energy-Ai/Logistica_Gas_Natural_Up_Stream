@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- edited with XMLSpy v2014 rel. 2 sp1 (x64) (http://www.altova.com) by - - (Agency for the Cooperation of Energy Regulators) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ait2="http://www.acer.europa.eu/REMIT/REMITTable2_V1.xsd" targetNamespace="http://www.acer.europa.eu/REMIT/REMITTable2_V1.xsd" elementFormDefault="qualified">
+	<xs:element name="REMITTable2">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="reportingEntityID" type="ait2:reportingEntityID">
+					<xs:annotation>
+						<xs:documentation>Field No. 5, Field No. 6</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="TradeList" type="ait2:TradeListType" minOccurs="0">
+					<xs:unique name="TradeRecordSeqNumber">
+						<xs:selector xpath="ait2:nonStandardContractReport"/>
+						<xs:field xpath="ait2:RecordSeqNumber"/>
+					</xs:unique>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:complexType name="fixingIndexType">
+		<xs:sequence>
+			<xs:element name="fixingIndex" type="ait2:restrictedString">
+				<xs:annotation>
+					<xs:documentation>Field No. 25</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="fixingIndexType" type="ait2:contractTypeType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 26</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="fixingIndexSource" type="ait2:restrictedString" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 27</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="firstFixingDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 28</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="lastFixingDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 29</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="fixingFrequency" type="ait2:frequencyType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 30</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="nonStandardTransactionReport">
+		<xs:sequence>
+			<xs:element name="RecordSeqNumber" type="ait2:RecordSeqNumberType"/>
+			<xs:element name="idOfMarketParticipant" type="ait2:participantType">
+				<xs:annotation>
+					<xs:documentation>Field No. 1, Field No. 2
+                    </xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="otherMarketParticipant" type="ait2:participantType" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Field No. 3, Field No. 4
+                    </xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="beneficiaryIdentification" type="ait2:participantType" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Field No. 7,Field No. 8</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="tradingCapacity" type="ait2:tradingCapacityType">
+				<xs:annotation>
+					<xs:documentation>Field No. 9</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="buySellIndicator" type="ait2:buySellIndicatorType">
+				<xs:annotation>
+					<xs:documentation>Field No. 10</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="contractId" type="ait2:contractIdType">
+				<xs:annotation>
+					<xs:documentation>Field No. 11</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="contractDate" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Field No. 12</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="contractType" type="ait2:contractTypeType">
+				<xs:annotation>
+					<xs:documentation>Field No. 13</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="energyCommodity" type="ait2:energyCommodityType" maxOccurs="2">
+				<xs:annotation>
+					<xs:documentation>Field No. 14</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="priceOrPriceFormula" type="ait2:priceOrPriceFormulaType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No 15</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="estimatedNotionalAmount" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 16 and Field No. 17</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:complexContent>
+						<xs:extension base="ait2:priceType"/>
+					</xs:complexContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="totalNotionalContractQuantity" type="ait2:notionalQuantityType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 18</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="volumeOptionality" type="ait2:volumeOptionalityType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 21</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="volumeOptionalityFrequency" type="ait2:frequencyType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 22</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="volumeOptionalityIntervals" type="ait2:volumeOptionalityIntervals" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Field No. 19 and No 23</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="typeOfIndexPrice" type="ait2:typeOfIndexPriceType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 24</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="fixingIndexDetails" type="ait2:fixingIndexType" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Fixing index details</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="settlementMethod" type="ait2:settlementMethodType" default="P">
+				<xs:annotation>
+					<xs:documentation>Field No. 31</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionDetails" type="ait2:optionDetails" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Option Details Filed No 32, 33,34,35,36,37,38,39 and 40</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="deliveryPointOrZone" type="ait2:eic" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Field No. 41</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="deliveryStartDate" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Field No. 42</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="deliveryEndDate" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Field No. 43</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="loadType" type="ait2:contractloadType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 44</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="actionType" type="ait2:actionTypesType">
+				<xs:annotation>
+					<xs:documentation>Field No. 45</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Extra" type="ait2:extraType" minOccurs="0"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="notionalQuantityType">
+		<xs:sequence>
+			<xs:element name="value" type="ait2:numberType">
+				<xs:annotation>
+					<xs:documentation>Field No. 18</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="unit" type="ait2:quantityUnitType">
+				<xs:annotation>
+					<xs:documentation>Field No. 20 for No 18</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="optionDetails">
+		<xs:sequence>
+			<xs:element name="optionStyle" type="ait2:optionStyleType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 32</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionType" type="ait2:optionTypeType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 33</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionFirstExerciseDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 34</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionLastExerciseDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 35</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionExerciseFrequency" type="ait2:frequencyType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 36</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionStrikeIndex" type="ait2:restrictedString" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 37</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionIndexType" type="ait2:contractTypeType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 38</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionIndexSource" type="ait2:restrictedString" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 39</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="optionStrikePrice" type="ait2:priceType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Field No. 40</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="participantType">
+		<xs:choice>
+			<xs:element name="ace" type="ait2:ace"/>
+			<xs:element name="lei" type="ait2:lei"/>
+			<xs:element name="bic" type="ait2:bic"/>
+			<xs:element name="eic" type="ait2:eic"/>
+			<xs:element name="gln" type="ait2:gln"/>
+		</xs:choice>
+	</xs:complexType>
+	<xs:complexType name="priceOrPriceFormulaType">
+		<xs:choice>
+			<xs:element name="price" type="ait2:priceType">
+				<xs:annotation>
+					<xs:documentation>Field No. 15</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="priceFormula">
+				<xs:annotation>
+					<xs:documentation>Field No. 15</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string">
+						<xs:maxLength value="1000"/>
+					</xs:restriction>
+				</xs:simpleType>
+			</xs:element>
+		</xs:choice>
+	</xs:complexType>
+	<xs:complexType name="priceType">
+		<xs:sequence>
+			<xs:element name="value" type="ait2:numberType">
+				<xs:annotation>
+					<xs:documentation>Price</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="currency" type="ait2:currencyCodeType">
+				<xs:annotation>
+					<xs:documentation>Currency Value</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="quantityType"/>
+	<xs:complexType name="reportingEntityID">
+		<xs:choice>
+			<xs:element name="ace" type="ait2:ace"/>
+			<xs:element name="lei" type="ait2:lei"/>
+			<xs:element name="bic" type="ait2:bic"/>
+			<xs:element name="eic" type="ait2:eic"/>
+			<xs:element name="gln" type="ait2:gln"/>
+		</xs:choice>
+	</xs:complexType>
+	<xs:complexType name="TradeListType">
+		<xs:sequence>
+			<xs:element name="nonStandardContractReport" type="ait2:nonStandardTransactionReport" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="volumeOptionalityIntervals">
+		<xs:sequence>
+			<xs:element name="capacity">
+				<xs:annotation>
+					<xs:documentation>Field No. 19 and 20</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:complexContent>
+						<xs:extension base="ait2:quantityType">
+							<xs:sequence>
+								<xs:element name="value" type="ait2:numberType">
+									<xs:annotation>
+										<xs:documentation>Field No. 19</xs:documentation>
+									</xs:annotation>
+								</xs:element>
+								<xs:element name="unit" type="ait2:capacityUnitType">
+									<xs:annotation>
+										<xs:documentation>Field No. 20 for 19</xs:documentation>
+									</xs:annotation>
+								</xs:element>
+							</xs:sequence>
+						</xs:extension>
+					</xs:complexContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="startDate" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Field No. 23</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="endDate" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Field No. 23</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:simpleType name="ace">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="12"/>
+			<xs:minLength value="12"/>
+			<xs:pattern value="[A-Za-z0-9_]+\.[A-Z][A-Z]"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="actionTypesType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="N"/>
+			<xs:enumeration value="M"/>
+			<xs:enumeration value="E"/>
+			<xs:enumeration value="C"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="bic">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="11"/>
+			<xs:minLength value="11"/>
+			<xs:pattern value="[A-Za-z0-9_]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="buySellIndicatorType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="B"/>
+			<xs:enumeration value="S"/>
+			<xs:enumeration value="C"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="capacityUnitType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="KW"/>
+			<xs:enumeration value="KWh/h"/>
+			<xs:enumeration value="KWh/d"/>
+			<xs:enumeration value="MW"/>
+			<xs:enumeration value="MWh/h"/>
+			<xs:enumeration value="MWh/d"/>
+			<xs:enumeration value="GW"/>
+			<xs:enumeration value="GWh/h"/>
+			<xs:enumeration value="GWh/d"/>
+			<xs:enumeration value="Therm/d"/>
+			<xs:enumeration value="KTherm/d"/>
+			<xs:enumeration value="MTherm/d"/>
+			<xs:enumeration value="cm/d"/>
+			<xs:enumeration value="mcm/d"/>
+			<xs:enumeration value="Btu/d"/>
+			<xs:enumeration value="MMBtu/d"/>
+			<xs:enumeration value="MJ/d"/>
+			<xs:enumeration value="100MJ/d"/>
+			<xs:enumeration value="MMJ/d"/>
+			<xs:enumeration value="GJ/d"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="contractIdType">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="100"/>
+			<xs:pattern value="[A-Za-z0-9_:-]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="contractloadType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="BL"/>
+			<xs:enumeration value="PL"/>
+			<xs:enumeration value="OP"/>
+			<xs:enumeration value="BH"/>
+			<xs:enumeration value="SH"/>
+			<xs:enumeration value="GD"/>
+			<xs:enumeration value="OT"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="contractTypeType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="SO"/>
+			<xs:enumeration value="FW"/>
+			<xs:enumeration value="FU"/>
+			<xs:enumeration value="OP"/>
+			<xs:enumeration value="OP_FW"/>
+			<xs:enumeration value="OP_FU"/>
+			<xs:enumeration value="OP_SW"/>
+			<xs:enumeration value="SP"/>
+			<xs:enumeration value="SW"/>
+			<xs:enumeration value="OT"/>
+			<xs:enumeration value="FW_DES"/>
+			<xs:enumeration value="FW_FOB"/>
+			<xs:enumeration value="FU_DES"/>
+			<xs:enumeration value="FU_FOB"/>
+			<xs:enumeration value="OP_DES"/>
+			<xs:enumeration value="OP_FOB"/>
+			<xs:enumeration value="SP_DES"/>
+			<xs:enumeration value="SP_FOB"/>
+			<xs:enumeration value="SW_DES"/>
+			<xs:enumeration value="SW_FOB"/>
+			<xs:enumeration value="SO_PPA"/>
+			<xs:enumeration value="FW_PPA"/>
+			<xs:enumeration value="FU_PPA"/>
+			<xs:enumeration value="OP_PPA"/>
+			<xs:enumeration value="SP_PPA"/>
+			<xs:enumeration value="SW_PPA"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="currencyCodeType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="BGN"/>
+			<xs:enumeration value="CHF"/>
+			<xs:enumeration value="CZK"/>
+			<xs:enumeration value="DKK"/>
+			<xs:enumeration value="EUR"/>
+			<xs:enumeration value="EUX"/>
+			<xs:enumeration value="GBX"/>
+			<xs:enumeration value="GBP"/>
+			<xs:enumeration value="HRK"/>
+			<xs:enumeration value="HUF"/>
+			<xs:enumeration value="ISK"/>
+			<xs:enumeration value="NOK"/>
+			<xs:enumeration value="PCT"/>
+			<xs:enumeration value="PLN"/>
+			<xs:enumeration value="RON"/>
+			<xs:enumeration value="SEK"/>
+			<xs:enumeration value="USD"/>
+			<xs:enumeration value="OTH"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="eic">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="16"/>
+			<xs:minLength value="16"/>
+			<xs:pattern value="[0-9][0-9][XYZTWV].+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="energyCommodityType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="EL"/>
+			<xs:enumeration value="NG"/>
+			<xs:enumeration value="LG"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="extraType">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="1000"/>
+			<xs:pattern value="((\w+==((\d+\.\d+)|(\d+)|(\w+));)+(\w+==((\d+\.\d+)|(\d+)|(\w+))))"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="frequencyType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="X"/>
+			<xs:enumeration value="H"/>
+			<xs:enumeration value="D"/>
+			<xs:enumeration value="W"/>
+			<xs:enumeration value="M"/>
+			<xs:enumeration value="Q"/>
+			<xs:enumeration value="S"/>
+			<xs:enumeration value="A"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="gln">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="13"/>
+			<xs:minLength value="13"/>
+			<xs:pattern value="[A-Za-z0-9_]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="lei">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="20"/>
+			<xs:minLength value="20"/>
+			<xs:pattern value="[A-Za-z0-9_]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="mic">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="4"/>
+			<xs:minLength value="4"/>
+			<xs:pattern value="[A-Za-z0-9_]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="numberType">
+		<xs:restriction base="xs:decimal">
+			<xs:totalDigits value="20"/>
+			<xs:fractionDigits value="5"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="optionStyleType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="A"/>
+			<xs:enumeration value="E"/>
+			<xs:enumeration value="B"/>
+			<xs:enumeration value="S"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="optionTypeType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="P"/>
+			<xs:enumeration value="C"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="quantityUnitType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="KWh"/>
+			<xs:enumeration value="MWh"/>
+			<xs:enumeration value="GWh"/>
+			<xs:enumeration value="Therm"/>
+			<xs:enumeration value="KTherm"/>
+			<xs:enumeration value="MTherm"/>
+			<xs:enumeration value="cm"/>
+			<xs:enumeration value="mcm"/>
+			<xs:enumeration value="Btu"/>
+			<xs:enumeration value="MMBtu"/>
+			<xs:enumeration value="MJ"/>
+			<xs:enumeration value="MMJ"/>
+			<xs:enumeration value="100MJ"/>
+			<xs:enumeration value="GJ"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="RecordSeqNumberType">
+		<xs:restriction base="xs:integer">
+			<xs:minInclusive value="1"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="restrictedString">
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="150"/>
+			<xs:pattern value="[A-Za-z0-9_ -]+"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="settlementMethodType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="P"/>
+			<xs:enumeration value="C"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="tradingCapacityType">
+		<xs:annotation>
+			<xs:documentation/>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="P"/>
+			<xs:enumeration value="A"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="typeOfIndexPriceType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="F"/>
+			<xs:enumeration value="I"/>
+			<xs:enumeration value="C"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="volumeOptionalityType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="V"/>
+			<xs:enumeration value="F"/>
+			<xs:enumeration value="M"/>
+			<xs:enumeration value="C"/>
+			<xs:enumeration value="O"/>
+		</xs:restriction>
+	</xs:simpleType>
+</xs:schema>

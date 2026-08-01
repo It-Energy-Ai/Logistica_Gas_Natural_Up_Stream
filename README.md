@@ -33,9 +33,9 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 |:---:|:---:|
 | <img src="docs/screenshots/login.png" alt="Login con SSO aziendale"><br>**Login** · email/password o SSO aziendale con scelta account | <img src="docs/screenshots/hub.png" alt="Hub moduli"><br>**Hub** · moduli come carte da gioco, con effetto mazzo all'hover |
 | <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · invio per punto/ciclo, storico del giorno gas | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
-| <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · sei aree di lavoro | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi, credenziali GME |
+| <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
 
-E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **REMIT · Segnalazioni** (registro delle transazioni con ciclo di vita degli invii verso ACER, codice ACER configurabile, scadenze T+1 / 1 mese), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD e preflight PDR), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
 > Screenshot e tour mostrano la **modalità demo** attiva; al primo avvio il portale parte pulito (vedi sotto).
 
@@ -48,7 +48,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["13 schermate"]
+    R --> UI["14 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```
@@ -95,10 +95,18 @@ I dati di scena che vedi negli screenshot (KPI, grafici, cicli, contratti) sono 
 |---|---|
 | Identità dal login, navigazione, wizard, tema chiaro/scuro | Dati di mercato: KPI, prezzi PSV, giacenze, cicli |
 | Sessioni con cookie, login/logout | Login e SSO accettano qualunque credenziale |
-| **Persistenza SQLite** di nomine, configurazione, punti e utenti | Integrazioni Snam / GME / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
+| **Persistenza SQLite** di nomine, configurazione, punti, utenti, audit REMIT e artefatti XML | Integrazioni Snam / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
 | Sync client→server con retry, gestione sessione scaduta, validazione a whitelist | |
 
 La colonna di destra è la mappa esatta di cosa sostituire per andare in produzione.
+
+## REMIT e PDR GME
+
+Il progetto genera file XML per i tracciati **ACER REMITTable1 V3** (TradeReport) e **REMITTable2 V1** (contratto non-standard a prezzo fisso), validandoli contro gli XSD ACER fissati nel repository. Per ogni export crea un nome file PDR con progressivo e conserva hash e audit locale.
+
+Questo non equivale a una ricevuta GME o ACER. L'upload PDR resta disabilitato finché non sono disponibili contratto/abilitazione, credenziali di test a due livelli, specifiche del web service e un collaudo con ricevute reali. Il tracciato GasCapacity/EDIG@S per il trasporto gas è esplicitamente bloccato, non simulato.
+
+Istruzioni, fonti ufficiali, versioni degli schemi e prerequisiti di esercizio sono in [docs/remit-pdr.md](docs/remit-pdr.md).
 
 ## Test e qualità
 
@@ -106,9 +114,10 @@ La colonna di destra è la mappa esatta di cosa sostituire per andare in produzi
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest              # test API: sessioni, validazione, persistenza
 node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, avvio pulito
+node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Il codice è passato da una revisione multi-agente (4 lenti indipendenti + verifica avversariale di ogni segnalazione): tutti i difetti confermati sono stati corretti e coperti da regressione — inclusa la sincronizzazione col backend, che ora accoda e ritenta invece di perdere modifiche su errori di rete o sessione scaduta.
+La suite copre sessioni, isolamento dello stato, generazione XML REMIT, validazione XSD, progressivi PDR, audit, blocco dell'invio reale, runtime e sincronizzazione del frontend.
 
 ## Autore
 

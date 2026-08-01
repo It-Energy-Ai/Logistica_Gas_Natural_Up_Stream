@@ -9,7 +9,37 @@ concurrency:
   group: release-${{ github.ref }}
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Test API e coerenza dipendenze
+        run: |
+          pip install -r requirements-dev.txt
+          pip check
+          pytest -q
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - name: Test frontend e artefatto generato
+        run: |
+          node tests/logic.test.cjs
+          node tests/runtime.test.cjs
+          python build_frontend.py
+          git diff --exit-code app/static/index.html
+
   build:
+    needs: verify
     permissions:
       contents: read
       issues: write # solo per la diagnostica automatica su fallimento macOS
@@ -32,12 +62,12 @@ jobs:
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Compila l'eseguibile
         run: |
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements-build.txt
           pyinstaller Vettore.spec
 
       - name: Smoke test (unix)
@@ -128,7 +158,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [verify, build]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:

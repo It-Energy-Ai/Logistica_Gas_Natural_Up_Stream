@@ -211,19 +211,6 @@ test("report: filtro per categoria", () => {
   assert.ok(v.repFiles.every((f) => f.tag === "Regolatorio"));
 });
 
-test("GME: verifica credenziali e download automatico", () => {
-  const app = new App();
-  app.setState({ screen: "cfgSis" });
-  let v = app.renderVals();
-  assert.equal(v.gmeOk, false);
-  v.verifyGme();
-  v = app.renderVals();
-  assert.equal(v.gmeOk, true);
-  v.gmeToggle();
-  assert.equal(app.state.gmeAuto, false);
-  assert.ok("gmeOk" in app._pending && "gmeAuto" in app._pending);
-});
-
 test("tema: toggle chiaro/scuro", () => {
   const app = new App();
   let v = app.renderVals();
@@ -268,12 +255,12 @@ test("login: campi controllati e Invio", async () => {
 
 test("sync: su errore di rete la patch resta in coda E riprogramma un retry", async () => {
   const app = new App();
-  app.state.gmeOk = true;
+  app.state.demoMode = true;
   global.fetch = async () => { throw new Error("rete giù"); };
-  app._pending = { gmeOk: true };
+  app._pending = { demoMode: true };
   const timerPrima = app._syncTimer;
   await app._flush();
-  assert.deepEqual(app._pending, { gmeOk: true }); // ri-accodata
+  assert.deepEqual(app._pending, { demoMode: true }); // ri-accodata
   assert.notEqual(app._syncTimer, timerPrima); // un NUOVO retry è stato programmato
   clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
@@ -281,12 +268,12 @@ test("sync: su errore di rete la patch resta in coda E riprogramma un retry", as
 
 test("sync: su 5xx la patch resta in coda e si ritenta (non scartata come il 422)", async () => {
   const app = new App();
-  app.state.gmeOk = true;
+  app.state.demoMode = true;
   global.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
-  app._pending = { gmeOk: true };
+  app._pending = { demoMode: true };
   const timerPrima = app._syncTimer;
   await app._flush();
-  assert.deepEqual(app._pending, { gmeOk: true });
+  assert.deepEqual(app._pending, { demoMode: true });
   assert.notEqual(app._syncTimer, timerPrima);
   clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
@@ -294,12 +281,12 @@ test("sync: su 5xx la patch resta in coda e si ritenta (non scartata come il 422
 
 test("sync: il retry non riporta indietro un valore già superato", async () => {
   const app = new App();
-  app.state.gmeOk = false; // valore CORRENTE
+  app.state.demoMode = false; // valore CORRENTE
   global.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
-  app._pending = { gmeOk: true }; // snapshot vecchio in volo
+  app._pending = { demoMode: true }; // snapshot vecchio in volo
   await app._flush();
   // _riaccoda deve ripartire dallo stato corrente, non dallo snapshot inviato
-  assert.equal(app._pending.gmeOk, false);
+  assert.equal(app._pending.demoMode, false);
   clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
 });
@@ -308,27 +295,27 @@ test("sync: 401 sospende (niente loop), il login riprende e svuota la coda", asy
   const app = new App();
   app.setState({ screen: "nomine" });
   app._sessionEmail = "operazioni@gasadriatica.it";
-  app.state.gmeOk = true; // valore corrente che _riaccoda deve conservare
+  app.state.demoMode = true; // valore corrente che _riaccoda deve conservare
   global.fetch = async () => ({ ok: false, status: 401, text: async () => "" });
-  app._pending = { gmeOk: true };
+  app._pending = { demoMode: true };
   const timerPrima = app._syncTimer;
   await app._flush();
   assert.equal(app.state.screen, "login");
-  assert.deepEqual(app._pending, { gmeOk: true }); // coda conservata
+  assert.deepEqual(app._pending, { demoMode: true }); // coda conservata
   assert.equal(app._sospesa, true);
   assert.equal(app._syncTimer, timerPrima); // NESSUN nuovo retry programmato
   // il login riattiva la sync e svuota la coda
   let inviate = null;
   global.fetch = async (url, opts = {}) => {
     if (url === "/api/login") return { ok: true, status: 200, json: async () => ({ email: "operazioni@gasadriatica.it" }) };
-    if (url === "/api/state" && !opts.method) return { ok: true, status: 200, json: async () => ({ email: "operazioni@gasadriatica.it", gmeOk: false }) };
+    if (url === "/api/state" && !opts.method) return { ok: true, status: 200, json: async () => ({ email: "operazioni@gasadriatica.it", demoMode: false }) };
     if (url === "/api/state" && opts.method === "PUT") inviate = JSON.parse(opts.body);
     return { ok: true, status: 200, text: async () => "" };
   };
   await app._apriSessione("operazioni@gasadriatica.it");
   assert.equal(app._sospesa, false);
   await new Promise((r) => setTimeout(r, 300)); // debounce 250ms
-  assert.deepEqual(inviate, { gmeOk: true });
+  assert.deepEqual(inviate, { demoMode: true });
   assert.deepEqual(app._pending, {});
   global.fetch = FETCH_OK;
 });
@@ -358,7 +345,7 @@ test("logout e nuovo login non conservano i dati dell'utente precedente", async 
 test("sync: serializza i salvataggi e conserva l'ultima modifica", async () => {
   const app = new App();
   app._sessionEmail = "operazioni@gasadriatica.it";
-  app.state.gmeOk = false;
+  app.state.demoMode = false;
   let risolviPrima;
   const invii = [];
   global.fetch = async (_url, opts) => {
@@ -366,15 +353,15 @@ test("sync: serializza i salvataggi e conserva l'ultima modifica", async () => {
     if (invii.length === 1) return new Promise((resolve) => { risolviPrima = () => resolve({ ok: true, status: 200, text: async () => "" }); });
     return { ok: true, status: 200, text: async () => "" };
   };
-  app._pending = { gmeOk: false };
+  app._pending = { demoMode: false };
   const primo = app._flush();
-  app.setState({ gmeOk: true });
+  app.setState({ demoMode: true });
   await app._flush();
   assert.equal(invii.length, 1, "non invia una seconda PUT mentre la prima è in volo");
   risolviPrima();
   await primo;
   await new Promise((resolve) => setTimeout(resolve, 300));
-  assert.deepEqual(invii, [{ gmeOk: false }, { gmeOk: true }]);
+  assert.deepEqual(invii, [{ demoMode: false }, { demoMode: true }]);
   clearTimeout(app._syncTimer);
   global.fetch = FETCH_OK;
 });
@@ -382,7 +369,7 @@ test("sync: serializza i salvataggi e conserva l'ultima modifica", async () => {
 test("sync: 422 scarta la patch senza ritentare", async () => {
   const app = new App();
   global.fetch = async () => ({ ok: false, status: 422, text: async () => "chiavi non valide" });
-  app._pending = { gmeOk: true };
+  app._pending = { demoMode: true };
   await app._flush();
   assert.deepEqual(app._pending, {});
   global.fetch = FETCH_OK;
@@ -433,44 +420,44 @@ test("REMIT pulito: registro vuoto, KPI a zero, codice da configurare", () => {
   assert.equal(v.remAcer, "da configurare");
 });
 
-test("REMIT: registra una segnalazione, poi segnala l'invio (persistito)", () => {
+test("REMIT: il form raccoglie i campi Table 1 senza creare falsi record locali", () => {
   const app = new App();
   app.setState({ screen: "remit" });
   let v = app.renderVals();
+  v.setRemAcer(ev("A0045821W.IT"));
   v.setRemRif(ev("PSV-2026-0142"));
-  app.renderVals().setRemQta(ev("500"));
-  app.renderVals().setRemPrezzo(ev("33,50"));
-  app.renderVals().addRem();
+  v.setRemContractId(ev("PSV-2026-0142"));
+  v.setRemControparte(ev("A0045821W.IT"));
+  v.setRemQta(ev("500"));
+  v.setRemPrezzo(ev("33,50"));
+  v.setRemMarketplaceId(ev("XGAS"));
+  v.setRemTransactionAt(ev("2026-08-01T10:15:00Z"));
+  v.setRemTransactionId(ev("UTI-1"));
   v = app.renderVals();
-  assert.equal(v.remRows.length, 1);
-  assert.equal(v.remRows[0].stato, "Da inviare");
-  assert.equal(v.remRows[0].daInviare, true);
-  assert.equal(v.remKpis[0].value, "1");
-  assert.ok("remList" in app._pending, "remList persistita");
-  v.remRows[0].invia();
-  v = app.renderVals();
-  assert.equal(v.remRows[0].stato, "Inviata");
-  assert.equal(v.remKpis[1].value, "1");
-  clearTimeout(app._syncTimer);
-});
-
-test("REMIT demo: scenografia in coda alle righe reali, mai salvata", () => {
-  const app = new App();
-  app.setState({ screen: "remit", demoMode: true });
-  let v = app.renderVals();
-  assert.equal(v.remRows.length, 4); // solo scena
   assert.equal(v.remAcer, "A0045821W.IT");
-  assert.deepEqual(v.remKpis.map((k) => k.value), ["1", "2", "1"]);
-  // una riga reale si mette DAVANTI alla scena
-  v.setRemRif(ev("REALE-01"));
-  app.renderVals().addRem();
-  v = app.renderVals();
-  assert.equal(v.remRows.length, 5);
-  assert.equal(v.remRows[0].rif, "REALE-01");
-  assert.equal(app.state.remList.length, 1); // la scena non entra nello stato
+  assert.equal(v.remTipo, "gas_standard");
+  assert.equal(v.remContractId, "PSV-2026-0142");
+  assert.equal(v.remTransactionId, "UTI-1");
+  assert.equal(v.remRows.length, 0);
+  assert.equal("remList" in app.state, false);
   clearTimeout(app._syncTimer);
 });
 
+test("PDR: schermata e profilo separano readiness da credenziali", () => {
+  const app = new App();
+  app.setState({ screen: "pdr" });
+  let v = app.renderVals();
+  assert.equal(v.screenPdr, true);
+  assert.equal(v.pdrEnvironment, "test");
+  v.pdrSetOperator(ev("M-GAS-123"));
+  v.pdrSetRegisteredAcer(ev("A0045821W.IT"));
+  v.pdrToggleTestAccess();
+  v = app.renderVals();
+  assert.equal(v.pdrOperator, "M-GAS-123");
+  assert.equal(v.pdrRegisteredAcer, "A0045821W.IT");
+  assert.equal(v.pdrTestAccess, true);
+  assert.equal("password" in app.state.pdr, false);
+});
 test("REMIT: il codice ACER si salva in cfg e compare nel chip", () => {
   const app = new App();
   app.setState({ screen: "remit" });
