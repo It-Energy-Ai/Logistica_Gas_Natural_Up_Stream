@@ -293,15 +293,17 @@ def _artifact_xml_del_report(
 def _transazione_ricevuta(conn):
     """Mantiene atomici inserimento immutabile e relativo evento audit."""
 
-    conn.execute("SAVEPOINT pdr_receipt_import")
+    # BEGIN IMMEDIATE e non SAVEPOINT: con WAL una transazione differita fissa
+    # lo snapshot sulla SELECT di idempotenza e la INSERT successiva fallisce
+    # con SQLITE_BUSY_SNAPSHOT, che busy_timeout non ritenta.
+    conn.execute("BEGIN IMMEDIATE")
     try:
         yield
     except Exception:
-        conn.execute("ROLLBACK TO SAVEPOINT pdr_receipt_import")
-        conn.execute("RELEASE SAVEPOINT pdr_receipt_import")
+        conn.execute("ROLLBACK")
         raise
     else:
-        conn.execute("RELEASE SAVEPOINT pdr_receipt_import")
+        conn.execute("COMMIT")
 
 
 def presenta_ricevuta(receipt: dict[str, Any]) -> dict[str, Any]:
@@ -365,9 +367,20 @@ def importa_ricevuta(conn, email: str, payload: dict[str, Any]) -> tuple[dict[st
     mime_type = _normalizza_mime(payload.get("mime_type"))
     load_code = _normalizza_load_code(payload.get("load_code"))
     error_detail = _normalizza_error_detail(payload)
-    parsed = _parse_pdr_functional_ack(content) if source == "pdr" else None
+    # Il riconoscimento non dipende da come l'operatore dichiara la fonte: se
+    # il file È un acknowledgement GME, il suo Status prevale comunque.
+    # Legandolo a source="pdr" bastava dichiarare "acer" per far passare come
+    # accettata una ricevuta che il GME aveva rifiutato.
+    parsed = _parse_pdr_functional_ack(content)
     parser_version = None
     parser_metadata: dict[str, Any] = {}
+
+    if parsed and source != "pdr":
+        # Il documento è un ack GME ma è stato dichiarato di altra fonte:
+        # l'incoerenza va segnalata, non risolta in silenzio.
+        raise PdrError(
+            "Il file è un acknowledgement funzionale GME/PDR: importalo dichiarando la fonte «pdr»."
+        )
 
     if parsed:
         parser_version = PIPE_ACK_PARSER_VERSION
@@ -479,9 +492,15 @@ def normalizza_profile(payload: dict[str, Any], *, previous: dict[str, Any] | No
     previous = previous or default_profile()
     environment = _text(payload.get("environment", previous.get("environment")), 20)
     channel = _text(payload.get("channel", previous.get("channel")), 20)
+    # Sostituire in silenzio un valore fuori lista farebbe credere
+    # all'operatore di aver salvato la produzione mentre resta sul test.
+    if environment and environment not in PDR_ENDPOINTS:
+        raise PdrError(f"Ambiente PDR non valido: ammessi {', '.join(sorted(PDR_ENDPOINTS))}.")
+    if channel and channel not in {"portal", "web_service"}:
+        raise PdrError("Canale PDR non valido: ammessi «portal» e «web_service».")
     return {
-        "environment": environment if environment in PDR_ENDPOINTS else "test",
-        "channel": channel if channel in {"portal", "web_service"} else "portal",
+        "environment": environment or "test",
+        "channel": channel or "portal",
         "gme_operator_code": _text(payload.get("gme_operator_code", previous.get("gme_operator_code")), 64),
         "pdr_contract_reference": _text(
             payload.get("pdr_contract_reference", previous.get("pdr_contract_reference")), 120

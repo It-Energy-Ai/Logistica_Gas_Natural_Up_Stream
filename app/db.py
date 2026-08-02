@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS edigas_nomina (
     creato_il TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_edigas_nomina_email ON edigas_nomina(email, giorno_gas);
+-- Identificativo e versione sono ciò che il trasportatore cita nella risposta:
+-- due nomine omonime renderebbero ambiguo l'abbinamento del NOMRES.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_edigas_nomina_identita
+    ON edigas_nomina(email, identificativo, versione);
 
 CREATE TABLE IF NOT EXISTS remit_migrazione (
     email TEXT NOT NULL,
@@ -474,6 +478,19 @@ def crea_nomina_edigas(
     )
 
 
+def _json_o_righe(grezzo: str | None) -> list[str]:
+    """Legge gli avvisi come JSON, con ricaduta sul vecchio formato a righe."""
+
+    testo = (grezzo or "").strip()
+    if not testo:
+        return []
+    try:
+        letto = json.loads(testo)
+    except json.JSONDecodeError:
+        return [r for r in testo.split("\n") if r]
+    return [str(x) for x in letto] if isinstance(letto, list) else []
+
+
 def _riga_nomina(row: sqlite3.Row, *, con_xml: bool = False) -> dict:
     dati = {
         "id": row["id"],
@@ -483,7 +500,9 @@ def _riga_nomina(row: sqlite3.Row, *, con_xml: bool = False) -> dict:
         "giorno_gas": row["giorno_gas"],
         "punto": row["punto"],
         "periodi": row["periodi"],
-        "avvisi": [a for a in (row["avvisi"] or "").split("\n") if a],
+        # JSON e non split("\n"): un valore che contenga un a capo spezzerebbe
+        # un avviso in due, mostrandone uno monco.
+        "avvisi": _json_o_righe(row["avvisi"]),
         "sha256": row["sha256"],
         "creato_il": row["creato_il"],
     }
@@ -524,9 +543,15 @@ def trova_nomina_edigas(
     """
 
     testo = str(versione or "").strip()
-    if not testo.isdecimal():
+    # `isdecimal()` è vero anche per una stringa di diecimila cifre, che poi
+    # sfonda il limite di conversione di int(). La versione EDIG@S sta in tre
+    # cifre (Version_Integer, maxInclusive 999): tutto il resto non può
+    # riferirsi a una nomina esistente.
+    if not testo.isdecimal() or len(testo) > 3:
         return None
     numero = int(testo)
+    if not 0 < numero <= 999:
+        return None
     row = conn.execute(
         f"SELECT {CAMPI_NOMINA}, xml FROM edigas_nomina "
         # La prima: è quella che lo shipper ha effettivamente inviato e che
@@ -577,11 +602,16 @@ def leggi_artifact_remit(conn: sqlite3.Connection, email: str, artifact_id: str)
 
 
 def migrazione_remit_eseguita(conn: sqlite3.Connection, email: str, source_hash: str) -> bool:
+    """Vero se l'utente ha già importato il proprio registro legacy.
+
+    L'esito NON dipende dall'impronta della lista: ancorarlo a quella
+    significava rimigrare tutto a ogni modifica di ``remList``, duplicando le
+    bozze già convertite. La migrazione è un evento che accade una volta per
+    utente; le righe aggiunte dopo appartengono al registro nuovo.
+    """
+
     return bool(
-        conn.execute(
-            "SELECT 1 FROM remit_migrazione WHERE email = ? AND source_hash = ?",
-            (email, source_hash),
-        ).fetchone()
+        conn.execute("SELECT 1 FROM remit_migrazione WHERE email = ?", (email,)).fetchone()
     )
 
 

@@ -325,8 +325,19 @@ def codici_ammessi(tipo: str) -> list[str]:
 
 
 def _errore(errors: list[dict[str, str]], campo: str, messaggio: str) -> None:
+    """Accoda un errore, fermandosi al tetto ma dichiarando quanti ne restano.
+
+    Troncare in silenzio farebbe credere all'operatore di aver corretto tutto
+    dopo aver sistemato i primi cinquanta.
+    """
+
     if len(errors) < MAX_ERRORI:
         errors.append({"field": campo, "message": messaggio})
+    elif len(errors) == MAX_ERRORI:
+        errors.append({
+            "field": "_altri",
+            "message": f"Altri errori non elencati: correggi i primi {MAX_ERRORI} e rigenera.",
+        })
 
 
 def _testo(
@@ -724,6 +735,10 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
         controparti = []
 
     partite: list[tuple[str, list[tuple[str, str, str]]]] = []
+    # I conti già incontrati stanno in un insieme costruito una volta sola:
+    # ricavarli dalle partite a ogni giro rendeva quadratico il costo, e una
+    # nomina con molte controparti teneva occupato il server per minuti.
+    conti_visti: set[str] = set()
     senza_controparte: list[tuple[str, str, str]] = []
     totale_periodi = 0
     if giorno is not None and non_matching:
@@ -749,7 +764,7 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
                 "AccountType-base",
                 f"Controparte {indice + 1} · conto",
             )
-            if conto_esterno and conto_esterno in {c for c, _ in partite}:
+            if conto_esterno and conto_esterno in conti_visti:
                 _errore(
                     errors,
                     f"controparti[{indice}].conto",
@@ -763,8 +778,14 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
             for conflitto in _sovrapposizioni(periodi):
                 _errore(errors, f"controparti[{indice}]", f"Controparte {indice + 1}: periodi sovrapposti — {conflitto}.")
             totale_periodi += len(periodi)
+            if conto_esterno:
+                conti_visti.add(conto_esterno)
             if conto_esterno and periodi:
                 partite.append((conto_esterno, periodi))
+            if totale_periodi > MAX_PERIODI:
+                # Si interrompe subito: continuare a espandere periodi che
+                # verranno comunque rifiutati è solo lavoro sprecato.
+                break
 
     if totale_periodi > MAX_PERIODI:
         _errore(errors, "controparti", f"Troppi periodi ({totale_periodi}): il limite applicativo è {MAX_PERIODI}.")

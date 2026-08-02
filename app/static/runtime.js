@@ -84,11 +84,30 @@
         continue;
       }
 
+      // Dentro <select> il parser HTML scarta qualunque elemento che non sia
+      // option/optgroup: un <sc-for> non sopravvive nemmeno al caricamento
+      // della pagina. La stessa ripetizione espressa come ATTRIBUTO resta,
+      // perché vive su un <option> legittimo.
+      if (node.hasAttribute("sc-repeat")) {
+        const expr = soleExpr(node.getAttribute("sc-repeat") || "");
+        const as = node.getAttribute("sc-as") || "item";
+        const list = expr ? lookup(scopes, expr) : null;
+        if (Array.isArray(list)) {
+          const modello = node.cloneNode(true);
+          modello.removeAttribute("sc-repeat");
+          modello.removeAttribute("sc-as");
+          for (const item of list) {
+            renderInto(parent, [modello], scopes.concat({ [as]: item }));
+          }
+        }
+        continue;
+      }
+
       const el = document.createElement(tag);
       let pendingValue = null;
       for (const attr of node.attributes) {
         const name = attr.name;
-        if (name.startsWith("hint-")) continue;
+        if (name.startsWith("hint-") || name.startsWith("sc-")) continue;
         if (name in EVENT_ATTRS) {
           const expr = soleExpr(attr.value);
           const fn = expr ? lookup(scopes, expr) : null;

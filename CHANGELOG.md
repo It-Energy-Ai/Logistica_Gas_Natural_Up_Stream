@@ -2,6 +2,30 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.5.1] — 2026-08-02
+
+Da una revisione a tappeto di tutti i moduli e di tutte le pagine: ogni difetto è stato riprodotto eseguendo codice e poi verificato una seconda volta in modo indipendente. Trenta difetti confermati, tutti corretti.
+
+### Corretto — identificativi e dati regolatori
+- **Un codice ACER di 13 caratteri veniva tagliato a 12 in silenzio**, diventando quello — formalmente valido — di un **altro soggetto**, che finiva in `reportingEntityID`, in `idOfMarketParticipant` e nel nome del file PDR. La regola già scritta per Contract ID e UTI («non troncare mai un identificativo regolatorio») non era stata estesa al dichiarante. Stesso trattamento per le date: `2026-08-0199` diventava `2026-08-01` senza un avviso.
+- **Una validazione fallita cancellava dal database i valori digitati dall'operatore**: la normalizzazione azzera ciò che non sa interpretare, e quei vuoti venivano salvati. Restavano i messaggi d'errore, riferiti a campi ormai vuoti.
+- **Un acknowledgement GME rifiutato poteva essere archiviato come accettato** dichiarando la fonte «acer»: il parser che confronta lo `Status` si attivava solo per fonte «pdr». Ora il riconoscimento non dipende da come l'operatore dichiara la fonte.
+- **L'XML esportato non era più riscaricabile**: se il download del browser falliva, l'unico modo per riaverlo era rigenerarlo. Ora il registro espone «Scarica XML» finché l'artefatto esiste.
+
+### Corretto — interfaccia
+- **Le tre tendine delle ricevute PDR non hanno mai funzionato.** Il parser HTML ammette dentro `<select>` solo `option` e `optgroup`: i `<sc-for>` venivano scartati al caricamento della pagina e a schermo restavano voci con le interpolazioni non risolte, del tipo `{{ ro.label }}`. Non era intercettabile dai test, perché il difetto nasce nel parser del browser. La ripetizione è ora un attributo `sc-repeat` su un `<option>` legittimo, con un guardrail nel builder e due test che vietano la forma sbagliata per sempre.
+- **Il pulsante «Audit» era morto**: scaricava la catena di eventi e non la mostrava, perché il markup non esisteva. Ora il pannello mostra gli eventi con impronta e transizione di stato.
+- **Il profilo PDR non salvava nulla di ciò che si digitava**, ma annunciava «Profilo PDR salvato»: veniva inviato lo snapshot precedente alla digitazione. Stesso difetto sul codice ACER del form REMIT, che non entrava né nella bozza né nel calcolo dell'UTI.
+- **Le risposte di una sessione chiusa finivano nello stato del nuovo utente**: entrando con un altro account si potevano vedere i dati del precedente. I caricamenti verificano ora di appartenere ancora alla sessione viva.
+- Il doppio clic non crea più bozze, nomine e ricevute duplicate; il logout invia la coda di sincronizzazione invece di buttarla; uscire mentre il workspace carica non lascia più bloccato il pulsante «Accedi»; rimuovendo un punto sparisce anche la sua chiave di configurazione, che prima restava orfana fino a rompere il salvataggio.
+
+### Corretto — robustezza
+- Nessun input produce più un errore interno: corpo di login che non è un oggetto, progressivo `Infinity`, surrogati UTF-16 spaiati nello stato, caratteri di controllo nel punto di consegna, offset orari impossibili, versione NOMRES di diecimila cifre.
+- **Una nomina con molte controparti bloccava il server per minuti** per un costo quadratico nel controllo dei duplicati: tremila controparti ora si risolvono in centesimi di secondo.
+- Due nomine con lo stesso identificativo e versione non sono più possibili: rendevano ambiguo l'abbinamento della risposta del trasportatore.
+- L'import del registro storico non si ripete più a ogni modifica della lista, che duplicava le bozze già convertite.
+- Una segnalazione inesistente risponde 404 e non più 409; un ambiente o un canale PDR fuori lista viene respinto invece di essere sostituito in silenzio.
+
 ## [1.5.0] — 2026-08-02
 
 ### Aggiunto

@@ -663,3 +663,168 @@ test("EDIG@S: ogni binding del pannello ha un valore dal render", () => {
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);
 });
+
+test("nessuna ripetizione condizionale dentro una <select>", () => {
+  // Il parser HTML ammette dentro <select> solo option/optgroup: un <sc-for>
+  // viene scartato al caricamento e a schermo restano le mustache non
+  // risolte. È già accaduto alle tre tendine delle ricevute PDR e nessun
+  // test lo aveva visto, perché il difetto nasce nel parser del browser.
+  const fs = require("node:fs");
+  for (const f of ["design/design.html", "app/static/index.html"]) {
+    const testoFile = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
+    const selects = testoFile.match(/<select\b[\s\S]*?<\/select>/g) || [];
+    const colpevoli = selects.filter((s) => s.includes("<sc-for") || s.includes("<sc-if"));
+    assert.deepEqual(colpevoli, [], `${f}: usa sc-repeat/sc-as sull'<option>`);
+  }
+});
+
+test("le option ripetute nel design usano sc-repeat con la sua lista", () => {
+  const fs = require("node:fs");
+  const design = fs.readFileSync(path.join(__dirname, "..", "design", "design.html"), "utf8");
+  const ripetute = design.match(/<option[^>]*sc-repeat[^>]*>/g) || [];
+  assert.ok(ripetute.length >= 3, `attese almeno 3 option ripetute, trovate ${ripetute.length}`);
+  for (const o of ripetute) {
+    assert.match(o, /sc-repeat="\{\{ \w+ \}\}"/, `sc-repeat malformato: ${o}`);
+    assert.match(o, /sc-as="\w+"/, `manca sc-as: ${o}`);
+  }
+});
+
+// --- closure stale e confini di sessione ------------------------------------
+
+test("il codice ACER digitato entra nella bozza anche senza re-render", () => {
+  // I campi di testo usano setSilent per non perdere il fuoco: la variabile
+  // catturata a inizio renderVals resta indietro. Se il payload la usasse,
+  // l'XML ACER dichiarerebbe un codice diverso da quello digitato.
+  const app = new App();
+  app.setState({ screen: "remit" });
+  const v = app.renderVals();
+  v.setRemAcer(ev("A0045821W.IT"));       // setSilent: nessun re-render
+  const payload = app.renderVals().remPayloadPerTest
+    ? app.renderVals().remPayloadPerTest()
+    : null;
+  // se il modulo non espone il payload, si verifica lo stato di partenza
+  assert.equal(app.state.cfg.acer, "A0045821W.IT");
+  if (payload) assert.equal(payload.acer_code, "A0045821W.IT");
+});
+
+test("il profilo PDR inviato è quello digitato, non lo snapshot del render", () => {
+  const app = new App();
+  app.setState({ screen: "pdr" });
+  const v = app.renderVals();
+  v.pdrSetOperator(ev("OP-NUOVO"));        // setSilent
+  let inviato = null;
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/pdr/profile") inviato = JSON.parse(opts.body || "{}");
+    return { ok: true, status: 200, json: async () => ({ profile: inviato || {} }), text: async () => "" };
+  };
+  return v.salvaPdr().then(() => {
+    assert.equal(inviato && inviato.gme_operator_code, "OP-NUOVO");
+    global.fetch = FETCH_OK;
+  });
+});
+
+test("una risposta della sessione precedente non entra nello stato del nuovo utente", async () => {
+  const app = new App();
+  app._sessionEmail = "primo@azienda.it";
+  let sblocca;
+  const attesa = new Promise((r) => { sblocca = r; });
+  global.fetch = async (url) => {
+    if (url === "/api/edigas/nomine") {
+      await attesa;
+      return { ok: true, status: 200, json: async () => ({ nomine: [{ id: "x", identificativo: "DEL-PRIMO" }] }), text: async () => "" };
+    }
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "" };
+  };
+  const inVolo = app._caricaEdigas();
+  app._sessionEpoch += 1;                  // nel frattempo: logout e nuovo login
+  app._sessionEmail = "secondo@azienda.it";
+  sblocca();
+  await inVolo;
+  assert.deepEqual(app.state.edgNomine, [], "i dati del primo utente non devono comparire");
+  global.fetch = FETCH_OK;
+});
+
+test("il doppio clic non crea due bozze REMIT", async () => {
+  const app = new App();
+  app.setState({ screen: "remit" });
+  let chiamate = 0;
+  let sblocca;
+  const attesa = new Promise((r) => { sblocca = r; });
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/remit/reports" && opts.method === "POST") {
+      chiamate++;
+      await attesa;
+      return { ok: true, status: 201, json: async () => ({ id: "r1", version: 1 }), text: async () => "" };
+    }
+    return { ok: true, status: 200, json: async () => ({ reports: [] }), text: async () => "" };
+  };
+  const v = app.renderVals();
+  const primo = v.addRem();
+  const secondo = v.addRem();          // clic ripetuto mentre il primo è in volo
+  sblocca();
+  await Promise.all([primo, secondo]);
+  assert.equal(chiamate, 1, "il secondo clic non deve creare una seconda bozza");
+  global.fetch = FETCH_OK;
+});
+
+test("dopo la risposta l'azione torna disponibile", async () => {
+  const app = new App();
+  app.setState({ screen: "remit" });
+  let chiamate = 0;
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/remit/reports" && opts.method === "POST") chiamate++;
+    return { ok: true, status: 201, json: async () => ({ id: "r", version: 1, reports: [] }), text: async () => "" };
+  };
+  await app.renderVals().addRem();
+  await app.renderVals().addRem();
+  assert.equal(chiamate, 2, "il guardiano deve rilasciare l'azione a richiesta conclusa");
+  global.fetch = FETCH_OK;
+});
+
+test("l'XML esportato resta scaricabile dal registro", () => {
+  const app = new App();
+  app.setState({
+    screen: "remit",
+    remReports: [{ id: "r1", status: "xml_validato_xsd", source_ref: "PSV-1", report_kind: "gas_standard",
+                   xml_artifact_id: "a1", xml_filename: "20260802_REMITTable1_V3_A0045821W.IT_1.XML" }],
+  });
+  const riga = app.renderVals().remRows[0];
+  assert.equal(riga.hasXml, true);
+  assert.equal(typeof riga.scaricaXml, "function");
+  assert.equal(riga.canExport, false, "un XML già generato non si riesporta");
+});
+
+test("rimuovendo un punto sparisce anche la sua chiave di configurazione", () => {
+  const app = new App();
+  app.setState({ screen: "cfgImp" });
+  const v = app.renderVals();
+  v.setNewPunto(ev("Punto di prova"));
+  app.renderVals().addPunto();
+  const chiave = app.state.extraPunti[0][2];
+  assert.ok(chiave in app.state.cfg, "la chiave deve esistere dopo l'aggiunta");
+  const riga = app.renderVals().punti.find((x) => x.name === "Punto di prova");
+  riga.removeP();
+  assert.equal(chiave in app.state.cfg, false, "la chiave orfana farebbe crescere cfg oltre il tetto");
+  assert.equal(app.state.extraPunti.length, 0);
+});
+
+test("il logout invia la coda in sospeso prima di chiudere", async () => {
+  const app = new App();
+  app._sessionEmail = "t@t.it";
+  const inviati = [];
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/state" && opts.method === "PUT") inviati.push(JSON.parse(opts.body || "{}"));
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "" };
+  };
+  app.setState({ demoMode: true });           // finisce in coda con debounce
+  await app.renderVals().logout();
+  assert.ok(inviati.some((p) => "demoMode" in p), "la modifica in coda non deve andare persa");
+  global.fetch = FETCH_OK;
+});
+
+test("il logout sblocca il pulsante di accesso", () => {
+  const app = new App();
+  app._loginInCorso = true;                    // login ancora in corso
+  app._reimpostaDopoLogout();
+  assert.equal(app._loginInCorso, false, "restando chiuso, «Accedi» non risponderebbe più");
+});

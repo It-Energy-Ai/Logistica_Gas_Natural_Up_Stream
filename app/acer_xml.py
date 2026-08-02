@@ -82,6 +82,10 @@ PDR_DECLARED_BUT_NOT_IMPLEMENTED = {
 IDENTIFIER_SCHEMES = {"ace", "lei", "bic", "eic", "gln"}
 MARKETPLACE_SCHEMES = {"ace", "lei", "mic", "bil"}
 ACE_RE = re.compile(r"^[A-Za-z0-9_]+\.[A-Z]{2}$")
+# I pattern XSD non escludono i caratteri di controllo: il "." di una regex li
+# ammette. Senza questo controllo l'errore emergeva solo dentro lxml, come 500
+# al momento dell'export invece che come errore sul campo.
+CARATTERI_VIETATI = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff]")
 # Gli XSD usano nomi di tipo diversi per gli stessi concetti nei due tracciati.
 NUMERO = {"gas_standard": "number", "gas_nonstandard": "numberType"}
 UNITA = {"gas_standard": "notionalQuantityUnitType", "gas_nonstandard": "quantityUnitType"}
@@ -177,6 +181,9 @@ def _controlla(
 
     if not valore:
         return
+    if CARATTERI_VIETATI.search(valore):
+        _error(errors, campo, f"{etichetta}: contiene caratteri non ammessi in un documento XML.")
+        return
     f = _facet(kind, tipo)
     if not f:
         return
@@ -243,8 +250,18 @@ def _is_iso_datetime(value: str) -> bool:
 
 
 def _is_future_iso_datetime(value: str) -> bool:
+    """Vero se l'istante è nel futuro; falso anche quando non è confrontabile.
+
+    Un offset estremo (``+99:00``) o un anno al limite fanno sfondare
+    ``astimezone`` con OverflowError: la data resta invalida, ma il chiamante
+    deve ricevere un esito, non un'eccezione.
+    """
+
     candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
-    return datetime.fromisoformat(candidate).astimezone(timezone.utc) > datetime.now(timezone.utc)
+    try:
+        return datetime.fromisoformat(candidate).astimezone(timezone.utc) > datetime.now(timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return False
 
 
 def _valid_ace(value: str) -> bool:
@@ -506,7 +523,12 @@ def genera_xml(record: dict[str, Any]) -> AcerXmlDocument:
         raise AcerXmlError("Dati incompleti o incompatibili con il tracciato ACER.", errors)
     kind = str(record["report_kind"])
     meta = SCHEMAS[kind]
-    root = _build_table_1(record, meta) if kind == "gas_standard" else _build_table_2(record, meta)
+    try:
+        root = _build_table_1(record, meta) if kind == "gas_standard" else _build_table_2(record, meta)
+    except (ValueError, TypeError) as exc:
+        # lxml rifiuta testi che non possono stare in un XML: qui diventa un
+        # errore comprensibile invece di un 500 al momento dell'export.
+        raise AcerXmlError(f"Un valore non è rappresentabile in XML: {exc}") from exc
     errors = _xsd_errors(kind, root)
     if errors:
         raise AcerXmlError("Il file generato non supera la validazione XSD ACER.", errors)

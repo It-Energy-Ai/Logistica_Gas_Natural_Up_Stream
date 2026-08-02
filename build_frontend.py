@@ -216,6 +216,18 @@ def main() -> None:
     if leftovers:
         sys.exit(f"pseudo-stili non convertiti: {len(leftovers)}")
 
+    # Dentro <select> il parser HTML ammette solo option/optgroup: un <sc-for>
+    # o un <sc-if> viene scartato al caricamento della pagina e la tendina
+    # resta con le interpolazioni non risolte a schermo. È già successo con le
+    # tre select delle ricevute PDR, e nessun test lo aveva intercettato
+    # perché il difetto nasce nel parser del browser, non nel template.
+    for blocco in re.findall(r"<select\b.*?</select>", template, re.S):
+        if "<sc-for" in blocco or "<sc-if" in blocco:
+            sys.exit(
+                "sc-for/sc-if dentro <select>: il parser HTML li scarta. "
+                "Usa sc-repeat/sc-as come attributi dell'<option>."
+            )
+
     out = f"""<!DOCTYPE html>
 <html lang="it">
 <head>

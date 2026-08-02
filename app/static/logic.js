@@ -93,6 +93,9 @@
       this._flushing = false;
       this._sessionEmail = null;
       this._sessionEpoch = 0;
+      // Azioni in volo: un doppio clic non deve creare due bozze, due nomine
+      // o due ricevute, che il backend non saprebbe distinguere.
+      this._inCorso = new Set();
       this._loginInCorso = false;
     }
 
@@ -274,34 +277,48 @@
 
     async _caricaRemit() {
       if (!this._sessionEmail) return;
+      // Se l'utente esce e ne entra un altro mentre la richiesta è in volo, la
+      // risposta della sessione precedente non deve atterrare nello stato del
+      // nuovo utente: i suoi dati comparirebbero a schermo.
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
       this.setState({ remCaricamento: true, remErrore: "" });
       try {
         const payload = await this._json("/api/remit/reports");
+        if (!miaSessione()) return;
         this.setState({
           remReports: Array.isArray(payload.reports) ? payload.reports : [],
           remCaricamento: false,
           remInfo: payload.legacy_imported ? `${payload.legacy_imported} record storico importato come bozza da verificare.` : this.state.remInfo,
         });
       } catch (error) {
+        if (!miaSessione()) return;
         this.setState({ remCaricamento: false, remErrore: `Registro REMIT non disponibile: ${error.message}` });
       }
     }
 
     async _caricaEdigas() {
       if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
       try {
         const payload = await this._json("/api/edigas/nomine");
+        if (!miaSessione()) return;
         this.setState({ edgNomine: Array.isArray(payload.nomine) ? payload.nomine : [], edgElencoErrore: "" });
       } catch (error) {
+        if (!miaSessione()) return;
         this.setState({ edgElencoErrore: `Elenco nomine EDIG@S non disponibile: ${error.message}` });
       }
     }
 
     async _caricaPdr() {
       if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
       this.setState({ pdrCaricamento: true, pdrErrore: "" });
       try {
         const payload = await this._json("/api/pdr");
+        if (!miaSessione()) return;
         this.setState({
           pdr: payload.profile || this.state.pdr,
           pdrFees: payload.fees || null,
@@ -309,6 +326,7 @@
           pdrCaricamento: false,
         });
       } catch (error) {
+        if (!miaSessione()) return;
         this.setState({ pdrCaricamento: false, pdrErrore: `Configurazione PDR non disponibile: ${error.message}` });
       }
     }
@@ -347,6 +365,10 @@
     }
 
     _reimpostaDopoLogout() {
+      // Senza questo, uscire mentre il workspace è ancora in caricamento
+      // lasciava il lucchetto chiuso e il pulsante "Accedi" non rispondeva più.
+      this._loginInCorso = false;
+      if (this._timerSso) { clearTimeout(this._timerSso); this._timerSso = null; }
       clearTimeout(this._syncTimer);
       this._pending = {};
       this._sospesa = false;
@@ -406,7 +428,15 @@
       }));
       const OK = { bg: "rgba(47,163,124,.15)", fg: "#259372" };
       const RUN = { bg: "rgba(62,150,180,.16)", fg: "#3E96B4" };
-      const WAIT = { bg: "var(--surface2)", fg: "var(--ink2)" };
+      // Nomi leggibili degli eventi del registro REMIT (app/db.py li scrive in
+  // inglese come tipo tecnico; qui vengono mostrati all'operatore italiano).
+  const REM_EVENTI = {
+    CREATED: "Creata", UPDATED: "Modificata", VALIDATED: "Validata",
+    EXPORTED: "XML generato", IMPORTED: "Importata", SUBMITTED: "Trasmessa",
+    RECEIPT_IMPORTED: "Ricevuta importata", PREFLIGHT: "Preflight PDR",
+  };
+
+  const WAIT = { bg: "var(--surface2)", fg: "var(--ink2)" };
       const WARN = { bg: "rgba(196,140,42,.16)", fg: "#B0842E" };
       const NEG = { bg: "rgba(197,96,80,.15)", fg: "#C05B4D" };
       const cfg = this.state.cfg;
@@ -418,9 +448,16 @@
       const punti = [...basePunti.filter((pp) => !hiddenP.includes(pp[2])), ...this.state.extraPunti].map(([name, tipo, k]) => ({
         name, tipo, go: tg(k), ...knob(cfg[k]),
         removable: true,
-        removeP: () => this.setState((st) => st.extraPunti.some((pp) => pp[2] === k)
-          ? { extraPunti: st.extraPunti.filter((pp) => pp[2] !== k), saved: false }
-          : { hiddenPunti: [...(st.hiddenPunti || []), k], saved: false }),
+        // Rimuovendo un punto va tolta anche la sua chiave in cfg: lasciarla
+        // orfana faceva crescere la mappa fino a superare il tetto di 256
+        // chiavi del backend, che da allora respingeva ogni salvataggio.
+        removeP: () => this.setState((st) => {
+          const cfgRidotto = { ...st.cfg };
+          delete cfgRidotto[k];
+          return st.extraPunti.some((pp) => pp[2] === k)
+            ? { extraPunti: st.extraPunti.filter((pp) => pp[2] !== k), cfg: cfgRidotto, saved: false }
+            : { hiddenPunti: [...(st.hiddenPunti || []), k], cfg: cfgRidotto, saved: false };
+        }),
       }));
       const addPunto = () => this.setState((st) => {
         const name = cap((st.newPunto || "").trim(), 160);
@@ -571,6 +608,18 @@
         { punto: "Mazara del Vallo", ciclo: "R2", qta: "2.400", stato: "Confermata" },
       ];
       const nomRows = [...this.state.nomList, ...nomDemo].map((r) => ({ ...r, bg: (nomStatoC[r.stato] || WAIT).bg, fg: (nomStatoC[r.stato] || WAIT).fg }));
+      // Un doppio clic non deve creare due bozze, due nomine o due ricevute:
+      // il secondo tentativo viene ignorato finché il primo non ha risposto.
+      const unaVolta = (nome, azione) => async (...args) => {
+        if (this._inCorso.has(nome)) return undefined;
+        this._inCorso.add(nome);
+        try {
+          return await azione(...args);
+        } finally {
+          this._inCorso.delete(nome);
+        }
+      };
+
       const addNomina = () => this.setState((st) => ({ nomList: [{ punto: cap(st.nomPunto, 120), ciclo: cap(st.nomCiclo, 120), qta: cap(st.nomQta || "500", 120), stato: "Inviata" }, ...st.nomList].slice(0, 500), nomQta: "" }));
 
       // --- EDIG@S 6.1 ---------------------------------------------------
@@ -621,7 +670,7 @@
         return base;
       };
 
-      const generaNomint = async () => {
+      const generaNomint = unaVolta("generaNomint", async () => {
         this.setState({ edgErrore: "", edgInfo: "", edgErroriCampo: [] });
         try {
           const esito = await this._json("/api/edigas/nomine", {
@@ -639,7 +688,7 @@
             edgErroriCampo: error.dettagli || [],
           });
         }
-      };
+      });
 
       const leggiNomres = async () => {
         this.setState({ edgRispostaErrore: "", edgRispostaInfo: "", edgScostamentiList: [] });
@@ -813,6 +862,11 @@
           errFg: errori.length ? NEG.fg : "var(--ink3)",
           canValidate: r.status === "bozza",
           canExport: r.status === "validata_localmente",
+          // L'XML resta scaricabile anche dopo l'export: se il download del
+          // browser fallisce o la scheda si chiude, l'artefatto va comunque
+          // recuperato senza rigenerarlo.
+          hasXml: !!r.xml_artifact_id,
+          scaricaXml: () => scaricaArtifact({ id: r.xml_artifact_id, filename: r.xml_filename }),
           validate: () => validaRemit(r),
           export: () => esportaRemit(r),
           audit: () => apriAuditRemit(r),
@@ -858,7 +912,11 @@
         quantity_unit: this.state.remUnita,
         price_eur_mwh: cap(this.state.remPrezzo, 40),
         price_currency: this.state.remValuta,
-        acer_code: cap(cfg.acer || "", 12),
+        // letto ORA e non dalla closure del render: i campi di testo usano
+        // setSilent (per non perdere il fuoco) e la variabile catturata a
+        // inizio renderVals resterebbe al valore precedente. Qui finirebbe un
+        // codice sbagliato dentro reportingEntityID e nel nome file PDR.
+        acer_code: cap(this.state.cfg.acer || "", 12),
         trading_capacity: this.state.remCapacita,
         contract_id: cap(this.state.remContractId, 50),
         contract_date: cap(this.state.remContractDate, 10),
@@ -875,7 +933,7 @@
       const sostituisciReport = (record) => this.setState((st) => ({
         remReports: (st.remReports || []).map((item) => item.id === record.id ? record : item),
       }));
-      const addRem = async () => {
+      const addRem = unaVolta("addRem", async () => {
         this.setState({ remErrore: "", remInfo: "" });
         try {
           const record = await this._json("/api/remit/reports", {
@@ -889,7 +947,7 @@
         } catch (error) {
           this.setState({ remErrore: `Impossibile salvare la bozza: ${error.message}` });
         }
-      };
+      });
       const validaRemit = async (record) => {
         this.setState({ remErrore: "", remInfo: "" });
         try {
@@ -945,17 +1003,17 @@
       const pdrProfile = this.state.pdr || {};
       const pdrSet = (key) => (event) => this.setSilent((st) => ({ pdr: { ...st.pdr, [key]: event.target.value } }));
       const pdrToggle = (key) => () => this.setState((st) => ({ pdr: { ...st.pdr, [key]: !st.pdr[key] } }));
-      const salvaPdr = async () => {
+      const salvaPdr = unaVolta("salvaPdr", async () => {
         this.setState({ pdrErrore: "", pdrInfo: "" });
         try {
           const result = await this._json("/api/pdr/profile", {
-            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pdrProfile),
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.state.pdr || {}), // stato corrente, non lo snapshot del render
           });
           this.setState({ pdr: result.profile, pdrInfo: "Profilo PDR salvato. Nessuna credenziale è stata memorizzata." });
         } catch (error) {
           this.setState({ pdrErrore: `Profilo PDR non salvato: ${error.message}` });
         }
-      };
+      });
 
       // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
       const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
@@ -1022,7 +1080,7 @@
       const pdrReceiptSetLoadCode = (event) => this.setSilent({
         pdrReceiptLoadCode: String(event.target.value || "").replace(/\D/g, "").slice(0, 6),
       });
-      const importaRicevuta = async () => {
+      const importaRicevuta = unaVolta("importaRicevuta", async () => {
         const reportId = this.state.pdrReceiptReportId;
         const file = this.state.pdrReceiptFile;
         if (!reportId) {
@@ -1080,7 +1138,7 @@
         } catch (error) {
           this.setState({ pdrReceiptImporting: false, pdrReceiptErrore: `Importazione ricevuta non completata: ${error.message}` });
         }
-      };
+      });
       const apriRicevuta = async (receipt) => {
         const id = receiptId(receipt);
         if (!id) {
@@ -1176,7 +1234,11 @@
         const email = (this.state.loginEmail || "").trim();
         await this._apriSessione(email);
       };
-      const logout = () => {
+      const logout = async () => {
+        // La coda di sincronizzazione va svuotata PRIMA di chiudere: il
+        // debounce di 250 ms fa sì che l'ultima modifica sia spesso ancora in
+        // attesa, e _reimpostaDopoLogout la butterebbe senza avvisare.
+        try { await this._flush(); } catch (_) { /* si esce comunque */ }
         fetch("/api/logout", { method: "POST" }).catch(() => {});
         this._reimpostaDopoLogout();
       };
@@ -1190,7 +1252,14 @@
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
         remKpis, remRows, addRem, remCaricamento: !!this.state.remCaricamento, remErrore: this.state.remErrore, remInfo: this.state.remInfo,
-        remAuditOpen: !!this.state.remAudit, remAuditTitle: this.state.remAudit?.title ?? "", remAuditLoading: !!this.state.remAudit?.loading, remAuditEvents: this.state.remAudit?.events ?? [], closeRemAudit: () => this.setState({ remAudit: null }),
+        remAuditOpen: !!this.state.remAudit, remAuditTitle: this.state.remAudit?.title ?? "", remAuditLoading: !!this.state.remAudit?.loading, remAuditEvents: (this.state.remAudit?.events ?? []).map((ev) => ({
+          quando: String(ev.occurred_at || "").replace("T", " ").slice(0, 19),
+          azione: REM_EVENTI[ev.event_type] || ev.event_type,
+          transizione: `${ev.from_status || "—"} → ${ev.to_status || "—"}`,
+          attore: ev.actor || "—",
+          // `detail` è un oggetto: interpolarlo stamperebbe [object Object]
+          impronta: String(ev.hash || "").slice(0, 12) + "…",
+        })), closeRemAudit: () => this.setState({ remAudit: null }),
         remTipo: this.state.remTipo, remAzione: this.state.remAzione, remRif: this.state.remRif, remData: this.state.remData, remPunto: this.state.remPunto, remControparte: this.state.remControparte, remControparteTipo: this.state.remControparteTipo, remLato: this.state.remLato, remQta: this.state.remQta, remUnita: this.state.remUnita, remPrezzo: this.state.remPrezzo, remValuta: this.state.remValuta, remCapacita: this.state.remCapacita,
         remContractId: this.state.remContractId, remContractDate: this.state.remContractDate, remContractType: this.state.remContractType, remCommodity: this.state.remCommodity, remDeliveryStart: this.state.remDeliveryStart, remDeliveryEnd: this.state.remDeliveryEnd, remSettlement: this.state.remSettlement, remMarketplaceTipo: this.state.remMarketplaceTipo, remMarketplaceId: this.state.remMarketplaceId, remTransactionAt: this.state.remTransactionAt, remTransactionId: this.state.remTransactionId,
         setRemTipo: (e) => this.setSilent({ remTipo: e.target.value }),
@@ -1229,12 +1298,12 @@
         ssoPickMarco: async () => {
           if (!await this._apriSessione("m.rossi@azienda1.it")) return;
           this.setState({ sso: "auth" });
-          setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900);
+          this._timerSso = setTimeout(() => this.setState((st) => (st.sso ? { sso: null, screen: "hub" } : { sso: null })), 900);
         },
         ssoPickLaura: async () => {
           if (!await this._apriSessione("l.bianchi@azienda1.it")) return;
           this.setState({ sso: "auth" });
-          setTimeout(() => this.setState({ sso: null, screen: "hub" }), 900);
+          this._timerSso = setTimeout(() => this.setState((st) => (st.sso ? { sso: null, screen: "hub" } : { sso: null })), 900);
         },
         ssoRedirect: this.state.sso === "redirect", ssoPickStep: this.state.sso === "pick", ssoAuth: this.state.sso === "auth", ssoOpen: !!this.state.sso,
         toggleTheme: () => { const t = theme === "dark" ? "light" : "dark"; store.setItem("vt-theme", t); this.setState({ theme: t }); },

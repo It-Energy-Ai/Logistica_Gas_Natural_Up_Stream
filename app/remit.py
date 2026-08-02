@@ -42,6 +42,9 @@ MAX_TEXT = 160
 # altrimenti il file dichiarerebbe un contratto o una transazione diversi
 MAX_IDENT = 400
 MAX_ACER_CODE = 12
+# Le date si conservano più lunghe del formato AAAA-MM-GG: troncarle a 10
+# trasformerebbe un valore sbagliato in uno plausibile, senza segnalarlo.
+MAX_DATA = 32
 
 
 class RemitError(ValueError):
@@ -101,7 +104,7 @@ def _numero(value: Any, field: str, errors: list[dict[str, str]], *, required: b
 
 
 def _data(value: Any, field: str, errors: list[dict[str, str]]) -> str:
-    testo = _testo(value, max_len=10)
+    testo = _testo(value, max_len=MAX_DATA)
     if not testo:
         errors.append({"field": field, "message": "Campo obbligatorio."})
         return ""
@@ -145,7 +148,7 @@ def normalizza_draft(payload: dict[str, Any], *, precedente: dict[str, Any] | No
         "report_kind": report_kind,
         "action": action,
         "source_ref": _testo(payload.get("source_ref", precedente.get("source_ref"))),
-        "event_at": _testo(payload.get("event_at", precedente.get("event_at")), max_len=10),
+        "event_at": _testo(payload.get("event_at", precedente.get("event_at")), max_len=MAX_DATA),
         "delivery_point": _testo(payload.get("delivery_point", precedente.get("delivery_point"))),
         "counterparty": _testo(payload.get("counterparty", precedente.get("counterparty"))),
         "counterparty_scheme": _testo(
@@ -156,23 +159,26 @@ def normalizza_draft(payload: dict[str, Any], *, precedente: dict[str, Any] | No
         "quantity_unit": _testo(payload.get("quantity_unit", precedente.get("quantity_unit")), max_len=16),
         "price_eur_mwh": _testo(payload.get("price_eur_mwh", precedente.get("price_eur_mwh")), max_len=40),
         "price_currency": _testo(payload.get("price_currency", precedente.get("price_currency")), max_len=8),
-        "acer_code": _testo(payload.get("acer_code", precedente.get("acer_code")), max_len=MAX_ACER_CODE),
+        # conservato intero come gli altri identificativi regolatori: se fosse
+        # tagliato a 12 un codice di 13 caratteri diventerebbe quello, valido,
+        # di un ALTRO soggetto, e finirebbe in reportingEntityID e nel nome PDR
+        "acer_code": _testo(payload.get("acer_code", precedente.get("acer_code")), max_len=MAX_IDENT),
         "trading_capacity": _testo(
             payload.get("trading_capacity", precedente.get("trading_capacity")), max_len=4
         ),
         # conservato intero: il limite dipende dal tracciato (50 su Table 1, 100 su
         # Table 2) e un troncamento silenzioso falsificherebbe l'identificativo
         "contract_id": _testo(payload.get("contract_id", precedente.get("contract_id")), max_len=MAX_IDENT),
-        "contract_date": _testo(payload.get("contract_date", precedente.get("contract_date")), max_len=10),
+        "contract_date": _testo(payload.get("contract_date", precedente.get("contract_date")), max_len=MAX_DATA),
         "contract_type": _testo(payload.get("contract_type", precedente.get("contract_type")), max_len=20),
         "energy_commodity": _testo(
             payload.get("energy_commodity", precedente.get("energy_commodity")), max_len=4
         ),
         "delivery_start_date": _testo(
-            payload.get("delivery_start_date", precedente.get("delivery_start_date")), max_len=10
+            payload.get("delivery_start_date", precedente.get("delivery_start_date")), max_len=MAX_DATA
         ),
         "delivery_end_date": _testo(
-            payload.get("delivery_end_date", precedente.get("delivery_end_date")), max_len=10
+            payload.get("delivery_end_date", precedente.get("delivery_end_date")), max_len=MAX_DATA
         ),
         "settlement_method": _testo(
             payload.get("settlement_method", precedente.get("settlement_method")), max_len=4
@@ -426,7 +432,16 @@ def valida_report(
     updated = _preserva_dati(record, normalizza_draft(payload, precedente=record))
     normalized, errors = valida(updated)
     previous_status = record["status"]
-    updated = _preserva_dati(updated, normalized)
+    # La normalizzazione azzera i valori che non sa interpretare (una quantità
+    # scritta male torna ""). Scriverli così nella bozza cancellerebbe dal
+    # database ciò che l'operatore ha digitato, lasciandolo con un messaggio
+    # d'errore che parla di un campo ormai vuoto: i campi svuotati conservano
+    # quindi il valore originale, e restano segnalati come errati.
+    ripulito = {
+        chiave: (updated.get(chiave) if valore == "" and updated.get(chiave) else valore)
+        for chiave, valore in normalized.items()
+    }
+    updated = _preserva_dati(updated, ripulito)
     updated["status"] = "validata_localmente" if not errors else "bozza"
     updated["updated_at"] = ora_iso()
     try:

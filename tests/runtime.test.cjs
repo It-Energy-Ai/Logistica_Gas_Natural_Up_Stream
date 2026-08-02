@@ -25,6 +25,13 @@ class El {
   }
   getAttribute(n) { const a = this.attributes.find((x) => x.name === n.toLowerCase()); return a ? a.value : null; }
   hasAttribute(n) { return this.attributes.some((x) => x.name === n.toLowerCase()); }
+  removeAttribute(n) { this.attributes = this.attributes.filter((x) => x.name !== n.toLowerCase()); }
+  cloneNode(deep) {
+    const c = new El(this.tagName);
+    c.attributes = this.attributes.map((a) => ({ ...a }));
+    if (deep) c.childNodes = this.childNodes.map((f) => (f.nodeType === 3 ? { ...f } : f.cloneNode(true)));
+    return c;
+  }
   addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); }
   appendChild(c) {
     if (c && c.tagName === "#FRAGMENT") this.childNodes.push(...c.childNodes); // il fragment sposta i suoi figli
@@ -126,4 +133,67 @@ test("un cliccabile non-button diventa accessibile da tastiera", () => {
   const root2 = new El("div");
   VT.mount(root2, frammento(tag("button", { onClick: "{{ vai }}" }, testo("ok"))), { renderVals: () => ({ vai: handler }) });
   assert.equal(root2.childNodes[0].hasAttribute("role"), false);
+});
+
+// --- sc-repeat: la ripetizione dentro <select> -------------------------------
+// Il parser HTML del browser scarta qualunque elemento che non sia
+// option/optgroup dentro una <select>: un <sc-for> non arriva mai al runtime.
+// La stessa ripetizione espressa come attributo di un <option> sopravvive.
+
+test("sc-repeat ripete l'option con lo scope dell'elemento", () => {
+  const VT = caricaVT();
+  const root = new El("select");
+  const opt = tag("option", { "sc-repeat": "{{ voci }}", "sc-as": "v", value: "{{ v.id }}" }, testo("{{ v.label }}"));
+  VT.mount(root, frammento(opt), {
+    renderVals: () => ({ voci: [{ id: "a", label: "Alfa" }, { id: "b", label: "Beta" }, { id: "c", label: "Gamma" }] }),
+  });
+  assert.equal(root.childNodes.length, 3);
+  assert.deepEqual(root.childNodes.map((o) => o.textContent), ["Alfa", "Beta", "Gamma"]);
+  assert.deepEqual(root.childNodes.map((o) => o.value), ["a", "b", "c"]);
+});
+
+test("sc-repeat su lista vuota o assente non produce nulla", () => {
+  const VT = caricaVT();
+  for (const voci of [[], null, undefined]) {
+    const root = new El("select");
+    const opt = tag("option", { "sc-repeat": "{{ voci }}", "sc-as": "v" }, testo("{{ v.label }}"));
+    VT.mount(root, frammento(opt), { renderVals: () => ({ voci }) });
+    assert.equal(root.childNodes.length, 0, `lista ${JSON.stringify(voci)}`);
+  }
+});
+
+test("sc-repeat non lascia attributi sc-* nel DOM generato", () => {
+  const VT = caricaVT();
+  const root = new El("select");
+  const opt = tag("option", { "sc-repeat": "{{ voci }}", "sc-as": "v", value: "{{ v.id }}" }, testo("x"));
+  VT.mount(root, frammento(opt), { renderVals: () => ({ voci: [{ id: "1" }] }) });
+  const nomi = root.childNodes[0].attributes.map((a) => a.name);
+  assert.ok(!nomi.some((n) => n.startsWith("sc-")), `attributi residui: ${nomi.join(",")}`);
+  assert.ok(!nomi.some((n) => n.startsWith("hint-")));
+});
+
+test("sc-repeat funziona dentro un sc-for esterno", () => {
+  const VT = caricaVT();
+  const root = new El("div");
+  const opt = tag("option", { "sc-repeat": "{{ g.voci }}", "sc-as": "v" }, testo("{{ g.nome }}:{{ v }} "));
+  const forEl = tag("sc-for", { list: "{{ gruppi }}", as: "g" }, opt);
+  VT.mount(root, frammento(forEl), {
+    renderVals: () => ({ gruppi: [{ nome: "A", voci: ["1", "2"] }, { nome: "B", voci: ["3"] }] }),
+  });
+  assert.equal(root.textContent, "A:1 A:2 B:3 ");
+});
+
+test("il template ripetuto non viene consumato dal primo giro", () => {
+  // Se il nodo modello venisse mutato invece che clonato, il secondo render
+  // produrrebbe un risultato diverso dal primo.
+  const VT = caricaVT();
+  const opt = tag("option", { "sc-repeat": "{{ voci }}", "sc-as": "v" }, testo("{{ v }}"));
+  const tpl = frammento(opt);
+  const vals = { renderVals: () => ({ voci: ["x", "y"] }) };
+  const primo = new El("select");
+  VT.mount(primo, tpl, vals);
+  const secondo = new El("select");
+  VT.mount(secondo, tpl, vals);
+  assert.equal(primo.textContent, secondo.textContent);
+  assert.equal(secondo.textContent, "xy");
 });

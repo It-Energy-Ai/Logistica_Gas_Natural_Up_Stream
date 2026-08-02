@@ -5,7 +5,9 @@ localmente. Non dichiara integrazioni esterne concluse senza le relative
 ricevute ufficiali.
 """
 
+import json
 import re
+import sqlite3
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -157,7 +159,14 @@ def _versione_attesa(request: Request, payload: dict | None = None) -> int | Non
 
 
 def _risposta_remit_error(error: remit.RemitError):
-    status = 409 if isinstance(error, remit.ConflittoVersione) else 422 if error.errors else 409
+    if isinstance(error, remit.ConflittoVersione):
+        status = 409
+    elif error.errors:
+        status = 422
+    elif "non trovata" in str(error).lower():
+        status = 404  # non è un conflitto di stato: la risorsa non esiste
+    else:
+        status = 409
     body = {"errore": str(error)}
     if error.errors:
         body["errors"] = error.errors
@@ -194,14 +203,16 @@ def healthz():
 
 @app.post("/api/login")
 async def login(request: Request, response: Response):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    # `_body_object` restituisce {} su corpo illeggibile e None su un JSON che
+    # non è un oggetto (una lista, un numero): senza questo, `body.get` su una
+    # lista sollevava AttributeError e il login rispondeva 500.
+    body = await _body_object(request) or {}
     # Su email assente o malformata si ripiega su un'identità NEUTRA, mai su
     # quella di scena (Marco Rossi), che contaminerebbe la modalità pulita.
-    email = str(body.get("email") or "").strip().lower()[:120]
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+    # Nessun troncamento: tagliare a 120 caratteri farebbe collassare due
+    # indirizzi distinti sullo stesso account, che ne condividerebbe i dati.
+    email = str(body.get("email") or "").strip().lower()
+    if len(email) > 120 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         email = "utente@locale"
     token = secrets.token_urlsafe(32)
     with db.connect() as conn:
@@ -246,6 +257,15 @@ async def put_state(request: Request):
         patch = await request.json()
     except Exception:
         return JSONResponse({"errore": "JSON non valido"}, status_code=400)
+    # I surrogati UTF-16 spaiati superano il parser JSON ma non si possono
+    # codificare in UTF-8: senza questo controllo la scrittura su SQLite dava
+    # 500.  `ensure_ascii=False` è indispensabile: con il default i surrogati
+    # verrebbero riscritti come sequenze di escape e il controllo passerebbe
+    # sempre, lasciando il problema alla riga di INSERT.
+    try:
+        json.dumps(patch, ensure_ascii=False).encode("utf-8")
+    except (UnicodeEncodeError, ValueError, TypeError):
+        return JSONResponse({"errore": "Il contenuto include caratteri non codificabili."}, status_code=422)
     if not isinstance(patch, dict):
         return JSONResponse({"errore": "atteso un oggetto"}, status_code=400)
     respinte = [k for k, v in patch.items() if k not in VALIDATORS or not VALIDATORS[k](v)]
@@ -297,9 +317,10 @@ async def post_identificativo_acer(request: Request):
         return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
     progressivo = payload.get("progressivo", 1)
     try:
+        # OverflowError: JSON ammette Infinity e 1e999, che int() non regge.
         progressivo = int(progressivo)
-    except (TypeError, ValueError):
-        return JSONResponse({"errore": "Il progressivo deve essere un numero."}, status_code=422)
+    except (TypeError, ValueError, OverflowError):
+        return JSONResponse({"errore": "Il progressivo deve essere un numero intero."}, status_code=422)
     try:
         return {
             "uti": uti.genera_uti(payload, progressivo),
@@ -372,22 +393,35 @@ async def post_edigas_nomina(request: Request):
         return JSONResponse({"errore": f"Dati della nomina non validi: {errore}"}, status_code=422)
 
     nomina_id = secrets.token_hex(8)
-    with db.connect() as conn:
-        db.crea_nomina_edigas(
-            conn,
-            nomina_id=nomina_id,
-            email=email,
-            identificativo=documento.identificativo,
-            versione=documento.versione,
-            tipo_documento=documento.tipo_documento,
-            giorno_gas=documento.giorno_gas,
-            punto=documento.punto,
-            periodi=documento.periodi,
-            avvisi="\n".join(documento.avvisi),
-            xml=documento.xml,
-            sha256=documento.xml_sha256,
+    try:
+        with db.connect() as conn:
+            db.crea_nomina_edigas(
+                conn,
+                nomina_id=nomina_id,
+                email=email,
+                identificativo=documento.identificativo,
+                versione=documento.versione,
+                tipo_documento=documento.tipo_documento,
+                giorno_gas=documento.giorno_gas,
+                punto=documento.punto,
+                periodi=documento.periodi,
+                avvisi=json.dumps(list(documento.avvisi)),
+                xml=documento.xml,
+                sha256=documento.xml_sha256,
+            )
+            record = db.leggi_nomina_edigas(conn, email, nomina_id)
+    except sqlite3.IntegrityError:
+        # Identificativo e versione sono ciò che il trasportatore cita nella
+        # risposta: due nomine omonime renderebbero ambiguo l'abbinamento.
+        return JSONResponse(
+            {
+                "errore": (
+                    f"Esiste già una nomina {documento.identificativo} versione {documento.versione}. "
+                    "Per una rinomina incrementa la versione."
+                )
+            },
+            status_code=409,
         )
-        record = db.leggi_nomina_edigas(conn, email, nomina_id)
     return JSONResponse(
         {
             **{k: v for k, v in (record or {}).items() if k != "xml"},
