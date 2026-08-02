@@ -686,6 +686,25 @@
         { label: "Validate", value: String(remN("validata_localmente")), unit: "localmente", delta: "pronte per export", dBg: OK.bg, dFg: OK.fg },
         { label: "XML ACER", value: String(remN("xml_validato_xsd")), unit: "XSD validati", delta: "preflight PDR", dBg: RUN.bg, dFg: RUN.fg },
       ];
+      // Calcola UTI e Contract ID con l'algoritmo ACER: per i contratti
+      // bilaterali entrambe le parti devono riportare lo stesso codice.
+      const generaUti = async () => {
+        this.setState({ remErrore: "", remInfo: "" });
+        try {
+          const esito = await this._json("/api/remit/identificativi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...remPayload(), progressivo: 1 }),
+          });
+          this.setState({
+            remTransactionId: esito.uti,
+            remInfo: `UTI calcolato con l'algoritmo ACER. La controparte, partendo dagli stessi dati, ottiene lo stesso codice.`,
+          });
+        } catch (error) {
+          this.setState({ remErrore: `UTI non calcolabile: ${error.message}${_dettagli(error)}` });
+        }
+      };
+
       const remPayload = () => ({
         report_kind: this.state.remTipo,
         action: this.state.remAzione,
@@ -1058,6 +1077,7 @@
         setRemMarketplaceId: (e) => this.setSilent({ remMarketplaceId: e.target.value }),
         setRemTransactionAt: (e) => this.setSilent({ remTransactionAt: e.target.value }),
         setRemTransactionId: (e) => this.setSilent({ remTransactionId: e.target.value }),
+        generaUti,
         doLogin, logout, goHub: go("hub"),
         loginEmail: this.state.loginEmail, loginPass: this.state.loginPass,
         loginErrore: this.state.loginErrore,

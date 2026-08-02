@@ -2,6 +2,17 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.4.0] — 2026-08-02
+
+### Aggiunto
+- **Generatore di UTI e Contract ID secondo l'algoritmo ufficiale ACER** (TRUM Annex IV, *UTI Generator* v2.3 del 2025). Per i contratti bilaterali le due controparti devono riportare lo stesso identificativo: l'algoritmo lo ricava dai soli termini economici, così ciascuna parte lo calcola per conto proprio e i due lati dell'operazione si appaiano in ARIS.
+  - `POST /api/remit/identificativi` restituisce UTI (13 campi, Table 1), Contract ID (9 campi, Table 2) e la stringa concatenata da cui derivano.
+  - Nel form REMIT il pulsante *Calcola con l'algoritmo ACER* compila il campo UTI.
+- **Conformità verificata sui dati di ACER**: il repository include i 181 casi calcolati dal foglio ufficiale (`tests/dati/uti_acer.json`, 128 UTI e 53 Contract ID) e un test li riproduce tutti, impronta per impronta.
+
+### Nota sull'algoritmo
+Concatenazione dei termini economici → SHA-256 in UTF-8 → base64 con le sostituzioni previste dal foglio ACER (`+`→A, `/`→B, `=`→C, `-`→D, per ottenere un codice solo alfanumerico) → primi 42 caratteri → progressivo a 3 cifre, per un totale di 45 caratteri conformi al pattern XSD. L'esempio pubblicato nell'Annex IV del 2021 riportava una struttura diversa (30+2 caratteri) e conteneva refusi: fa fede il generatore v2.3, che è stato riprodotto esattamente.
+
 ## [1.3.1] — 2026-08-02
 
 Da un audit del modulo REMIT che ha confrontato campo per campo ciò che l'app genera con gli XSD ACER inclusi e con i tracciati Table 1 / Table 2.
@@ -128,6 +139,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.4.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.4.0
 [1.3.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.3.1
 [1.3.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.3.0
 [1.2.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.1

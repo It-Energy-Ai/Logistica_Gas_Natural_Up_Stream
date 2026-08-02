@@ -15,7 +15,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, pdr, remit
+from . import db
+from . import uti, pdr, remit
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -267,6 +268,36 @@ def get_remit_reports(request: Request):
             "è stato effettuato verso ACER, GME/PDR, un RRM o un'IIP."
         ),
     }
+
+
+@app.post("/api/remit/identificativi")
+async def post_identificativo_acer(request: Request):
+    """Calcola UTI e Contract ID con l'algoritmo ACER (TRUM Annex IV).
+
+    Serve per i contratti bilaterali: entrambe le controparti, partendo dai
+    propri dati, ottengono lo stesso identificativo senza scambiarsi nulla.
+    """
+
+    if not _sessione(request):
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    progressivo = payload.get("progressivo", 1)
+    try:
+        progressivo = int(progressivo)
+    except (TypeError, ValueError):
+        return JSONResponse({"errore": "Il progressivo deve essere un numero."}, status_code=422)
+    try:
+        return {
+            "uti": uti.genera_uti(payload, progressivo),
+            "contract_id": uti.genera_contract_id(payload, progressivo),
+            "concatenato_uti": uti.stringa_uti(payload),
+            "progressivo": progressivo,
+            "algoritmo": "ACER TRUM Annex IV · UTI Generator v2.3",
+        }
+    except uti.UtiError as errore:
+        return JSONResponse({"errore": str(errore)}, status_code=422)
 
 
 @app.post("/api/remit/reports")
