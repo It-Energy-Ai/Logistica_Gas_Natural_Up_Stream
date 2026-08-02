@@ -1,10 +1,13 @@
 # Spec PyInstaller multipiattaforma: `pyinstaller Vettore.spec`
+import sys
+
 from PyInstaller.utils.hooks import collect_all
 
 datas = [("app/static", "app/static"), ("app/schemas", "app/schemas")]
 binaries = []
 hiddenimports = []
-for pacchetto in ("uvicorn", "fastapi", "starlette", "lxml"):
+# tzdata serve solo su Windows, dove zoneinfo non trova i fusi di sistema.
+for pacchetto in ("uvicorn", "fastapi", "starlette", "lxml", *(("tzdata",) if sys.platform == "win32" else ())):
     d, b, h = collect_all(pacchetto)
     datas += d
     binaries += b

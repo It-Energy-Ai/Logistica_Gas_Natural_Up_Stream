@@ -706,3 +706,23 @@ def test_lo_schema_alterato_viene_rifiutato(tmp_path, monkeypatch):
         assert "Integrità dello schema" in str(exc.value)
     finally:
         edigas._schema.cache_clear()
+
+
+def test_il_database_dei_fusi_e_una_dipendenza_dichiarata():
+    """Windows non ha i fusi di sistema: senza tzdata l'app non parte proprio.
+
+    Il calcolo del giorno gas avviene su ``Europe/Rome`` all'import del
+    modulo, quindi la mancanza del database non degrada una funzione: impedisce
+    l'avvio. Sulle macchine di sviluppo Linux e macOS il problema è invisibile,
+    ed è per questo che va bloccato qui.
+    """
+
+    requisiti = (Path(__file__).resolve().parent.parent / "requirements.txt").read_text()
+    riga = [r for r in requisiti.splitlines() if r.strip().startswith("tzdata")]
+    assert riga, "tzdata deve restare fra le dipendenze"
+    assert "win32" in riga[0], "va installato almeno su Windows"
+
+
+def test_il_fuso_del_giorno_gas_e_caricabile():
+    assert edigas.FUSO_GAS.key == "Europe/Rome"
+    assert edigas.confini_giorno_gas(date(2026, 1, 15))[0].tzinfo is timezone.utc

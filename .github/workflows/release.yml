@@ -109,16 +109,28 @@ jobs:
           $env:VETTORE_NO_BROWSER = "1"
           $env:VETTORE_PORTA = "8123"
           $env:VETTORE_DB = "$env:TEMP\smoke.db"
-          $p = Start-Process -FilePath "dist\Vettore.exe" -PassThru
+          $env:VETTORE_DEBUG_STACK = "1"
+          # L'output del processo va su file: se l'exe muore all'avvio è
+          # l'unica traccia della causa (un import mancante, per esempio).
+          $p = Start-Process -FilePath "dist\Vettore.exe" -PassThru `
+                 -RedirectStandardOutput server.out.log -RedirectStandardError server.err.log
           $ok = $false
           foreach ($i in 1..90) {
+            if ($p.HasExited) { Write-Host "il processo e' uscito con codice $($p.ExitCode)"; break }
             try {
               $r = Invoke-WebRequest -Uri "http://127.0.0.1:8123/" -UseBasicParsing -TimeoutSec 2
               if ($r.Content -match "data-screen-label") { $ok = $true; break }
-            } catch { Start-Sleep -Seconds 2 }
+            } catch { }
+            Start-Sleep -Seconds 2
           }
-          Stop-Process -Id $p.Id -Force
-          if (-not $ok) { exit 1 }
+          # Il processo puo' essere gia' uscito: la pulizia non deve diventare
+          # essa stessa il fallimento e mascherare la causa vera.
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) {
+            Write-Host "--- stdout del server:"; Get-Content server.out.log -ErrorAction SilentlyContinue
+            Write-Host "--- stderr del server:"; Get-Content server.err.log -ErrorAction SilentlyContinue
+            exit 1
+          }
 
       - name: Diagnostica pubblica su fallimento (macOS)
         if: runner.os == 'macOS' && steps.smoke.outcome == 'failure'
