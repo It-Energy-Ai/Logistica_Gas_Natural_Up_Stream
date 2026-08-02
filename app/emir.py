@@ -29,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -488,6 +488,31 @@ _cache_schemi: dict[str, Any] = {}
 _cache_enumerazioni: dict[tuple[str, str], list[str]] = {}
 
 
+def _byte_schema(codice: str) -> bytes:
+    """Legge lo XSD e ne verifica l'impronta prima di qualunque parse.
+
+    Vale per entrambe le strade che leggono lo schema: la compilazione che
+    valida i documenti e l'indice dei tipi che alimenta le tendine.  Senza il
+    controllo anche qui, uno schema sostituito su disco bloccherebbe la
+    generazione ma continuerebbe a riempire il catalogo: due verità diverse
+    sullo stesso file.  I byte verificati sono anche ciò che viene parsato,
+    così non c'è finestra fra il controllo e l'uso.
+    """
+
+    meta = SCHEMI[codice]
+    percorso = SCHEMA_DIR / meta["filename"]
+    try:
+        contenuto = percorso.read_bytes()
+    except OSError as exc:
+        raise EmirError(f"Schema EMIR non leggibile ({meta['radice']}): {exc}") from exc
+    if hashlib.sha256(contenuto).hexdigest() != meta["sha256"]:
+        raise EmirError(
+            f"Integrità dello schema EMIR non verificata ({meta['radice']}): "
+            "l'impronta del file non corrisponde a quella dichiarata."
+        )
+    return contenuto
+
+
 def _definizioni(codice: str) -> dict[str, Any]:
     """Indice dei tipi dichiarati nello schema, compilato una volta sola."""
 
@@ -495,12 +520,15 @@ def _definizioni(codice: str) -> dict[str, Any]:
         return _cache_definizioni[codice]
     if etree is None:  # pragma: no cover
         raise EmirError("lxml non è installato: impossibile leggere lo schema EMIR.")
-    percorso = SCHEMA_DIR / SCHEMI[codice]["filename"]
+    contenuto = _byte_schema(codice)
     try:
-        albero = etree.parse(str(percorso))
-    except (OSError, etree.XMLSyntaxError) as exc:
+        # Il parser esplicito è la convenzione del modulo: gli XSD sono nostri
+        # e verificati per impronta, ma la sicurezza non deve dipendere dai
+        # default della libreria installata.
+        radice = etree.fromstring(contenuto, _parser_sicuro())
+    except etree.XMLSyntaxError as exc:
         raise EmirError(f"Schema EMIR non leggibile ({SCHEMI[codice]['radice']}): {exc}") from exc
-    indice = {t.get("name"): t for t in albero.getroot() if t.get("name")}
+    indice = {t.get("name"): t for t in radice if t.get("name")}
     _cache_definizioni[codice] = indice
     return indice
 
@@ -979,6 +1007,26 @@ def genera_segnalazione(dati: dict[str, Any]) -> DocumentoEmir:
                             obbligatorio=False)
         if efficacia and scadenza and scadenza < efficacia:
             _errore(errors, "data_scadenza", "La data di scadenza precede quella di efficacia.")
+        if esecuzione and scadenza:
+            # Un contratto non può scadere prima di essere stato concluso. La
+            # tolleranza di un giorno però è necessaria: un within-day sul
+            # giorno gas D negoziato dopo la mezzanotte ha l'esecuzione con
+            # data di calendario D+1 e la scadenza ancora a D — legittimo,
+            # perché il giorno gas finisce alle 06:00 del giorno dopo.
+            giorno_esecuzione = date.fromisoformat(esecuzione[:10])
+            if date.fromisoformat(scadenza) < giorno_esecuzione - timedelta(days=1):
+                _errore(
+                    errors,
+                    "data_scadenza",
+                    "La data di scadenza precede il giorno dell'esecuzione: un contratto "
+                    "non può scadere prima di essere stato concluso.",
+                )
+            elif date.fromisoformat(scadenza) < giorno_esecuzione:
+                avvisi.append(
+                    "La scadenza cade il giorno di calendario precedente all'esecuzione: "
+                    "è coerente solo con un prodotto a giorno gas negoziato dopo la mezzanotte "
+                    "(within-day). Se non è questo il caso, ricontrolla le date."
+                )
         accordo = _codice(
             _testo(dati, "accordo_tipo", errors, "Accordo quadro", max_len=8),
             "MasterAgreementType2Code", "accordo_tipo", "Accordo quadro", errors,
@@ -1588,19 +1636,14 @@ def _schema(codice: str):
     if codice in _cache_schemi:
         return _cache_schemi[codice]
     meta = SCHEMI[codice]
-    percorso = SCHEMA_DIR / meta["filename"]
+    contenuto = _byte_schema(codice)
     try:
-        contenuto = percorso.read_bytes()
-    except OSError as exc:
-        raise EmirError(f"Schema EMIR non leggibile ({meta['radice']}): {exc}") from exc
-    if hashlib.sha256(contenuto).hexdigest() != meta["sha256"]:
-        raise EmirError(
-            f"Integrità dello schema EMIR non verificata ({meta['radice']}): "
-            "l'impronta del file non corrisponde a quella dichiarata."
-        )
-    try:
-        schema = etree.XMLSchema(etree.parse(str(percorso)))
-    except etree.XMLSchemaParseError as exc:
+        # Si compila dai byte appena verificati, non rileggendo il percorso:
+        # rileggere aprirebbe una finestra fra il controllo dell'impronta e
+        # l'uso del file.  Funziona perché gli XSD ESMA sono autonomi, senza
+        # xs:import né xs:include da risolvere.
+        schema = etree.XMLSchema(etree.fromstring(contenuto, _parser_sicuro()))
+    except (etree.XMLSyntaxError, etree.XMLSchemaParseError) as exc:
         raise EmirError(f"Schema EMIR non compilabile ({meta['radice']}): {exc}") from exc
     _cache_schemi[codice] = schema
     return schema

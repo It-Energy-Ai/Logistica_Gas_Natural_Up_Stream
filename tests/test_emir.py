@@ -184,6 +184,40 @@ def test_la_scadenza_non_puo_precedere_lefficacia():
     assert any(e["field"] == "data_scadenza" for e in errore.value.errors)
 
 
+def test_la_scadenza_non_puo_precedere_il_giorno_dellesecuzione():
+    """Un contratto non può scadere prima di essere stato concluso.
+
+    L'efficacia retrodatata rende il caso invisibile al solo confronto
+    scadenza-efficacia: qui l'esecuzione è un mese dopo la scadenza.
+    """
+
+    with pytest.raises(emir.EmirError) as errore:
+        emir.genera_segnalazione(dati(
+            "nuovo",
+            data_efficacia="2026-06-01",
+            data_scadenza="2026-07-01",
+            momento_esecuzione="2026-08-01T14:30:00Z",
+        ))
+    assert any(e["field"] == "data_scadenza" for e in errore.value.errors)
+
+
+def test_il_within_day_a_cavallo_di_mezzanotte_passa_con_avviso():
+    """Giorno gas D negoziato alle 01:30 di calendario D+1: scadenza D è legittima.
+
+    Il giorno gas finisce alle 06:00 del giorno dopo, quindi l'esecuzione può
+    avere data di calendario successiva alla scadenza di un giorno esatto: un
+    errore bloccante qui sarebbe un falso positivo. Oltre un giorno, no.
+    """
+
+    documento = emir.genera_segnalazione(dati(
+        "nuovo",
+        data_efficacia="2026-09-01",
+        data_scadenza="2026-09-01",
+        momento_esecuzione="2026-09-02T01:30:00Z",
+    ))
+    assert any("within-day" in a for a in documento.avvisi)
+
+
 def test_un_punto_di_consegna_non_eic_viene_respinto():
     with pytest.raises(emir.EmirError) as errore:
         emir.genera_segnalazione(dati("nuovo", punti_consegna=["PSV"]))
@@ -371,6 +405,12 @@ def test_uno_schema_manomesso_blocca_la_generazione(tmp_path, monkeypatch):
     assert "impronta" in str(errore.value)
     with pytest.raises(emir.EmirError):
         emir.leggi_esito((DATI / "esito-tr.xml").read_bytes())
+    # Anche il catalogo deve fermarsi: le tendine lette da uno schema
+    # manomesso e la generazione bloccata sarebbero due verità diverse
+    # sullo stesso file.
+    with pytest.raises(emir.EmirError) as errore_catalogo:
+        emir.catalogo()
+    assert "impronta" in str(errore_catalogo.value)
 
 
 def test_il_documento_dichiara_limpronta_di_ciò_che_ha_prodotto():

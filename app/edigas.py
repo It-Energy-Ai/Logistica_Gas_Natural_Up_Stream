@@ -1082,8 +1082,14 @@ def _schema(codice: str):
             "l'impronta del file non corrisponde a quella dichiarata."
         )
     try:
-        return etree.XMLSchema(etree.parse(str(percorso)))
-    except etree.XMLSchemaParseError as exc:
+        # Si compila dai byte appena verificati, non rileggendo il percorso:
+        # rileggere aprirebbe una finestra fra il controllo dell'impronta e
+        # l'uso del file. Il base_url resta quello del percorso perché gli
+        # XSD EDIG@S importano i file di code list accanto a sé; quei file
+        # non hanno un'impronta dichiarata, come prima di questa modifica.
+        radice = etree.fromstring(contenuto, _parser_sicuro(), base_url=str(percorso))
+        return etree.XMLSchema(radice)
+    except (etree.XMLSyntaxError, etree.XMLSchemaParseError) as exc:
         raise EdigasError(f"Schema EDIG@S non compilabile ({meta['radice']}): {exc}") from exc
 
 

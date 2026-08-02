@@ -2,6 +2,20 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.7.1] — 2026-08-02
+
+Da una revisione esterna del modulo EMIR: sei rilievi, verificati uno per uno contro il codice. Due accolti (in parte), quattro respinti con prova — fra questi «test assenti» (sono 63 e passano) e «manca il checksum del LEI» (c'è, MOD 97-10, su tutti e sette i campi LEI, con test).
+
+### Corretto
+- **Gli XSD si leggono una volta sola, dai byte verificati, col parser esplicito.** L'impronta SHA-256 era controllata alla compilazione dello schema ma non nell'indice dei tipi che alimenta le tendine: uno schema sostituito su disco avrebbe bloccato la generazione continuando però a riempire il catalogo — due verità diverse sullo stesso file. In più c'era una finestra fra il controllo dell'impronta e la rilettura dal percorso, e il parse degli XSD si affidava ai default della libreria invece che al parser indurito già usato per l'XML in ingresso. Ora `_byte_schema` verifica e restituisce i byte, e tutto il resto parte da lì. Stesso trattamento alla compilazione degli schemi EDIG@S (lì il base_url resta quello del percorso, perché gli XSD EASEE-gas importano le code list accanto a sé).
+- **La scadenza non può più precedere il giorno dell'esecuzione.** Il confronto con la sola efficacia non bastava: con un'efficacia retrodatata, un contratto «scaduto prima di essere concluso» passava la validazione XSD senza un avviso. Con una tolleranza deliberata di un giorno: un within-day sul giorno gas D negoziato dopo la mezzanotte ha legittimamente l'esecuzione con data di calendario D+1 e la scadenza a D — quel caso genera un avviso, non un errore, perché il giorno gas finisce alle 06:00 del giorno dopo.
+
+### Respinto, con prova
+- «Il modulo non parsifica XML esterno»: falso, l'esito `auth.092` arriva dall'esterno e viene letto col parser indurito; il test XXE dedicato esiste già.
+- «Manca la validazione del LEI»: falsa, `cifra_di_controllo_lei` implementa ISO 17442 → MOD 97-10 ed è applicata ovunque.
+- «Test assenti»: falso, 51 test Python + 12 Node dedicati al modulo, tutti verdi.
+- «Il limite di profondità delle enumerazioni fallirebbe silenziosamente»: negli schemi ESMA reali il ramo ricorsivo non viene mai percorso (le restriction puntano tutte a tipi built-in), e se un giorno fallisse la suite cadrebbe con un messaggio per-tipo — rumorosamente, non in silenzio.
+
 ## [1.7.0] — 2026-08-02
 
 ### Aggiunto
