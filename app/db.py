@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS edigas_riscontro (
     tipo_documento TEXT NOT NULL,
     riferimento TEXT NOT NULL,
     accettato INTEGER NOT NULL,
+    esito TEXT NOT NULL DEFAULT 'respinto',
     motivazioni TEXT NOT NULL,
     creato_il TEXT NOT NULL,
     xml TEXT NOT NULL,
@@ -593,6 +594,7 @@ def crea_riscontro_edigas(
     tipo_documento: str,
     riferimento: str,
     accettato: bool,
+    esito: str,
     motivazioni: str,
     creato_il: str,
     xml: str,
@@ -600,11 +602,11 @@ def crea_riscontro_edigas(
 ) -> None:
     conn.execute(
         "INSERT INTO edigas_riscontro (id, email, nomina_id, identificativo, tipo_documento, riferimento, "
-        "accettato, motivazioni, creato_il, xml, sha256, importato_il) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        "accettato, esito, motivazioni, creato_il, xml, sha256, importato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
         (
             riscontro_id, email, nomina_id, identificativo, tipo_documento, riferimento,
-            1 if accettato else 0, motivazioni, creato_il, xml, sha256,
+            1 if accettato else 0, esito, motivazioni, creato_il, xml, sha256,
         ),
     )
 
@@ -617,6 +619,7 @@ def _riga_riscontro(row: sqlite3.Row) -> dict:
         "tipo_documento": row["tipo_documento"],
         "riferimento": row["riferimento"],
         "accettato": bool(row["accettato"]),
+        "esito": row["esito"],
         "motivazioni": _json_o_righe(row["motivazioni"]),
         "creato_il": row["creato_il"],
         "sha256": row["sha256"],
@@ -625,7 +628,7 @@ def _riga_riscontro(row: sqlite3.Row) -> dict:
 
 
 CAMPI_RISCONTRO = (
-    "id, nomina_id, identificativo, tipo_documento, riferimento, accettato, motivazioni, "
+    "id, nomina_id, identificativo, tipo_documento, riferimento, accettato, esito, motivazioni, "
     "creato_il, sha256, importato_il"
 )
 

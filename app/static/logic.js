@@ -777,6 +777,15 @@
         }
       };
 
+      // Stato del riscontro per nomina: senza questo l'operatore dovrebbe
+      // incrociare a mano due elenchi per sapere quali documenti il
+      // trasportatore ha preso in carico.
+      const ESITI_ACK = {
+        "accettato": { testo: "presa in carico", bg: "#D1FADF", fg: "#05603A" },
+        "accettato con riserva": { testo: "con riserva", bg: "#FEF0C7", fg: "#B54708" },
+        "respinto": { testo: "respinta", bg: "#FEE4E2", fg: "#B42318" },
+      };
+
       const importaAck = unaVolta("importaAck", async () => {
         this.setState({ edgAckErrore: "", edgAckInfo: "" });
         const testo = (this.state.edgAck || "").trim();
@@ -814,9 +823,9 @@
         ...r,
         tipo: r.tipo_documento === "AMU" ? "Riscontro tecnico" : "Riscontro applicativo",
         dettaglio: (r.motivazioni || []).join(" · ") || "senza motivazione",
-        esito: r.accettato ? "preso in carico" : "respinto",
-        bg: r.accettato ? "#D1FADF" : "#FEE4E2",
-        fg: r.accettato ? "#05603A" : "#B42318",
+        esito: (ESITI_ACK[r.esito] || ESITI_ACK["respinto"]).testo,
+        bg: (ESITI_ACK[r.esito] || ESITI_ACK["respinto"]).bg,
+        fg: (ESITI_ACK[r.esito] || ESITI_ACK["respinto"]).fg,
       }));
 
       const EDG_ESITI = {
@@ -825,12 +834,25 @@
         "non nominato": { bg: "#FEE4E2", fg: "#B42318" },
         "senza risposta": { bg: "#FEE4E2", fg: "#B42318" },
       };
-      const edgRows = (this.state.edgNomine || []).map((n) => ({
-        ...n,
-        impronta: `SHA-256 ${String(n.sha256 || "").slice(0, 16)}…`,
-        avvisi: (n.avvisi || []).map((testo) => ({ testo })),
-        scarica: () => window.open(`/api/edigas/nomine/${n.id}/download`, "_blank"),
-      }));
+      const ackPerNomina = new Map();
+      for (const r of this.state.edgRiscontriList || []) {
+        // il più recente vince: l'elenco arriva già ordinato dal più nuovo
+        if (r.nomina_id && !ackPerNomina.has(r.nomina_id)) ackPerNomina.set(r.nomina_id, r);
+      }
+      const edgRows = (this.state.edgNomine || []).map((n) => {
+        const ack = ackPerNomina.get(n.id);
+        const stato = ack ? (ESITI_ACK[ack.esito] || ESITI_ACK["respinto"]) : null;
+        return {
+          ...n,
+          impronta: `SHA-256 ${String(n.sha256 || "").slice(0, 16)}…`,
+          avvisi: (n.avvisi || []).map((testo) => ({ testo })),
+          scarica: () => window.open(`/api/edigas/nomine/${n.id}/download`, "_blank"),
+          ackEsito: stato ? stato.testo : "in attesa di riscontro",
+          ackBg: stato ? stato.bg : "var(--surface2)",
+          ackFg: stato ? stato.fg : "var(--ink3)",
+          ackNota: ack ? (ack.motivazioni || []).join(" · ") : "",
+        };
+      });
       const edgScostamenti = (this.state.edgScostamentiList || []).map((s) => {
         const colori = EDG_ESITI[s.esito] || { bg: "var(--surface2)", fg: "var(--ink2)" };
         const nominato = s.nominato === null || s.nominato === undefined ? "—" : s.nominato;

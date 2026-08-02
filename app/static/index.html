@@ -647,7 +647,7 @@ input::placeholder{color:var(--ink3)}
             <span style="font-size:11.5px;color:var(--ink2)">v{{ er.versione }} · {{ er.tipo_documento }}</span>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ er.periodi }} per.</span>
             <button onClick="{{ er.scarica }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Scarica XML</button>
-            <span style="grid-column:1 / -1;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)">{{ er.impronta }}</span>
+            <span style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:{{ er.ackBg }};color:{{ er.ackFg }}">{{ er.ackEsito }}</span><span style="font-size:10.5px;color:var(--ink3)">{{ er.ackNota }}</span></span><span style="grid-column:1 / -1;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)">{{ er.impronta }}</span>
             <sc-for list="{{ er.avvisi }}" as="aw" hint-placeholder-count="1"><span style="grid-column:1 / -1;font-size:11px;color:#B54708">{{ aw.testo }}</span></sc-for>
           </div>
         </sc-for>

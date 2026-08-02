@@ -522,6 +522,7 @@ async def post_edigas_riscontro(request: Request):
             tipo_documento=riscontro["tipo_documento"],
             riferimento=rif["identificativo"] or rif["nome_file"],
             accettato=riscontro["accettato"],
+            esito=riscontro["esito"],
             motivazioni=json.dumps(
                 [f"{m['codice']} · {m['descrizione']}" for m in riscontro["motivazioni"]]
             ),

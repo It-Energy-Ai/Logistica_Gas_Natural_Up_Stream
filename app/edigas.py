@@ -86,10 +86,22 @@ TIPI_RISCONTRO = {
     "AMU": "Riscontro tecnico",
 }
 
-# Esiti del riscontro: il codice di motivazione dice se il documento è stato
-# preso in carico o respinto, e perché.  Un ACKNOW senza motivazione non
-# esiste: la decision table lo dichiara obbligatorio.
-RISCONTRI_ACCETTAZIONE = {"01G", "01H", "02G", "02H", "03G", "50G", "82G", "83G", "90G"}
+# Il modello ACKNOW non ha un campo "accettato": l'esito sta tutto nel codice
+# di motivazione, e la lista ufficiale è piatta, senza categorie.  La
+# classificazione qui sotto deriva dalle definizioni letterali della
+# ReasonCodeTypeCodeList, dove alcuni codici dicono esplicitamente "accepted,
+# but…": trattarli come rifiuti direbbe all'operatore il contrario del vero.
+RISCONTRI_ACCETTAZIONE = {"01G", "02G", "03G", "90G"}
+RISCONTRI_RISERVA = {
+    "01H",  # programma accettato con osservazioni (in via di deprecazione)
+    "02H",  # accettato, ma valgono solo i valori dalla scadenza in poi
+    "50G",  # messaggio già accettato in precedenza
+    "84G",  # dettaglio accettato, discordanza altrove (in via di deprecazione)
+    "92G",  # accettato, ma alcuni conti sono stati rimossi
+    "93G",  # accettato, ma i parametri di validazione non sono ancora disponibili
+    "95G",  # accettato, ma le modifiche nel passato sono ignorate
+}
+RISCONTRI_PRESA_IN_CARICO = RISCONTRI_ACCETTAZIONE | RISCONTRI_RISERVA
 
 # I 63 codici della ReasonCodeTypeCodeList di EDIG@S 6.1, tradotti per
 # l'operatore italiano (fonte: edigas6_1-CodeListCoreComponents_v9r0, §2.2.22).
@@ -1093,7 +1105,8 @@ def leggi_riscontro(contenuto: bytes | str) -> dict[str, Any]:
                     "codice": codice,
                     "descrizione": MOTIVAZIONI.get(codice, "Motivazione non in elenco"),
                     "nota": testo("e:text", motivo),
-                    "accettazione": codice in RISCONTRI_ACCETTAZIONE,
+                    "accettazione": codice in RISCONTRI_PRESA_IN_CARICO,
+                    "riserva": codice in RISCONTRI_RISERVA,
                 }
             )
         return fuori
@@ -1112,6 +1125,8 @@ def leggi_riscontro(contenuto: bytes | str) -> dict[str, Any]:
     # in generale ma rifiuta un punto non è un'accettazione.
     tutte = generali + [m for p in punti for m in p["motivazioni"]]
     accettato = bool(tutte) and all(m["accettazione"] for m in tutte)
+    con_riserva = accettato and any(m["riserva"] for m in tutte)
+    esito = "respinto" if not accettato else ("accettato con riserva" if con_riserva else "accettato")
     tipo = testo("e:documentCode")
 
     return {
@@ -1134,6 +1149,7 @@ def leggi_riscontro(contenuto: bytes | str) -> dict[str, Any]:
             "nome_file": testo("e:receiving_Document.payloadName"),
         },
         "accettato": accettato,
+        "esito": esito,
         "motivazioni": generali,
         "punti_respinti": punti,
         "valido_xsd": valido,

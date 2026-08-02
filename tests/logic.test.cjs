@@ -831,22 +831,63 @@ test("il logout sblocca il pulsante di accesso", () => {
 
 // --- riscontro ACKNOW --------------------------------------------------------
 
-test("ACKNOW: i riscontri archiviati distinguono presa in carico e rifiuto", () => {
+test("ACKNOW: i tre esiti sono distinti a schermo", () => {
+  // Un "accettato con riserva" mostrato come rifiuto direbbe all'operatore il
+  // contrario del vero: 95G significa accettato, ma con una precisazione.
   const app = new App();
   app.setState({
     screen: "nomine",
     edgRiscontriList: [
-      { riferimento: "NOM-1", tipo_documento: "294", accettato: true, motivazioni: ["01G · Elaborato e accettato"] },
-      { riferimento: "NOM-2", tipo_documento: "AMU", accettato: false, motivazioni: ["40G · Errore sintattico nel messaggio"] },
+      { riferimento: "NOM-1", tipo_documento: "294", esito: "accettato", accettato: true, motivazioni: ["01G · Elaborato e accettato"] },
+      { riferimento: "NOM-2", tipo_documento: "294", esito: "accettato con riserva", accettato: true, motivazioni: ["95G · Modifiche nel passato ignorate"] },
+      { riferimento: "NOM-3", tipo_documento: "AMU", esito: "respinto", accettato: false, motivazioni: ["40G · Errore sintattico nel messaggio"] },
     ],
   });
-  const [primo, secondo] = app.renderVals().edgRiscontri;
+  const [primo, secondo, terzo] = app.renderVals().edgRiscontri;
   assert.equal(primo.tipo, "Riscontro applicativo");
-  assert.equal(primo.esito, "preso in carico");
-  assert.equal(secondo.tipo, "Riscontro tecnico");
-  assert.equal(secondo.esito, "respinto");
-  assert.equal(secondo.dettaglio, "40G · Errore sintattico nel messaggio");
+  assert.equal(primo.esito, "presa in carico");
+  assert.equal(secondo.esito, "con riserva");
+  assert.equal(terzo.tipo, "Riscontro tecnico");
+  assert.equal(terzo.esito, "respinta");
+  assert.equal(terzo.dettaglio, "40G · Errore sintattico nel messaggio");
   assert.equal(app.renderVals().edgAckVuoto, false);
+});
+
+test("ACKNOW: ogni nomina mostra se è stata riscontrata", () => {
+  // Senza questo l'operatore dovrebbe incrociare a mano due elenchi.
+  const app = new App();
+  app.setState({
+    screen: "nomine",
+    edgNomine: [
+      { id: "n1", identificativo: "NOM-1", versione: 1, sha256: "a".repeat(64), avvisi: [] },
+      { id: "n2", identificativo: "NOM-2", versione: 1, sha256: "b".repeat(64), avvisi: [] },
+      { id: "n3", identificativo: "NOM-3", versione: 1, sha256: "c".repeat(64), avvisi: [] },
+    ],
+    edgRiscontriList: [
+      { nomina_id: "n1", esito: "accettato", accettato: true, motivazioni: ["01G · Elaborato e accettato"], tipo_documento: "294", riferimento: "NOM-1" },
+      { nomina_id: "n2", esito: "accettato con riserva", accettato: true, motivazioni: ["95G · Modifiche nel passato ignorate"], tipo_documento: "294", riferimento: "NOM-2" },
+    ],
+  });
+  const righe = app.renderVals().edgRows;
+  assert.equal(righe[0].ackEsito, "presa in carico");
+  assert.equal(righe[0].ackNota, "01G · Elaborato e accettato");
+  assert.equal(righe[1].ackEsito, "con riserva");
+  assert.equal(righe[2].ackEsito, "in attesa di riscontro", "una nomina senza riscontro non è né accettata né respinta");
+  assert.equal(righe[2].ackNota, "");
+});
+
+test("ACKNOW: fra due riscontri sulla stessa nomina vale il più recente", () => {
+  const app = new App();
+  app.setState({
+    screen: "nomine",
+    edgNomine: [{ id: "n1", identificativo: "NOM-1", versione: 1, sha256: "a".repeat(64), avvisi: [] }],
+    // l'elenco arriva ordinato dal più recente
+    edgRiscontriList: [
+      { nomina_id: "n1", esito: "respinto", accettato: false, motivazioni: ["23G"], tipo_documento: "294", riferimento: "NOM-1" },
+      { nomina_id: "n1", esito: "accettato", accettato: true, motivazioni: ["01G"], tipo_documento: "294", riferimento: "NOM-1" },
+    ],
+  });
+  assert.equal(app.renderVals().edgRows[0].ackEsito, "respinta");
 });
 
 test("ACKNOW: a portale pulito il pannello spiega a cosa serve", () => {

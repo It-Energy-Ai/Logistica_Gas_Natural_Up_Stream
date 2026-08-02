@@ -874,3 +874,46 @@ def test_un_file_che_non_e_un_riscontro_viene_rifiutato():
     with pytest.raises(edigas.EdigasError) as exc:
         edigas.leggi_riscontro(nomina().xml)
     assert "non è un riscontro" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "codice,esito,preso_in_carico",
+    [
+        ("01G", "accettato", True),
+        ("90G", "accettato", True),
+        # «Message accepted, but…»: dirlo respinto sarebbe il contrario del vero
+        ("95G", "accettato con riserva", True),
+        ("92G", "accettato con riserva", True),
+        ("02H", "accettato con riserva", True),
+        ("14G", "respinto", False),
+        ("40G", "respinto", False),
+        ("23G", "respinto", False),
+    ],
+)
+def test_i_tre_esiti_del_riscontro(codice, esito, preso_in_carico):
+    """Il tracciato non ha un campo «accettato»: l'esito sta nel codice."""
+
+    letto = edigas.leggi_riscontro(riscontro(motivazioni=[{"codice": codice}]).xml)
+    assert letto["esito"] == esito
+    assert letto["accettato"] is preso_in_carico
+
+
+def test_una_riserva_fra_piu_motivazioni_declassa_l_esito():
+    letto = edigas.leggi_riscontro(
+        riscontro(motivazioni=[{"codice": "01G"}, {"codice": "95G"}]).xml
+    )
+    assert letto["esito"] == "accettato con riserva"
+    assert letto["accettato"] is True
+
+
+def test_un_rifiuto_fra_piu_motivazioni_respinge_tutto():
+    letto = edigas.leggi_riscontro(
+        riscontro(motivazioni=[{"codice": "01G"}, {"codice": "14G"}]).xml
+    )
+    assert letto["esito"] == "respinto"
+    assert letto["accettato"] is False
+
+
+def test_le_categorie_di_esito_non_si_sovrappongono():
+    assert not (edigas.RISCONTRI_ACCETTAZIONE & edigas.RISCONTRI_RISERVA)
+    assert edigas.RISCONTRI_PRESA_IN_CARICO <= set(edigas.MOTIVAZIONI)

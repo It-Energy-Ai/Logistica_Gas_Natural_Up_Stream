@@ -155,10 +155,29 @@ SHA-256, perché è la prova che il documento è arrivato. Reimportare lo stesso
 file non crea un secondo riscontro: è lo stesso fatto.
 
 I **63 codici di motivazione** della `ReasonCodeTypeCodeList` sono tradotti in
-italiano, così l'operatore legge «Conto non riconosciuto» invece di `14G`. Il
-riscontro risulta una presa in carico solo se **tutte** le motivazioni lo sono
-e nessun punto di connessione è stato respinto: accettare in generale e
-rifiutare un punto non è un'accettazione.
+italiano, così l'operatore legge «Conto non riconosciuto» invece di `14G`.
+
+Il tracciato **non ha un campo «accettato»**: l'esito sta tutto nel codice, e
+la lista ufficiale è piatta, senza categorie. Alcuni codici dicono però
+esplicitamente *accepted, but…* — `95G` è «accettato, ma le modifiche nel
+passato sono ignorate», `92G` è «accettato, ma alcuni conti sono stati
+rimossi». Mostrarli come rifiuti direbbe all'operatore il contrario del vero,
+quindi gli esiti sono tre:
+
+| Esito | Codici | Significato |
+|---|---|---|
+| Accettato | `01G` `02G` `03G` `90G` | Preso in carico senza riserve |
+| Accettato con riserva | `01H` `02H` `50G` `84G` `92G` `93G` `95G` | Preso in carico, ma con una precisazione da leggere |
+| Respinto | tutti gli altri | Non preso in carico |
+
+Il riscontro risulta una presa in carico solo se **tutte** le motivazioni lo
+sono e nessun punto di connessione è stato respinto: accettare in generale e
+rifiutare un punto non è un'accettazione. Basta una riserva fra più
+motivazioni perché l'esito complessivo sia «con riserva».
+
+**Nell'elenco dei documenti generati ogni nomina mostra il proprio stato** —
+presa in carico, con riserva, respinta, oppure in attesa di riscontro — così
+non serve incrociare a mano due elenchi.
 
 Un caso che va gestito e che è facile dimenticare: il trasportatore può
 riscontrare **un documento che non è riuscito a interpretare**. In quel caso al
