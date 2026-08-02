@@ -581,7 +581,7 @@
         top: "none",
         shadow: "var(--shadow)",
       });
-      const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine · Bilanciamento · Stoccaggio", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
+      const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine EDIG@S · REMIT e PDR · Bilanciamento", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
       const cfgCards = [
         { title: "Sistema", desc: "Stato dei servizi collegati, ambiente e attività recenti.", stat: demoOn ? "3" : "0", statLabel: "servizi collegati", go: go("cfgSis") },
         { title: "Impostazioni", desc: "Anagrafica shipper, parametri di nomina, punti e notifiche.", stat: String(nAbil), statLabel: "punti abilitati", go: go("cfgImp") },

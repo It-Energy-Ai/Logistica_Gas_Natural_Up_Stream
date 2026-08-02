@@ -44,10 +44,11 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | <img src="docs/screenshots/login.png" alt="Login con SSO aziendale"><br>**Login** · email/password o SSO aziendale con scelta account | <img src="docs/screenshots/hub.png" alt="Hub moduli"><br>**Hub** · moduli come carte da gioco, con effetto mazzo all'hover |
 | <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · documento EDIG@S 6.1 validato e registro interno dei cicli | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
+| <img src="docs/screenshots/remit.png" alt="REMIT · XML ACER"><br>**REMIT · XML ACER** · registro nei tre stati, validazione XSD, UTI, audit ed export | <img src="docs/screenshots/pdr.png" alt="PDR · GME"><br>**PDR · GME** · profilo, schemi fissati, preflight per artefatto e ricevute |
 
 E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
-> Screenshot e tour mostrano la **modalità demo** attiva; al primo avvio il portale parte pulito (vedi sotto).
+> Screenshot e tour mostrano la **modalità demo** attiva per i dati di mercato; bozze REMIT, documenti EDIG@S con i riscontri e tessere regolatorie sono invece **dati reali** creati nel portale. Al primo avvio tutto parte pulito (vedi sotto).
 
 ## Dal design all'app funzionante
 
