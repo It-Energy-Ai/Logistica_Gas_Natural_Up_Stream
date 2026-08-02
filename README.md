@@ -17,6 +17,16 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](app/main.py)
 [![Frontend vanilla](https://img.shields.io/badge/frontend-vanilla%20JS-F7DF1E?logo=javascript&logoColor=black)](app/static/runtime.js)
 
+### ⬇️ Scarica l'applicazione pronta
+
+| [**Windows**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-windows.exe) | [**macOS** (Apple Silicon)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-macos-apple-silicon) | [**Linux**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-linux) |
+|:---:|:---:|:---:|
+
+Un file solo, doppio click, il browser si apre da solo. **Niente Docker, niente Python, niente terminale.**
+Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest) · [SHA256SUMS](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/SHA256SUMS.txt)
+
+> Il pulsante verde **Code ▾ → Download ZIP** qui sopra scarica invece il **codice sorgente** (`…-main.zip`), che serve a chi vuole leggere o modificare il progetto. Per usare l'applicazione servono i file qui sopra.
+
 <img src="docs/screenshots/dashboard.png" alt="Dashboard — posizione shipper del giorno gas" width="900">
 
 </div>
@@ -66,7 +76,9 @@ Per modificare l'interfaccia: si aggiorna design/design.html e si rilancia `pyth
 
 ### 1 · Eseguibile pronto (niente da installare)
 
-Scarica dalla pagina [**Releases**](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases) il file per il tuo sistema — Windows, macOS (Apple Silicon) o Linux — e fai doppio click: il browser si apre da solo su <http://localhost:8080>. Nessun Docker, nessun Python, nessun terminale. I dati restano in `~/.vettore/vettore.db`.
+Scarica il file per il tuo sistema — [Windows](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-windows.exe) · [macOS Apple Silicon](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-macos-apple-silicon) · [Linux](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-linux) — e fai doppio click: il browser si apre da solo su <http://localhost:8080>. Nessun Docker, nessun Python, nessun terminale. I dati restano in `~/.vettore/vettore.db`.
+
+I collegamenti puntano sempre all'**ultima versione**: non serve cercarla fra le [release](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases). Attenzione a non confonderli con il pulsante verde *Code ▾ → Download ZIP* della pagina principale, che scarica il codice sorgente (`…-main.zip`) e non l'applicazione.
 
 > macOS al primo avvio: tasto destro → *Apri* (il binario non è firmato). Windows: se SmartScreen avvisa, *Ulteriori informazioni → Esegui comunque*. **Mac Intel**: usa la strada 2 qui sotto. Ogni release include `SHA256SUMS.txt` per verificare l'integrità dei file.
 
