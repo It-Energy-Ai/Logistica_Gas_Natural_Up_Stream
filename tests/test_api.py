@@ -118,7 +118,8 @@ def _remit_valida(kind="gas_standard", **extra):
         "source_ref": "PSV-2026-0142",
         "event_at": "2026-07-31",
         "counterparty_scheme": "ace",
-        "counterparty": "A0045821W.IT",
+        # controparte distinta dal dichiarante: Table 1/2 li vogliono soggetti diversi
+        "counterparty": "B0011111X.IT",
         "side": "buy",
         "quantity_mwh": "1.250,50",
         "quantity_unit": "MWh",
@@ -678,3 +679,130 @@ def test_migrazione_stato_globale_importa_solo_per_proprietario_esplicito(tmp_pa
         assert conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'stato_legacy'"
         ).fetchone() is None
+
+
+# --- Regressioni dell'audit REMIT: i vincoli degli XSD valgono già in locale ---
+
+
+def _record_t2(**extra):
+    base = {
+        "report_kind": "gas_nonstandard",
+        "acer_code": "A0045821W.IT",
+        "counterparty": "B0011111X.IT",
+        "counterparty_scheme": "ace",
+        "quantity_mwh": "500",
+        "quantity_unit": "MWh",
+        "price_eur_mwh": "33.50",
+        "price_currency": "EUR",
+        "action": "new",
+        "side": "buy",
+        "trading_capacity": "P",
+        "contract_id": "PSV-2026-0142",
+        "contract_date": "2026-07-01",
+        "contract_type": "FW",
+        "energy_commodity": "NG",
+        "delivery_point": "21YIT-SNAMRG--PX",
+        "delivery_start_date": "2026-08-01",
+        "delivery_end_date": "2026-08-31",
+        "settlement_method": "P",
+    }
+    base.update(extra)
+    return base
+
+
+def _record_t1(**extra):
+    base = {
+        "report_kind": "gas_standard",
+        "acer_code": "A0045821W.IT",
+        "counterparty": "B0011111X.IT",
+        "counterparty_scheme": "ace",
+        "quantity_mwh": "250",
+        "quantity_unit": "MWh",
+        "price_eur_mwh": "33.45",
+        "price_currency": "EUR",
+        "action": "new",
+        "side": "sell",
+        "trading_capacity": "P",
+        "contract_id": "MGP-GAS-2026-0042",
+        "transaction_id": "UTI-2026-0000042",
+        "transaction_at": "2026-08-01T10:15:00Z",
+        "marketplace_id": "XGME",
+        "marketplace_scheme": "mic",
+    }
+    base.update(extra)
+    return base
+
+
+def _campi_in_errore(record):
+    from app import acer_xml
+
+    return {e["field"] for e in acer_xml.errori_dati(record)}
+
+
+def test_record_completi_passano_e_generano_xml_valido():
+    from app import acer_xml
+
+    for record in (_record_t1(), _record_t2()):
+        assert acer_xml.errori_dati(record) == []
+        acer_xml.genera_xml(record)  # solleva se l'XSD non è soddisfatto
+
+
+def test_settlement_method_obbligatorio_e_mai_inventato():
+    """Table 2 campo 31: un contratto finanziario non deve diventare 'P' da solo."""
+    from lxml import etree
+
+    from app import acer_xml
+
+    assert "settlement_method" in _campi_in_errore(_record_t2(settlement_method=""))
+    assert "settlement_method" in _campi_in_errore(_record_t2(settlement_method="F"))
+    doc = acer_xml.genera_xml(_record_t2(settlement_method="C"))
+    grezzo = doc.xml.encode() if isinstance(doc.xml, str) else doc.xml
+    radice = etree.fromstring(grezzo)
+    assert radice.find(".//{*}settlementMethod").text == "C"
+
+
+def test_liste_chiuse_bloccate_prima_dellexport():
+    for campo, valore in (
+        ("trading_capacity", "X"),
+        ("price_currency", "XXX"),
+        ("quantity_unit", "BOH"),
+        ("energy_commodity", "GAS"),
+        ("contract_type", "CO"),  # valore di Table 1, non ammesso su Table 2
+    ):
+        assert campo in _campi_in_errore(_record_t2(**{campo: valore})), campo
+
+
+def test_identificativi_rispettano_lunghezza_e_pattern_dello_schema():
+    assert "counterparty" in _campi_in_errore(_record_t2(counterparty_scheme="lei", counterparty="ABC123"))
+    assert "counterparty" in _campi_in_errore(_record_t2(counterparty_scheme="bic", counterparty="UNCRITMM"))
+    assert "delivery_point" in _campi_in_errore(_record_t2(delivery_point="PIPPO"))
+    assert "delivery_point" in _campi_in_errore(_record_t2(delivery_point="AAAAAAAAAAAAAAAA"))
+    assert "marketplace_id" in _campi_in_errore(_record_t1(marketplace_scheme="bil", marketplace_id="GME"))
+
+
+def test_controparte_diversa_dal_dichiarante():
+    assert "counterparty" in _campi_in_errore(_record_t2(counterparty="A0045821W.IT"))
+
+
+def test_identificativi_non_vengono_troncati_in_silenzio():
+    """Un UTI o un contract_id troppo lunghi sono un errore, non un taglio."""
+    assert "transaction_id" in _campi_in_errore(_record_t1(transaction_id="U" * 120))
+    assert "contract_id" in _campi_in_errore(_record_t1(contract_id="C" * 60))
+    # Table 2 ammette 100 caratteri: 80 devono passare
+    assert _campi_in_errore(_record_t2(contract_id="C" * 80)) == set()
+
+
+def test_numeri_rispettano_i_facet_dello_schema():
+    assert "price_eur_mwh" in _campi_in_errore(_record_t2(price_eur_mwh="33.1234567"))
+    assert "quantity_mwh" in _campi_in_errore(_record_t2(quantity_mwh="-500"))
+
+
+def test_i_vincoli_sono_derivati_dagli_xsd_non_ricopiati():
+    """Le liste cambiano tra i due tracciati: la fonte deve essere lo schema."""
+    from app import acer_xml
+
+    t1 = acer_xml._facet("gas_standard", "contractIdType")
+    t2 = acer_xml._facet("gas_nonstandard", "contractIdType")
+    assert t1["maxLength"] == 50 and t2["maxLength"] == 100
+    assert "CO" in acer_xml._facet("gas_standard", "contractTypeType")["enum"]
+    assert "CO" not in acer_xml._facet("gas_nonstandard", "contractTypeType")["enum"]

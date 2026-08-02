@@ -2,6 +2,20 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.3.1] — 2026-08-02
+
+Da un audit del modulo REMIT che ha confrontato campo per campo ciò che l'app genera con gli XSD ACER inclusi e con i tracciati Table 1 / Table 2.
+
+### Corretto
+- **`settlementMethod` non viene più inventato.** Era obbligatorio per Table 2 ma non richiesto né validato: se mancava, il file dichiarava `P` (consegna fisica) anche per un contratto a regolamento finanziario. Ora è un campo obbligatorio con lista chiusa (P/C/O).
+- **Niente più troncamenti silenziosi di identificativi.** UTI oltre 100 caratteri e Contract ID oltre 50 venivano tagliati: il file dichiarava una transazione o un contratto **diversi** da quelli reali. Ora sono errori espliciti, e Table 2 usa correttamente il proprio limite di 100 caratteri invece di quello di Table 1.
+- **La validazione locale replica i vincoli degli XSD**, che prima erano verificati solo in fase di export (o non verificati affatto): liste chiuse (unità, valuta, capacità di negoziazione, tipo contratto, commodity), lunghezze e formati degli identificativi per schema (ace, lei, bic, eic, gln, mic, bil), pattern di Contract ID e UTI, EIC del punto di consegna, decimali e cifre di quantità e prezzo, quantità non negative.
+- **La controparte non può coincidere con il soggetto che segnala** (Table 1 campi 1/2 e 4/5, Table 2 analoghi).
+- **L'operatore vede quali campi sono sbagliati**, non più solo quanti: il registro elenca i messaggi per campo con i valori ammessi, e il dettaglio degli errori dell'API non viene più scartato dall'interfaccia.
+
+### Nota tecnica
+I vincoli non sono ricopiati a mano: vengono **derivati dagli XSD stessi** a ogni avvio. Le liste differiscono tra i due tracciati (per esempio `CO` è un tipo contratto valido su Table 1 ma non su Table 2, e Contract ID ammette 50 caratteri su Table 1 e 100 su Table 2), quindi aggiornando gli schemi la validazione locale resta allineata da sola. Otto nuovi test di regressione lo verificano.
+
 ## [1.3.0] — 2026-08-02
 
 ### Aggiunto
@@ -114,6 +128,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.3.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.3.1
 [1.3.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.3.0
 [1.2.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.1
 [1.1.3]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.3

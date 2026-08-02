@@ -26,6 +26,12 @@
 
   const PROPS = { tema: "chiaro", colorePrimario: "#0E5A75", coloreAccento: "#4C93C9" };
 
+  // Elenca i campi respinti dal server: senza, resta solo un messaggio generico.
+  const _dettagli = (error) =>
+    error && Array.isArray(error.dettagli) && error.dettagli.length
+      ? ` — ${error.dettagli.map((d) => d.message || d.field).join(" · ")}`
+      : "";
+
   const store = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null, setItem: () => {} };
 
   // Chiavi di stato persistite sul backend (il resto è scenografia demo).
@@ -251,7 +257,13 @@
       const response = await fetch(url, options);
       let body = {};
       try { body = await response.json(); } catch (_) { /* risposta senza JSON */ }
-      if (!response.ok) throw new Error(body && body.errore ? body.errore : `richiesta HTTP ${response.status}`);
+      if (!response.ok) {
+        const errore = new Error(body && body.errore ? body.errore : `richiesta HTTP ${response.status}`);
+        // conserva il dettaglio per campo: senza, l'operatore vedrebbe solo un
+        // messaggio generico e non saprebbe cosa correggere
+        errore.dettagli = Array.isArray(body && body.errors) ? body.errors : [];
+        throw errore;
+      }
       return body;
     }
 
@@ -653,7 +665,11 @@
           stato: remStatoLabel[r.status] || "Da verificare",
           bg: colore.bg,
           fg: colore.fg,
-          errLabel: errori.length ? `${errori.length} campo/i da correggere` : "Controlli locali superati",
+          errLabel: errori.length
+            ? errori
+                .map((e) => (e && e.message ? e.message : String(e)))
+                .join(" · ")
+            : "Controlli locali superati",
           errFg: errori.length ? NEG.fg : "var(--ink3)",
           canValidate: r.status === "bozza",
           canExport: r.status === "validata_localmente",
@@ -724,7 +740,7 @@
           sostituisciReport(updated);
           this.setState({ remInfo: updated.is_complete ? "Controlli di completezza completati: puoi generare l'XML ACER validato XSD." : "La bozza resta da correggere: consulta i campi segnalati." });
         } catch (error) {
-          this.setState({ remErrore: `Validazione non completata: ${error.message}` });
+          this.setState({ remErrore: `Validazione non completata: ${error.message}${_dettagli(error)}` });
         }
       };
       const scaricaArtifact = async (artifact) => {

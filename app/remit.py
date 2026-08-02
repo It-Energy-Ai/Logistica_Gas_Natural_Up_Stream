@@ -38,6 +38,9 @@ STATUSES = {
 }
 
 MAX_TEXT = 160
+# tetto di conservazione: non deve MAI tagliare un identificativo regolatorio,
+# altrimenti il file dichiarerebbe un contratto o una transazione diversi
+MAX_IDENT = 400
 MAX_ACER_CODE = 12
 
 
@@ -157,7 +160,9 @@ def normalizza_draft(payload: dict[str, Any], *, precedente: dict[str, Any] | No
         "trading_capacity": _testo(
             payload.get("trading_capacity", precedente.get("trading_capacity")), max_len=4
         ),
-        "contract_id": _testo(payload.get("contract_id", precedente.get("contract_id")), max_len=50),
+        # conservato intero: il limite dipende dal tracciato (50 su Table 1, 100 su
+        # Table 2) e un troncamento silenzioso falsificherebbe l'identificativo
+        "contract_id": _testo(payload.get("contract_id", precedente.get("contract_id")), max_len=MAX_IDENT),
         "contract_date": _testo(payload.get("contract_date", precedente.get("contract_date")), max_len=10),
         "contract_type": _testo(payload.get("contract_type", precedente.get("contract_type")), max_len=20),
         "energy_commodity": _testo(
@@ -177,7 +182,7 @@ def normalizza_draft(payload: dict[str, Any], *, precedente: dict[str, Any] | No
         ).lower(),
         "marketplace_id": _testo(payload.get("marketplace_id", precedente.get("marketplace_id")), max_len=32),
         "transaction_at": _testo(payload.get("transaction_at", precedente.get("transaction_at")), max_len=40),
-        "transaction_id": _testo(payload.get("transaction_id", precedente.get("transaction_id")), max_len=100),
+        "transaction_id": _testo(payload.get("transaction_id", precedente.get("transaction_id")), max_len=MAX_IDENT),
     }
 
 

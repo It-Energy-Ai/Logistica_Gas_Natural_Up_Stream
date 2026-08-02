@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from xml.etree import ElementTree
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from functools import lru_cache
@@ -79,6 +80,9 @@ PDR_DECLARED_BUT_NOT_IMPLEMENTED = {
 IDENTIFIER_SCHEMES = {"ace", "lei", "bic", "eic", "gln"}
 MARKETPLACE_SCHEMES = {"ace", "lei", "mic", "bil"}
 ACE_RE = re.compile(r"^[A-Za-z0-9_]+\.[A-Z]{2}$")
+# Gli XSD usano nomi di tipo diversi per gli stessi concetti nei due tracciati.
+NUMERO = {"gas_standard": "number", "gas_nonstandard": "numberType"}
+UNITA = {"gas_standard": "notionalQuantityUnitType", "gas_nonstandard": "quantityUnitType"}
 
 
 class AcerXmlError(ValueError):
@@ -124,6 +128,86 @@ def catalogo_schemi() -> list[dict[str, Any]]:
 
 def schema_per_tipo(kind: str) -> dict[str, str] | None:
     return SCHEMAS.get(kind)
+
+
+@lru_cache(maxsize=None)
+def _facet(kind: str, tipo: str) -> dict[str, Any]:
+    """Legge i vincoli di un simpleType direttamente dall'XSD del tracciato.
+
+    Le liste ammesse differiscono tra Table 1 e Table 2 (per esempio
+    contractType e le unità), quindi i vincoli si derivano dallo schema
+    invece di essere ricopiati a mano: se gli XSD vengono aggiornati, la
+    validazione locale resta allineata.
+    """
+
+    meta = SCHEMAS.get(kind)
+    if not meta:
+        return {}
+    ns = "{http://www.w3.org/2001/XMLSchema}"
+    radice = ElementTree.parse(SCHEMA_DIR / meta["filename"]).getroot()
+    for st in radice.iter(f"{ns}simpleType"):
+        if st.get("name") != tipo:
+            continue
+        res = st.find(f"{ns}restriction")
+        if res is None:
+            break
+        out: dict[str, Any] = {
+            "enum": [e.get("value") for e in res.findall(f"{ns}enumeration")],
+            "pattern": [pt.get("value") for pt in res.findall(f"{ns}pattern")],
+        }
+        for facet in ("minLength", "maxLength", "length", "totalDigits", "fractionDigits"):
+            el = res.find(f"{ns}{facet}")
+            if el is not None:
+                out[facet] = int(el.get("value"))
+        return out
+    return {}
+
+
+def _controlla(
+    errors: list[dict[str, str]],
+    kind: str,
+    campo: str,
+    valore: str,
+    tipo: str,
+    etichetta: str,
+) -> None:
+    """Verifica un valore contro i facet XSD del suo tipo, in italiano."""
+
+    if not valore:
+        return
+    f = _facet(kind, tipo)
+    if not f:
+        return
+    ammessi = f.get("enum") or []
+    if ammessi and valore not in ammessi:
+        elenco = ", ".join(ammessi[:14]) + ("…" if len(ammessi) > 14 else "")
+        _error(errors, campo, f"{etichetta}: valore non ammesso dal tracciato. Valori validi: {elenco}.")
+        return
+    lung = f.get("length")
+    minimo, massimo = f.get("minLength"), f.get("maxLength")
+    if lung is not None and len(valore) != lung:
+        _error(errors, campo, f"{etichetta}: servono esattamente {lung} caratteri (ne hai {len(valore)}).")
+        return
+    if minimo is not None and massimo is not None and minimo == massimo and len(valore) != minimo:
+        _error(errors, campo, f"{etichetta}: servono esattamente {minimo} caratteri (ne hai {len(valore)}).")
+        return
+    if massimo is not None and len(valore) > massimo:
+        _error(errors, campo, f"{etichetta}: massimo {massimo} caratteri (ne hai {len(valore)}).")
+        return
+    if minimo is not None and len(valore) < minimo:
+        _error(errors, campo, f"{etichetta}: minimo {minimo} caratteri (ne hai {len(valore)}).")
+        return
+    for pattern in f.get("pattern") or []:
+        if not re.fullmatch(pattern, valore):
+            _error(errors, campo, f"{etichetta}: formato non conforme al tracciato ACER.")
+            return
+    cifre, decimali = f.get("totalDigits"), f.get("fractionDigits")
+    if cifre is not None or decimali is not None:
+        intera, _, frazione = valore.lstrip("-").partition(".")
+        if decimali is not None and len(frazione) > decimali:
+            _error(errors, campo, f"{etichetta}: al massimo {decimali} decimali.")
+        elif cifre is not None and len(intera) + len(frazione) > cifre:
+            _error(errors, campo, f"{etichetta}: al massimo {cifre} cifre complessive.")
 
 
 def _error(errors: list[dict[str, str]], field: str, message: str) -> None:
@@ -193,11 +277,22 @@ def errori_dati(record: dict[str, Any]) -> list[dict[str, str]]:
     if not counterparty:
         # Evita un secondo errore XSD poco utile per l'identificativo vuoto.
         return errors
+    if counterparty_scheme in IDENTIFIER_SCHEMES:
+        _controlla(errors, kind, "counterparty", counterparty, counterparty_scheme, "Identificativo controparte")
+    if acer_code and counterparty_scheme == "ace" and counterparty.upper() == acer_code.upper():
+        # Table 1 campi 1/2 e 4/5, Table 2 campi 1/2 e 4/5: il dichiarante e la
+        # controparte devono essere soggetti distinti.
+        _error(errors, "counterparty", "La controparte non può coincidere con il soggetto che segnala.")
 
     quantity = _require(record, "quantity_mwh", errors, "Quantità")
-    _require(record, "quantity_unit", errors, "Unità quantità")
+    quantity_unit = _require(record, "quantity_unit", errors, "Unità quantità")
     if quantity and not re.fullmatch(r"-?\d+(?:\.\d+)?", quantity):
         _error(errors, "quantity_mwh", "La quantità deve essere un decimale normalizzato.")
+    elif quantity and quantity.startswith("-"):
+        _error(errors, "quantity_mwh", "La quantità non può essere negativa.")
+    else:
+        _controlla(errors, kind, "quantity_mwh", quantity, NUMERO[kind], "Quantità")
+    _controlla(errors, kind, "quantity_unit", quantity_unit, UNITA[kind], "Unità quantità")
 
     action = _require(record, "action", errors, "Azione")
     if action and action not in {"new", "modify", "cancel", "error"}:
@@ -205,16 +300,22 @@ def errori_dati(record: dict[str, Any]) -> list[dict[str, str]]:
     side = _require(record, "side", errors, "Lato")
     if side and side not in {"buy", "sell", "cross"}:
         _error(errors, "side", "Lato non supportato: usa buy, sell o cross.")
-    _require(record, "trading_capacity", errors, "Capacità di negoziazione")
+    trading_capacity = _require(record, "trading_capacity", errors, "Capacità di negoziazione")
+    _controlla(errors, kind, "trading_capacity", trading_capacity, "tradingCapacityType", "Capacità di negoziazione")
 
     price = _require(record, "price_eur_mwh", errors, "Prezzo")
-    _require(record, "price_currency", errors, "Valuta prezzo")
+    price_currency = _require(record, "price_currency", errors, "Valuta prezzo")
     if price and not re.fullmatch(r"-?\d+(?:\.\d+)?", price):
         _error(errors, "price_eur_mwh", "Il prezzo deve essere un decimale normalizzato.")
+    else:
+        _controlla(errors, kind, "price_eur_mwh", price, NUMERO[kind], "Prezzo")
+    _controlla(errors, kind, "price_currency", price_currency, "currencyCodeType", "Valuta prezzo")
 
     if kind == "gas_standard":
-        _require(record, "contract_id", errors, "Contract ID")
+        contract_id = _require(record, "contract_id", errors, "Contract ID")
+        _controlla(errors, kind, "contract_id", contract_id, "contractIdType", "Contract ID")
         transaction_id = _require(record, "transaction_id", errors, "UTI/identificativo transazione")
+        _controlla(errors, kind, "transaction_id", transaction_id, "uniqueTransactionIdentifierType", "UTI")
         transaction_at = _require(record, "transaction_at", errors, "Data-ora transazione")
         if transaction_at and not _is_iso_datetime(transaction_at):
             _error(errors, "transaction_at", "Usa ISO 8601 con fuso, ad esempio 2026-08-01T10:15:00Z.")
@@ -224,16 +325,23 @@ def errori_dati(record: dict[str, Any]) -> list[dict[str, str]]:
         market_scheme = _require(record, "marketplace_scheme", errors, "Tipo identificativo mercato").lower()
         if market_scheme and market_scheme not in MARKETPLACE_SCHEMES:
             _error(errors, "marketplace_scheme", "Usa ace, lei, mic o bil per il mercato organizzato.")
-        if transaction_id and len(transaction_id) > 100:
-            _error(errors, "transaction_id", "L'identificativo transazione supera 100 caratteri.")
+        market_id = str(record.get("marketplace_id") or "").strip()
+        if market_scheme in MARKETPLACE_SCHEMES:
+            _controlla(errors, kind, "marketplace_id", market_id, market_scheme, "Identificativo mercato")
     elif kind == "gas_nonstandard":
-        _require(record, "contract_id", errors, "Contract ID")
+        contract_id = _require(record, "contract_id", errors, "Contract ID")
+        _controlla(errors, kind, "contract_id", contract_id, "contractIdType", "Contract ID")
         contract_date = _require(record, "contract_date", errors, "Data contratto")
         delivery_start = _require(record, "delivery_start_date", errors, "Inizio consegna")
         delivery_end = _require(record, "delivery_end_date", errors, "Fine consegna")
-        _require(record, "contract_type", errors, "Tipo contratto")
-        _require(record, "energy_commodity", errors, "Commodity")
+        contract_type = _require(record, "contract_type", errors, "Tipo contratto")
+        _controlla(errors, kind, "contract_type", contract_type, "contractTypeType", "Tipo contratto")
+        commodity = _require(record, "energy_commodity", errors, "Commodity")
+        _controlla(errors, kind, "energy_commodity", commodity, "energyCommodityType", "Commodity")
+        settlement = _require(record, "settlement_method", errors, "Metodo di regolamento")
+        _controlla(errors, kind, "settlement_method", settlement, "settlementMethodType", "Metodo di regolamento")
         delivery_point = _require(record, "delivery_point", errors, "EIC punto/zona di consegna")
+        _controlla(errors, kind, "delivery_point", delivery_point, "eic", "EIC punto/zona di consegna")
         for field, value in (
             ("contract_date", contract_date),
             ("delivery_start_date", delivery_start),
@@ -246,8 +354,6 @@ def errori_dati(record: dict[str, Any]) -> list[dict[str, str]]:
         if delivery_start and delivery_end and _is_iso_date(delivery_start) and _is_iso_date(delivery_end):
             if delivery_end < delivery_start:
                 _error(errors, "delivery_end_date", "La fine consegna non può precedere l'inizio.")
-        if delivery_point and len(delivery_point) != 16:
-            _error(errors, "delivery_point", "Il punto/zona Table 2 deve essere un EIC di 16 caratteri.")
     return errors
 
 
@@ -351,7 +457,7 @@ def _build_table_2(record: dict[str, Any], meta: dict[str, str]):
     total = _append(trade, meta, "totalNotionalContractQuantity")
     _append(total, meta, "value", str(record["quantity_mwh"]))
     _append(total, meta, "unit", str(record["quantity_unit"]))
-    _append(trade, meta, "settlementMethod", str(record.get("settlement_method") or "P"))
+    _append(trade, meta, "settlementMethod", str(record["settlement_method"]))
     _append(trade, meta, "deliveryPointOrZone", str(record["delivery_point"]))
     _append(trade, meta, "deliveryStartDate", str(record["delivery_start_date"]))
     _append(trade, meta, "deliveryEndDate", str(record["delivery_end_date"]))
