@@ -262,7 +262,8 @@ def test_remit_blocca_export_incompleto_conflitti_e_ambito_non_supportato(client
     assert conflict.status_code == 409
 
     transport = client.post("/api/remit/reports", json=_remit_valida("gas_transport")).json()
-    assert any("GasCapacity" in error["message"] for error in transport["validation_errors"])
+    # il blocco non è un rinvio tecnico: quegli schemi non ammettono lo shipper come emittente
+    assert any("ZSO" in error["message"] for error in transport["validation_errors"])
 
     future_transaction = client.post(
         "/api/remit/reports", json=_remit_valida(transaction_at="2099-01-01T00:00:00Z")
@@ -806,3 +807,322 @@ def test_i_vincoli_sono_derivati_dagli_xsd_non_ricopiati():
     assert t1["maxLength"] == 50 and t2["maxLength"] == 100
     assert "CO" in acer_xml._facet("gas_standard", "contractTypeType")["enum"]
     assert "CO" not in acer_xml._facet("gas_nonstandard", "contractTypeType")["enum"]
+
+
+# ------------------------------------------------------------------ EDIG@S
+
+
+def _nomina_valida(**extra):
+    return {
+        "identificativo": "NOMINT-20260803-001",
+        "versione": 1,
+        "tipo_documento": "01G",
+        "tipo_nomina": "A02",
+        "emittente_eic": "21X000000001234A",
+        "emittente_ruolo": "ZSH",
+        "destinatario_eic": "21X00000000567KB",
+        "destinatario_ruolo": "ZSO",
+        "giorno_gas": "2026-08-03",
+        "conto_interno": "SHIPPER-01",
+        "punto_eic": "21Z0000000001234",
+        "unita": "KW1",
+        "controparti": [{"conto": "CTP-ALFA", "direzione": "Z02", "quantita_giornaliera": "12500"}],
+        **extra,
+    }
+
+
+def test_edigas_richiede_la_sessione(client):
+    for metodo, url in [
+        ("get", "/api/edigas/catalogo"),
+        ("get", "/api/edigas/nomine"),
+        ("post", "/api/edigas/nomine"),
+        ("post", "/api/edigas/risposte"),
+    ]:
+        assert getattr(client, metodo)(url).status_code == 401, url
+
+
+def test_edigas_catalogo_espone_i_codici_dello_schema(client):
+    client.post("/api/login", json={})
+    catalogo = client.get("/api/edigas/catalogo").json()
+    assert catalogo["versione"] == "6.1"
+    assert {t["codice"] for t in catalogo["tipi_documento"]} == {"01G", "02G", "03G", "04G"}
+    assert set(catalogo["direzioni"]) == {"Z02", "Z03"}
+    assert catalogo["unita"]["A15"] == "kg/h"
+    assert [s["radice"] for s in catalogo["schemi"]] == [
+        "Nomination_Document",
+        "NominationResponse_Document",
+    ]
+
+
+def test_edigas_ciclo_nomina_download_e_risposta(client):
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida())
+    assert creata.status_code == 201
+    corpo = creata.json()
+    assert corpo["valido_xsd"] is True and corpo["periodi"] == 1
+    assert len(corpo["sha256"]) == 64
+    assert "xml" not in corpo
+
+    elenco = client.get("/api/edigas/nomine").json()["nomine"]
+    assert [n["id"] for n in elenco] == [corpo["id"]]
+
+    scaricata = client.get(f"/api/edigas/nomine/{corpo['id']}/download")
+    assert scaricata.status_code == 200
+    assert scaricata.headers["content-type"].startswith("application/xml")
+    assert "NOMINT" in scaricata.headers["content-disposition"]
+    assert scaricata.text.startswith("<?xml")
+
+    # la risposta del trasportatore cita la nomina: l'abbinamento è automatico
+    risposta = _risposta_per(scaricata.text, quantita="9000")
+    letta = client.post("/api/edigas/risposte", content=risposta).json()
+    assert letta["nomina_trovata"] is True
+    assert letta["nomina_id"] == corpo["id"]
+    assert [s["esito"] for s in letta["scostamenti"]] == ["ridotto"]
+
+
+def _risposta_per(nomina_xml: str, *, quantita: str, business_code: str = "16G") -> bytes:
+    """Costruisce il NOMRES che un trasportatore invierebbe per quella nomina."""
+
+    from lxml import etree
+
+    from app import edigas
+
+    ns_n = edigas.SCHEMI["nomina"]["namespace"]
+    ns_r = edigas.SCHEMI["risposta"]["namespace"]
+    origine = etree.fromstring(nomina_xml.encode("utf-8"))
+
+    def valore(nome, radice=origine):
+        el = radice.find(f"{{{ns_n}}}{nome}")
+        return (el.text or "").strip() if el is not None else ""
+
+    periodo = origine.find(f".//{{{ns_n}}}Period")
+    intervallo = periodo.find(f"{{{ns_n}}}timeInterval").text
+    conto_esterno = origine.find(f".//{{{ns_n}}}externalAccount").text
+
+    radice = etree.Element(f"{{{ns_r}}}NominationResponse_Document", nsmap={None: ns_r})
+    radice.set("schemaVersion", "1")
+
+    def figlio(padre, nome, testo, **attrs):
+        el = etree.SubElement(padre, f"{{{ns_r}}}{nome}")
+        el.text = testo
+        for k, v in attrs.items():
+            el.set(k, v)
+        return el
+
+    figlio(radice, "identification", "NOMRES-TEST")
+    figlio(radice, "version", "1")
+    figlio(radice, "documentCode", "08G")
+    figlio(radice, "creationDateTime", "2026-08-02T12:00:00Z")
+    figlio(radice, "validityPeriod", valore("validityPeriod"))
+    figlio(radice, "issuer_MarketParticipant.identification", valore("recipient_MarketParticipant.identification"), codingScheme="305")
+    figlio(radice, "issuer_MarketParticipant.marketRole.roleCode", "ZSO")
+    figlio(radice, "recipient_MarketParticipant.identification", valore("issuer_MarketParticipant.identification"), codingScheme="305")
+    figlio(radice, "recipient_MarketParticipant.marketRole.roleCode", "ZSH")
+    figlio(radice, "nomination_Document.identification", valore("identification"))
+    figlio(radice, "nomination_Document.version", valore("version"))
+    figlio(radice, "nomination_Document.documentCode", valore("documentCode"))
+    interno = etree.SubElement(radice, f"{{{ns_r}}}Internal_Account")
+    figlio(interno, "internalAccount", origine.find(f".//{{{ns_n}}}internalAccount").text, codingScheme="ZSO")
+    punto = etree.SubElement(interno, f"{{{ns_r}}}ConnectionPoint")
+    figlio(punto, "identification", origine.find(f".//{{{ns_n}}}ConnectionPoint/{{{ns_n}}}identification").text, codingScheme="305")
+    figlio(punto, "measureUnit.unitOfMeasureCode", "KW1")
+    esterno = etree.SubElement(punto, f"{{{ns_r}}}External_Account")
+    figlio(esterno, "externalAccount", conto_esterno, codingScheme="ZSO")
+    serie = etree.SubElement(esterno, f"{{{ns_r}}}InformationOrigin_TimeSeries")
+    figlio(serie, "businessCode", business_code)
+    periodo_r = etree.SubElement(serie, f"{{{ns_r}}}Period")
+    figlio(periodo_r, "timeInterval", intervallo)
+    figlio(periodo_r, "direction.gasDirectionCode", "Z02")
+    figlio(periodo_r, "quantity.amount", quantita)
+    return etree.tostring(radice, xml_declaration=True, encoding="UTF-8")
+
+
+def test_edigas_solo_la_serie_confermata_entra_nel_confronto(client):
+    """14G/15G/18G descrivono l'elaborazione, non la conferma allo shipper.
+
+    Confrontarle produrrebbe scostamenti inesistenti su ogni risposta reale.
+    """
+
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+
+    # la serie di lavorazione del trasportatore non è una conferma
+    solo_14g = client.post("/api/edigas/risposte", content=_risposta_per(xml, quantita="9000", business_code="14G")).json()
+    assert [s["esito"] for s in solo_14g["scostamenti"]] == ["senza risposta"]
+
+    # la conferma per l'intero importo non produce scostamenti
+    piena = client.post("/api/edigas/risposte", content=_risposta_per(xml, quantita="12500")).json()
+    assert piena["scostamenti"] == []
+
+
+def test_edigas_confronta_anche_le_nomine_al_cliente_finale(client):
+    """Con 04G i periodi pendono dal punto: il confronto deve vederli lo stesso."""
+
+    client.post("/api/login", json={})
+    payload = _nomina_valida()
+    del payload["controparti"], payload["tipo_nomina"]
+    payload.update(tipo_documento="04G", direzione="Z03", quantita_giornaliera="12500")
+    creata = client.post("/api/edigas/nomine", json=payload)
+    assert creata.status_code == 201, creata.json()
+    xml = client.get(f"/api/edigas/nomine/{creata.json()['id']}/download").text
+
+    letta = client.post("/api/edigas/risposte", content=_risposta_04g(xml, quantita="8000")).json()
+    assert letta["nomina_trovata"] is True
+    assert [s["esito"] for s in letta["scostamenti"]] == ["ridotto"]
+    assert letta["scostamenti"][0]["nominato"] == "12500"
+
+
+def _risposta_04g(nomina_xml: str, *, quantita: str) -> bytes:
+    """NOMRES non-matching: le serie pendono dal punto, senza controparte."""
+
+    from lxml import etree
+
+    from app import edigas
+
+    ns_n = edigas.SCHEMI["nomina"]["namespace"]
+    ns_r = edigas.SCHEMI["risposta"]["namespace"]
+    origine = etree.fromstring(nomina_xml.encode("utf-8"))
+
+    def valore(nome):
+        el = origine.find(f"{{{ns_n}}}{nome}")
+        return (el.text or "").strip() if el is not None else ""
+
+    radice = etree.Element(f"{{{ns_r}}}NominationResponse_Document", nsmap={None: ns_r})
+    radice.set("schemaVersion", "1")
+
+    def figlio(padre, nome, testo, **attrs):
+        el = etree.SubElement(padre, f"{{{ns_r}}}{nome}")
+        el.text = testo
+        for k, v in attrs.items():
+            el.set(k, v)
+        return el
+
+    figlio(radice, "identification", "NOMRES-04G-TEST")
+    figlio(radice, "version", "1")
+    figlio(radice, "documentCode", "08G")
+    figlio(radice, "creationDateTime", "2026-08-02T12:00:00Z")
+    figlio(radice, "validityPeriod", valore("validityPeriod"))
+    figlio(radice, "issuer_MarketParticipant.identification", valore("recipient_MarketParticipant.identification"), codingScheme="305")
+    figlio(radice, "issuer_MarketParticipant.marketRole.roleCode", "ZSO")
+    figlio(radice, "recipient_MarketParticipant.identification", valore("issuer_MarketParticipant.identification"), codingScheme="305")
+    figlio(radice, "recipient_MarketParticipant.marketRole.roleCode", "ZSH")
+    figlio(radice, "nomination_Document.identification", valore("identification"))
+    figlio(radice, "nomination_Document.version", valore("version"))
+    figlio(radice, "nomination_Document.documentCode", valore("documentCode"))
+    interno = etree.SubElement(radice, f"{{{ns_r}}}Internal_Account")
+    figlio(interno, "internalAccount", origine.find(f".//{{{ns_n}}}internalAccount").text, codingScheme="ZSO")
+    punto = etree.SubElement(interno, f"{{{ns_r}}}ConnectionPoint")
+    figlio(punto, "identification", origine.find(f".//{{{ns_n}}}ConnectionPoint/{{{ns_n}}}identification").text, codingScheme="305")
+    figlio(punto, "measureUnit.unitOfMeasureCode", "KW1")
+    serie = etree.SubElement(punto, f"{{{ns_r}}}InformationOrigin_TimeSeries")
+    figlio(serie, "businessCode", "16G")
+    periodo = origine.find(f".//{{{ns_n}}}Period")
+    pr = etree.SubElement(serie, f"{{{ns_r}}}Period")
+    figlio(pr, "timeInterval", periodo.find(f"{{{ns_n}}}timeInterval").text)
+    figlio(pr, "direction.gasDirectionCode", "Z03")
+    figlio(pr, "quantity.amount", quantita)
+    return etree.tostring(radice, xml_declaration=True, encoding="UTF-8")
+
+
+def test_edigas_nomina_non_conforme_elenca_i_campi(client):
+    client.post("/api/login", json={})
+    r = client.post("/api/edigas/nomine", json=_nomina_valida(emittente_ruolo="ZUM"))
+    assert r.status_code == 422
+    assert any(e["field"] == "emittente_ruolo" for e in r.json()["errors"])
+
+
+def test_edigas_risposte_rifiuta_file_non_pertinenti(client):
+    client.post("/api/login", json={})
+    assert client.post("/api/edigas/risposte", content=b"").status_code == 400
+    assert client.post("/api/edigas/risposte", content=b"<rotto>").status_code == 422
+
+
+def test_edigas_le_nomine_sono_isolate_per_account(client, tmp_path):
+    client.post("/api/login", json={"email": "primo@azienda.it"})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    from app.main import app
+
+    with TestClient(app) as altro:
+        altro.post("/api/login", json={"email": "secondo@azienda.it"})
+        assert altro.get("/api/edigas/nomine").json()["nomine"] == []
+        assert altro.get(f"/api/edigas/nomine/{creata['id']}").status_code == 404
+        assert altro.get(f"/api/edigas/nomine/{creata['id']}/download").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "descrizione,modifiche",
+    [
+        ("versione con cifra unicode", {"versione": "²"}),
+        ("versione oltre il limite di int()", {"versione": "1" * 4301}),
+        ("carattere di controllo", {"conto_interno": "SHIP\x0bPER"}),
+        ("byte nullo", {"identificativo": "N\x001"}),
+        ("anno fuori scala", {"giorno_gas": "9999-12-31"}),
+        ("istante di creazione impossibile", {"creato_il": "0001-01-01T00:00"}),
+        ("dict al posto di una stringa", {"identificativo": {"a": 1}}),
+        ("lista al posto di un conto", {"controparti": [{"conto": ["A"], "direzione": "Z02", "quantita_giornaliera": "1"}]}),
+        ("quantità in notazione esponenziale", {"controparti": [{"conto": "C", "direzione": "Z02", "quantita_giornaliera": "1e5"}]}),
+        ("quantità non finita", {"controparti": [{"conto": "C", "direzione": "Z02", "quantita_giornaliera": "nan"}]}),
+    ],
+)
+def test_edigas_nessun_input_produce_un_errore_interno(client, descrizione, modifiche):
+    """Ogni input malformato deve tornare come 422 spiegato, mai come 500."""
+
+    client.post("/api/login", json={})
+    r = client.post("/api/edigas/nomine", json={**_nomina_valida(), **modifiche})
+    assert r.status_code == 422, f"{descrizione}: atteso 422, ricevuto {r.status_code}"
+    assert r.json()["errore"] or r.json()["errors"]
+
+
+def test_edigas_risposta_con_versione_non_numerica_non_rompe(client):
+    """La versione citata la scrive il trasportatore: un refuso non è un 500."""
+
+    client.post("/api/login", json={})
+    ns = "urn:easee-gas.eu:edigas:BrpNominationAndMatching:NominationResponseDocument:6:1"
+    xml = (
+        f'<?xml version="1.0"?><NominationResponse_Document xmlns="{ns}">'
+        "<identification>X</identification>"
+        "<nomination_Document.version>1.0</nomination_Document.version>"
+        "</NominationResponse_Document>"
+    ).encode()
+    r = client.post("/api/edigas/risposte", content=xml)
+    assert r.status_code == 200
+    assert r.json()["nomina_trovata"] is False
+    assert r.json()["valido_xsd"] is False
+
+
+def test_edigas_corpo_troppo_grande_respinto_prima_di_leggerlo(client):
+    client.post("/api/login", json={})
+    r = client.post(
+        "/api/edigas/nomine",
+        content=b"{}",
+        headers={"Content-Length": "999999999", "Content-Type": "application/json"},
+    )
+    assert r.status_code == 413
+
+
+def test_edigas_controparte_ripetuta_respinta(client):
+    """Due voci con lo stesso conto genererebbero periodi doppi sullo stesso intervallo."""
+
+    client.post("/api/login", json={})
+    payload = _nomina_valida(
+        controparti=[
+            {"conto": "CTP", "direzione": "Z02", "quantita_giornaliera": "100"},
+            {"conto": "CTP", "direzione": "Z02", "quantita_giornaliera": "900"},
+        ]
+    )
+    r = client.post("/api/edigas/nomine", json=payload)
+    assert r.status_code == 422
+    assert any("compare più volte" in e["message"] for e in r.json()["errors"])
+
+
+def test_edigas_i_metadati_salvati_sono_quelli_normalizzati(client):
+    """Il record deve descrivere il file prodotto, non il payload ricevuto."""
+
+    client.post("/api/login", json={})
+    creata = client.post(
+        "/api/edigas/nomine",
+        json=_nomina_valida(giorno_gas="2026-08-03", punto_eic=" 21Z0000000001234 "),
+    ).json()
+    assert creata["giorno_gas"] == "2026-08-03"
+    assert creata["punto"] == "21Z0000000001234"

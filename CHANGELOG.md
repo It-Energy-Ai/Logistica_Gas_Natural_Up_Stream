@@ -2,6 +2,32 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.5.0] — 2026-08-02
+
+### Aggiunto
+- **Protocollo EDIG@S 6.1 per le nomine di trasporto gas.** La schermata Nomine produce il `Nomination_Document` (NOMINT) validato contro gli schemi ufficiali EASEE-gas inclusi nel repository, e legge il `NominationResponse_Document` (NOMRES) del trasportatore.
+  - Coperti i quattro tipi di nomina: `01G` punto di connessione, `02G` PSV OTC, `03G` PSV borsa, `04G` cliente finale. Ruoli delle parti, presenza del tipo di nomina e struttura dell'XML seguono la decision table del MIG "BRP Nomination and Matching" v6r0: una combinazione fuori tabella viene respinta prima di produrre il file.
+  - Quantità indicabili come valore costante sul giorno, profilo orario o periodi espliciti.
+  - La risposta del trasportatore viene **abbinata da sola** alla nomina che cita e confrontata riga per riga: quantità ridotte, aumentate, periodi confermati senza nomina o rimasti senza risposta.
+  - Nuovi endpoint `GET /api/edigas/catalogo`, `GET|POST /api/edigas/nomine`, `GET /api/edigas/nomine/{id}[/download]`, `POST /api/edigas/risposte`. Le nomine sono isolate per account.
+- **Giorno gas calcolato sul fuso reale.** Il giorno gas va dalle 06:00 alle 06:00 locali: su `Europe/Rome` diventa 05:00Z d'inverno e 04:00Z d'estate, e i giorni di cambio ora durano 23 e 25 ore. Il cambio avviene alle 02:00 locali, quindi dentro il giorno gas iniziato il pomeriggio prima: sono il 28/03 e il 24/10 a essere anomali, non il 29/03 e il 25/10. Un profilo orario che non rispetta la durata reale viene rifiutato con il conteggio corretto.
+- Oltre 100 nuovi test, fra cui la **riproduzione strutturale dei quattro esempi NOMINT ufficiali** del pacchetto EASEE-gas, la lettura dei quattro NOMRES e una batteria che verifica che nessun input malformato produca un errore interno.
+
+### Modificato
+- I codici ammessi dal tracciato (tipo documento, ruoli, direzioni, unità, tipo nomina) sono **letti dagli XSD a runtime**, risolvendo la catena `union` fra lista standard e lista locale, invece di essere ricopiati nel codice.
+- Il tracciato "trasporto gas" del modulo REMIT resta bloccato, ma ora con la ragione tecnica esatta: gli XSD EDIG@S di monitoraggio capacità e nomina (CANMON, NOMASS) ammettono come emittente solo `ZSO` o `ZUA`, quindi un documento emesso da uno shipper sarebbe invalido già a livello di schema. L'obbligo ricade sul trasportatore.
+
+### Corretto
+- La versione `0` di una nomina non viene più corretta in silenzio a `1`: era un valore falsy che il default assorbiva senza segnalarlo.
+- **Il confronto con la risposta del trasportatore considera solo la serie `16G`**, quella confermata. Prima pesava insieme anche `14G`, `15G` e `18G`: le ultime due portano per specifica la direzione speculare, quindi ogni risposta reale produceva scostamenti inesistenti.
+- **Il confronto vede anche le nomine al cliente finale** (`04G`), dove i periodi pendono dal punto di connessione invece che da una controparte: prima una riduzione del trasportatore non veniva rilevata affatto.
+- Un file NOMRES non conforme allo schema non viene più raccontato come "confermato per intero": l'esito della validazione XSD è mostrato all'operatore.
+- Nessun input produce più un errore interno: cifre unicode nella versione, caratteri di controllo, byte nulli, anni fuori scala, dict o liste al posto di stringhe, quantità in notazione esponenziale e corpi di richiesta smisurati tornano tutti come errore sul campo. La versione citata dentro un NOMRES è testo scritto dal trasportatore e un refuso come `1.0` non fa più cadere la richiesta.
+- La stessa controparte ripetuta due volte veniva scritta come due blocchi sullo stesso intervallo, falsando nomina e confronto.
+- I secondi vengono troncati prima dei controlli, non dopo: un periodo di 40 secondi non diventa più un intervallo a durata zero dentro un file formalmente valido.
+- I metadati salvati descrivono il documento prodotto e non il payload ricevuto, così l'elenco per giorno gas non perde le nomine con spazi o formati alternativi nella data.
+- L'impronta dello schema restituita al client viene verificata a runtime, come già avveniva per gli schemi ACER.
+
 ## [1.4.0] — 2026-08-02
 
 ### Aggiunto

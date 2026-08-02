@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="urn:easee-gas.eu:edigas:BrpNominationAndMatching:NominationResponseDocument:6:1" xmlns:sawsdl="http://www.w3.org/ns/sawsdl" xmlns:cimp="http://www.iec.ch/cimprofile" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="urn:easee-gas.eu:edigas:BrpNominationAndMatching:NominationResponseDocument:6:1" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:include schemaLocation="urn-easee-gas-eu-edigas-BrpNominationAndMatching-NominationResponseDocument-6-1-restricted-codes.xsd" />
+  <xs:element name="NominationResponse_Document" type="NominationResponse_Document" />
+  <xs:simpleType name="IdentificationType" sawsdl:modelReference="http://easse-gas/edigas#IdentificationType">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="35" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="Version_Integer" sawsdl:modelReference="http://easse-gas/edigas#Version_Integer">
+    <xs:restriction base="xs:integer">
+      <xs:maxInclusive value="999" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DocumentCodeType" sawsdl:modelReference="http://easse-gas/edigas#DocumentCodeType">
+    <xs:restriction base="DocumentCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:simpleType name="TimeIntervalType" sawsdl:modelReference="http://easse-gas/edigas#TimeIntervalType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(((((20[0-9]{2})[\-](0[13578]|1[02])[\-](0[1-9]|[12][0-9]|3[01])|([0-9]{4})[\-]((0[469])|(11))[\-](0[1-9]|[12][0-9]|30))T(([01][0-9]|2[0-3]):[0-5][0-9])Z/)|(([13579][26][02468][048]|[13579][01345789](0)[48]|[13579][01345789][2468][048]|[02468][048][02468][048]|[02468][1235679](0)[48]|[02468][1235679][2468][048]|[0-9][0-9][13579][26])[\-](02)[\-](0[1-9]|1[0-9]|2[0-9])T(([01][0-9]|2[0-3]):[0-5][0-9])Z/)|(([13579][26][02468][1235679]|[13579][01345789](0)[01235679]|[13579][01345789][2468][1235679]|[02468][048][02468][1235679]|[02468][1235679](0)[01235679]|[02468][1235679][2468][1235679]|[0-9][0-9][13579][01345789])[\-](02)[\-](0[1-9]|1[0-9]|2[0-8])T(([01][0-9]|2[0-3]):[0-5][0-9])Z/))(((([0-9]{4})-(0[13578]|1[02])[\-](0[1-9]|[12][0-9]|3[01])|([0-9]{4})[\-]((0[469])|(11))[\-](0[1-9]|[12][0-9]|30))T(([01][0-9]|2[0-3]):[0-5][0-9])Z)|(([13579][26][02468][048]|[13579][01345789](0)[48]|[13579][01345789][2468][048]|[02468][048][02468][048]|[02468][1235679](0)[48]|[02468][1235679][2468][048]|[0-9][0-9][13579][26])[\-](02)[\-](0[1-9]|1[0-9]|2[0-9])T(([01][0-9]|2[0-3]):[0-5][0-9])Z)|(([13579][26][02468][1235679]|[13579][01345789](0)[01235679]|[13579][01345789][2468][1235679]|[02468][048][02468][1235679]|[02468][1235679](0)[01235679]|[02468][1235679][2468][1235679]|[0-9][0-9][13579][01345789])[\-](02)[\-](0[1-9]|1[0-9]|2[0-8])T(([01][0-9]|2[0-3]):[0-5][0-9])Z)))" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="LocationType-base" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="16" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="LocationType" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:simpleContent>
+      <xs:extension base="LocationType-base">
+        <xs:attribute name="codingScheme" type="CodingSchemeCodeTypeCodeList" use="required" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="PartyType-base" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="16" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="PartyType" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:simpleContent>
+      <xs:extension base="PartyType-base">
+        <xs:attribute name="codingScheme" type="CodingSchemeCodeTypeCodeList" use="required" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="RoleCodeType" sawsdl:modelReference="http://easse-gas/edigas#RoleCodeType">
+    <xs:restriction base="RoleCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:complexType name="ConnectionPoint" sawsdl:modelReference="http://easse-gas/edigas#ConnectionPoint">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="identification" type="MeasurementPointType" sawsdl:modelReference="http://easse-gas/edigas#ConnectionPoint.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="measureUnit.unitOfMeasureCode" type="UnitOfMeasureCodeType" sawsdl:modelReference="http://easse-gas/edigas#MeasureUnit.unitOfMeasureCode">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="NominationType" type="NominationType" sawsdl:modelReference="http://easse-gas/edigas#ConnectionPoint.NominationType">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="External_Account" type="External_Account" sawsdl:modelReference="http://easse-gas/edigas#ConnectionPoint.External_Account">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="InformationOrigin_TimeSeries" type="InformationOrigin_TimeSeries" sawsdl:modelReference="http://easse-gas/edigas#ConnectionPoint.InformationOrigin_TimeSeries">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="AccountType-base" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="35" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="AccountType" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:simpleContent>
+      <xs:extension base="AccountType-base">
+        <xs:attribute name="codingScheme" type="CodingSchemeCodeTypeCodeList" use="required" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="Decomposition_Quantity" sawsdl:modelReference="http://easse-gas/edigas#Quantity">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="quantityCode" type="QuantityCodeType" sawsdl:modelReference="http://easse-gas/edigas#Quantity.quantityCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="amount" type="Amount_Decimal" sawsdl:modelReference="http://easse-gas/edigas#Quantity.amount">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="MeasurementPointType-base" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="35" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="MeasurementPointType" sawsdl:modelReference="http://easse-gas/edigas#String">
+    <xs:simpleContent>
+      <xs:extension base="MeasurementPointType-base">
+        <xs:attribute name="codingScheme" type="CodingSchemeCodeTypeCodeList" use="required" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="UnitOfMeasureCodeType" sawsdl:modelReference="http://easse-gas/edigas#UnitOfMeasureCodeType">
+    <xs:restriction base="UnitOfMeasureCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:complexType name="External_Account" sawsdl:modelReference="http://easse-gas/edigas#Account">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="externalAccount" type="AccountType" sawsdl:modelReference="http://easse-gas/edigas#Account.externalAccount">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="1" name="externalAccountTso" type="PartyType" sawsdl:modelReference="http://easse-gas/edigas#Account.externalAccountTso">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="unbounded" name="InformationOrigin_TimeSeries" type="InformationOrigin_TimeSeries" sawsdl:modelReference="http://easse-gas/edigas#Account.InformationOrigin_TimeSeries">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="NominationCodeType" sawsdl:modelReference="http://easse-gas/edigas#NominationCodeType">
+    <xs:restriction base="NominationCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:complexType name="InformationOrigin_TimeSeries" sawsdl:modelReference="http://easse-gas/edigas#TimeSeries">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="businessCode" type="BusinessCodeType" sawsdl:modelReference="http://easse-gas/edigas#TimeSeries.businessCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="unbounded" name="Period" type="Period" sawsdl:modelReference="http://easse-gas/edigas#TimeSeries.Period">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Internal_Account" sawsdl:modelReference="http://easse-gas/edigas#Account">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="internalAccount" type="AccountType" sawsdl:modelReference="http://easse-gas/edigas#Account.internalAccount">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="1" name="internalAccountTso" type="PartyType" sawsdl:modelReference="http://easse-gas/edigas#Account.internalAccountTso">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="ConnectionPoint" type="ConnectionPoint" sawsdl:modelReference="http://easse-gas/edigas#Account.ConnectionPoint">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="BusinessCodeType" sawsdl:modelReference="http://easse-gas/edigas#BusinessCodeType">
+    <xs:restriction base="BusinessCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:complexType name="NominationResponse_Document" sawsdl:modelReference="http://easse-gas/edigas#Document">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="identification" type="IdentificationType" sawsdl:modelReference="http://easse-gas/edigas#Document.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="version" type="Version_Integer" sawsdl:modelReference="http://easse-gas/edigas#Document.version">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="documentCode" type="DocumentCodeType" sawsdl:modelReference="http://easse-gas/edigas#Document.documentCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="creationDateTime" type="xs:dateTime" sawsdl:modelReference="http://easse-gas/edigas#Document.creationDateTime">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="validityPeriod" type="TimeIntervalType" sawsdl:modelReference="http://easse-gas/edigas#Document.validityPeriod">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="1" name="applicationContext" type="LocationType" sawsdl:modelReference="http://easse-gas/edigas#Document.applicationContext">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="issuer_MarketParticipant.identification" type="PartyType" sawsdl:modelReference="http://easse-gas/edigas#MarketParticipant.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="issuer_MarketParticipant.marketRole.roleCode" type="RoleCodeType" sawsdl:modelReference="http://easse-gas/edigas#MarketRole.roleCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="recipient_MarketParticipant.identification" type="PartyType" sawsdl:modelReference="http://easse-gas/edigas#MarketParticipant.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="recipient_MarketParticipant.marketRole.roleCode" type="RoleCodeType" sawsdl:modelReference="http://easse-gas/edigas#MarketRole.roleCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="nomination_Document.identification" type="IdentificationType" sawsdl:modelReference="http://easse-gas/edigas#Document.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="nomination_Document.version" type="Version_Integer" sawsdl:modelReference="http://easse-gas/edigas#Document.version">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="nomination_Document.documentCode" type="DocumentCodeType" sawsdl:modelReference="http://easse-gas/edigas#Document.documentCode">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="1" name="nomination_Document.singleSidedBrpSource_MarketParticipant.identification" type="PartyType" sawsdl:modelReference="http://easse-gas/edigas#MarketParticipant.identification">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="Internal_Account" type="Internal_Account" sawsdl:modelReference="http://easse-gas/edigas#Document.Internal_Account">
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="schemaVersion" type="xs:string" use="required"/>          
+  </xs:complexType>
+  <xs:simpleType name="GasDirectionCodeType" sawsdl:modelReference="http://easse-gas/edigas#GasDirectionCodeType">
+    <xs:restriction base="GasDirectionCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:simpleType name="Amount_Decimal" sawsdl:modelReference="http://easse-gas/edigas#Decimal">
+    <xs:restriction base="xs:decimal">
+      <xs:totalDigits value="40" />
+      <xs:fractionDigits value="12" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="NominationType" sawsdl:modelReference="http://easse-gas/edigas#NominationType">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="nominationCode" type="NominationCodeType" sawsdl:modelReference="http://easse-gas/edigas#NominationType.nominationCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="unbounded" name="External_Account" type="External_Account" sawsdl:modelReference="http://easse-gas/edigas#NominationType.External_Account">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="QuantityCodeType" sawsdl:modelReference="http://easse-gas/edigas#QuantityCodeType">
+    <xs:restriction base="QuantityCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:complexType name="Period" sawsdl:modelReference="http://easse-gas/edigas#Period">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="timeInterval" type="TimeIntervalType" sawsdl:modelReference="http://easse-gas/edigas#Period.timeInterval">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="direction.gasDirectionCode" type="GasDirectionCodeType" sawsdl:modelReference="http://easse-gas/edigas#GasDirection.gasDirectionCode">
+      </xs:element>
+      <xs:element minOccurs="1" maxOccurs="1" name="quantity.amount" type="Amount_Decimal" sawsdl:modelReference="http://easse-gas/edigas#Quantity.amount">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="Status" type="Status" sawsdl:modelReference="http://easse-gas/edigas#Period.Status">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="Decomposition_Quantity" type="Decomposition_Quantity" sawsdl:modelReference="http://easse-gas/edigas#Period.Decomposition_Quantity">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="StatusCodeType" sawsdl:modelReference="http://easse-gas/edigas#StatusCodeType">
+    <xs:restriction base="StatusCodeTypeCodeList" />
+  </xs:simpleType>
+  <xs:simpleType name="TextType" sawsdl:modelReference="http://easse-gas/edigas#TextType">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="512" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="Status" sawsdl:modelReference="http://easse-gas/edigas#Status">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="statusCode" type="StatusCodeType" sawsdl:modelReference="http://easse-gas/edigas#Status.statusCode">
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="1" name="complementaryText.text" type="TextType" sawsdl:modelReference="http://easse-gas/edigas#ComplementaryText.text">
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

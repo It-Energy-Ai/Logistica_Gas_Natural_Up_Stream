@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IMPORTANT! All comments in this document are provided for better undertanding of the example(-s) provided. None of the examples or comments can be used as the reference to the standard. ALWAYS refer to the documentation of latest edig@s version avalaible in www.edigas.org or any other official source -->
+<Nomination_Document xmlns="urn:easee-gas.eu:edigas:BrpNominationAndMatching:NominationDocument:6:1"  schemaVersion="1">
+	<identification>NOMINT-02G-OTC</identification>
+	<version>1</version>
+	<documentCode>02G</documentCode>
+	<creationDateTime>2020-01-12T19:30:47Z</creationDateTime>
+	<validityPeriod>2020-01-13T05:00Z/2020-01-14T05:00Z</validityPeriod>
+	<issuer_MarketParticipant.identification codingScheme="305">IssuerEIC</issuer_MarketParticipant.identification>
+	<issuer_MarketParticipant.marketRole.roleCode>ZSH</issuer_MarketParticipant.marketRole.roleCode>
+	<recipient_MarketParticipant.identification codingScheme="305">RecipientEIC</recipient_MarketParticipant.identification>
+	<recipient_MarketParticipant.marketRole.roleCode>ZUK</recipient_MarketParticipant.marketRole.roleCode>
+	<Internal_Account>
+		<internalAccount codingScheme="ZSO">ACCOUNT</internalAccount>
+		<ConnectionPoint>
+			<identification codingScheme="305">ConnectionPntEIC</identification>
+			<measureUnit.unitOfMeasureCode>KW1</measureUnit.unitOfMeasureCode>
+			<NominationType>
+				<nominationCode>A02</nominationCode>
+				<External_Account>
+					<externalAccount codingScheme="ZSO">COUNTERPARTY-1</externalAccount>
+					<Period>
+						<timeInterval>2020-01-13T05:00Z/2020-01-13T06:00Z</timeInterval>
+						<direction.gasDirectionCode>Z02</direction.gasDirectionCode>
+						<quantity.amount>100</quantity.amount>
+					</Period>
+					<Period>
+						<timeInterval>2020-01-13T06:00Z/2020-01-14T05:00Z</timeInterval>
+						<direction.gasDirectionCode>Z02</direction.gasDirectionCode>
+						<quantity.amount>120</quantity.amount>
+					</Period>
+				</External_Account>
+				<External_Account>
+					<externalAccount codingScheme="ZSO">COUNTERPARTY-2</externalAccount>
+					<Period>
+						<timeInterval>2020-01-13T05:00Z/2020-01-14T05:00Z</timeInterval>
+						<direction.gasDirectionCode>Z03</direction.gasDirectionCode>
+						<quantity.amount>200</quantity.amount>
+					</Period>
+				</External_Account>
+			</NominationType>
+		</ConnectionPoint>
+	</Internal_Account>
+</Nomination_Document>

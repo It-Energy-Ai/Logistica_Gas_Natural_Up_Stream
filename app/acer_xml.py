@@ -11,9 +11,9 @@ Copertura intenzionalmente esplicita:
   identificato;
 * ``REMITTable2 / V1``: una nonStandardContractReport a prezzo fisso.
 
-Il trasporto gas usa un tracciato EDIG@S distinto (GasCapacity) e non viene
-mai trasformato in un XML Table 1/2 approssimativo.  Rimane bloccato fino alla
-raccolta dei suoi dati specifici e alla validazione del relativo bundle XSD.
+Il trasporto gas usa tracciati EDIG@S distinti (CANMON, NOMASS) e non viene
+mai trasformato in un XML Table 1/2 approssimativo.  Resta bloccato perché
+quegli schemi ammettono come emittente solo il trasportatore, non lo shipper.
 """
 
 from __future__ import annotations
@@ -67,12 +67,14 @@ SCHEMAS: dict[str, dict[str, str]] = {
 PDR_DECLARED_BUT_NOT_IMPLEMENTED = {
     "gas_transport": {
         "kind": "gas_transport",
-        "label": "Trasporto gas · GasCapacity",
-        "schema_name": "GasCapacity",
+        "label": "Trasporto gas · CANMON/NOMASS",
+        "schema_name": "CANMON",
         "schema_version": "V2",
         "reason": (
-            "Il tracciato GasCapacity/EDIG@S richiede dati di asta, TSO, punto di "
-            "connessione, capacità e periodi che il form Table 1/2 non raccoglie."
+            "I documenti EDIG@S di monitoraggio capacità e nomina (CANMON, NOMASS) "
+            "ammettono come emittente solo ZSO — System Operator — o ZUA: uno shipper "
+            "non può emetterli, il file sarebbe invalido già a livello di schema. "
+            "L'obbligo di segnalazione ricade sul trasportatore, non sull'utente."
         ),
     }
 }

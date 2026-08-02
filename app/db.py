@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS remit_artifact (
 );
 CREATE INDEX IF NOT EXISTS idx_remit_artifact_email ON remit_artifact(email, report_id);
 
+CREATE TABLE IF NOT EXISTS edigas_nomina (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    identificativo TEXT NOT NULL,
+    versione INTEGER NOT NULL,
+    tipo_documento TEXT NOT NULL,
+    giorno_gas TEXT NOT NULL,
+    punto TEXT NOT NULL,
+    periodi INTEGER NOT NULL,
+    avvisi TEXT NOT NULL,
+    xml TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    creato_il TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_edigas_nomina_email ON edigas_nomina(email, giorno_gas);
+
 CREATE TABLE IF NOT EXISTS remit_migrazione (
     email TEXT NOT NULL,
     source_hash TEXT NOT NULL,
@@ -421,6 +437,104 @@ def leggi_eventi_remit(conn: sqlite3.Connection, email: str, report_id: str) -> 
             }
         )
     return out
+
+
+def crea_nomina_edigas(
+    conn: sqlite3.Connection,
+    *,
+    nomina_id: str,
+    email: str,
+    identificativo: str,
+    versione: int,
+    tipo_documento: str,
+    giorno_gas: str,
+    punto: str,
+    periodi: int,
+    avvisi: str,
+    xml: str,
+    sha256: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO edigas_nomina (id, email, identificativo, versione, tipo_documento, giorno_gas, "
+        "punto, periodi, avvisi, xml, sha256, creato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (
+            nomina_id,
+            email,
+            identificativo,
+            versione,
+            tipo_documento,
+            giorno_gas,
+            punto,
+            periodi,
+            avvisi,
+            xml,
+            sha256,
+        ),
+    )
+
+
+def _riga_nomina(row: sqlite3.Row, *, con_xml: bool = False) -> dict:
+    dati = {
+        "id": row["id"],
+        "identificativo": row["identificativo"],
+        "versione": row["versione"],
+        "tipo_documento": row["tipo_documento"],
+        "giorno_gas": row["giorno_gas"],
+        "punto": row["punto"],
+        "periodi": row["periodi"],
+        "avvisi": [a for a in (row["avvisi"] or "").split("\n") if a],
+        "sha256": row["sha256"],
+        "creato_il": row["creato_il"],
+    }
+    if con_xml:
+        dati["xml"] = row["xml"]
+    return dati
+
+
+CAMPI_NOMINA = (
+    "id, identificativo, versione, tipo_documento, giorno_gas, punto, periodi, avvisi, sha256, creato_il"
+)
+
+
+def elenca_nomine_edigas(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_NOMINA} FROM edigas_nomina WHERE email = ? "
+        "ORDER BY creato_il DESC, rowid DESC LIMIT 500",
+        (email,),
+    ).fetchall()
+    return [_riga_nomina(r) for r in righe]
+
+
+def leggi_nomina_edigas(conn: sqlite3.Connection, email: str, nomina_id: str) -> dict | None:
+    row = conn.execute(
+        f"SELECT {CAMPI_NOMINA}, xml FROM edigas_nomina WHERE email = ? AND id = ?",
+        (email, nomina_id),
+    ).fetchone()
+    return _riga_nomina(row, con_xml=True) if row else None
+
+
+def trova_nomina_edigas(
+    conn: sqlite3.Connection, email: str, identificativo: str, versione: str | int
+) -> dict | None:
+    """Ritrova la nomina citata da una risposta del trasportatore.
+
+    La versione arriva dal file del trasportatore, quindi è testo libero: un
+    refuso come "1.0" non deve far cadere la richiesta.
+    """
+
+    testo = str(versione or "").strip()
+    if not testo.isdecimal():
+        return None
+    numero = int(testo)
+    row = conn.execute(
+        f"SELECT {CAMPI_NOMINA}, xml FROM edigas_nomina "
+        # La prima: è quella che lo shipper ha effettivamente inviato e che
+        # il trasportatore cita nella risposta.
+        "WHERE email = ? AND identificativo = ? AND versione = ? ORDER BY rowid ASC LIMIT 1",
+        (email, identificativo, numero),
+    ).fetchone()
+    return _riga_nomina(row, con_xml=True) if row else None
 
 
 def crea_artifact_remit(

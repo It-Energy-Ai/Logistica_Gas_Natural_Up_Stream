@@ -29,7 +29,15 @@ accettato.
 |---|---|---|---|
 | Contratto standard gas | `REMITTable1_V3` / TradeReport | `app/schemas/REMITTable1_V3.xsd` | Disponibile |
 | Contratto non-standard gas a prezzo fisso | `REMITTable2_V1` / nonStandardContractReport | `app/schemas/REMITTable2_V1.xsd` | Disponibile |
-| Capacità/trasporto gas | GasCapacity / EDIG@S | — | Bloccato intenzionalmente |
+| Capacità/trasporto gas | CANMON / NOMASS · EDIG@S | — | Bloccato: emittente riservato al trasportatore |
+
+Sul trasporto gas la scelta non è un rinvio tecnico. Gli XSD EDIG@S dei
+documenti di monitoraggio capacità e nomina restringono l'emittente ai ruoli
+`ZSO` (System Operator) e `ZUA` (Market Information Aggregator): uno shipper
+(`ZSH`) non è nell'elenco, e un file del genere emesso da lui sarebbe invalido
+già a livello di schema. L'obbligo di segnalare quei dati ricade sul
+trasportatore. Le nomine che lo shipper *deve* invece emettere sono coperte,
+e sono documentate in [edigas.md](edigas.md).
 
 Le impronte dei due XSD sono controllate a runtime prima dell'export. Le fonti
 sono gli archivi ufficiali ACER pubblicati il 4 luglio 2024:
@@ -41,10 +49,7 @@ ACER segnala che il materiale di reporting può essere in aggiornamento dopo
 le modifiche normative del 2026. Prima di un uso produttivo occorre confrontare
 le versioni incluse con la [pagina ACER di reporting guidance](https://www.acer.europa.eu/remit-documents/remit-reporting-guidance), il [TRUM](https://www.acer.europa.eu/transaction-reporting-user-manual-trum) e le Data Validation Rules vigenti.
 
-Il tracciato GasCapacity non è generato perché richiede un set sostanzialmente
-diverso (asta, TSO, punto di connessione, capacità, periodi e transazioni). Il
-modulo lo rifiuta esplicitamente invece di convertirlo impropriamente in Table
-1 o Table 2.
+Il dettaglio della motivazione, con la citazione degli XSD, è in [edigas.md](edigas.md).
 
 ## Nome file PDR
 

@@ -625,6 +625,73 @@ input::placeholder{color:var(--ink3)}
       </sc-for>
     </div>
   </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-top:16px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Documento EDIG@S · NOMINT</h3><span style="font-size:12px;color:var(--ink3)">Nomina EASEE-gas 6.1 validata contro lo schema ufficiale.</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo documento<select value="{{ edgTipo }}" onChange="{{ setEdgTipo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="01G">01G · punto di connessione</option><option value="02G">02G · PSV OTC</option><option value="03G">03G · PSV borsa</option><option value="04G">04G · cliente finale</option></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo nomina<select value="{{ edgTipoNomina }}" onChange="{{ setEdgTipoNomina }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="">Non previsto</option><option value="A01">A01 · single-sided</option><option value="A02">A02 · double-sided</option></select></label>
+      </div>
+      <span style="font-size:11px;color:var(--ink3)">{{ edgRuoli }}</span>
+      <div style="display:grid;grid-template-columns:1.4fr .6fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Identificativo<input type="text" value="{{ edgIdent }}" onChange="{{ setEdgIdent }}" maxlength="35" placeholder="NOMINT-20260803-001" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Versione<input type="text" value="{{ edgVersione }}" onChange="{{ setEdgVersione }}" placeholder="1" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">EIC emittente<input type="text" value="{{ edgEmittente }}" onChange="{{ setEdgEmittente }}" maxlength="16" placeholder="21X000000001234A" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">EIC destinatario<input type="text" value="{{ edgDestinatario }}" onChange="{{ setEdgDestinatario }}" maxlength="16" placeholder="21X0000000005678" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Conto interno<input type="text" value="{{ edgConto }}" onChange="{{ setEdgConto }}" maxlength="35" placeholder="SHIPPER-01" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">EIC punto<input type="text" value="{{ edgPunto }}" onChange="{{ setEdgPunto }}" maxlength="35" placeholder="21Z0000000001234" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Giorno gas<input type="date" value="{{ edgGiorno }}" onChange="{{ setEdgGiorno }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Unità<select value="{{ edgUnita }}" onChange="{{ setEdgUnita }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="KW1">KW1 · kWh/h</option><option value="KW2">KW2 · kWh/g</option><option value="A15">A15 · kg/h</option></select></label>
+      </div>
+      <div style="display:grid;grid-template-columns:1.3fr .7fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Controparte<input type="text" value="{{ edgControparte }}" onChange="{{ setEdgControparte }}" maxlength="35" placeholder="CTP-ALFA" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Direzione<select value="{{ edgDirezione }}" onChange="{{ setEdgDirezione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="Z02">Z02 · entrata</option><option value="Z03">Z03 · uscita</option></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità giorno<input type="text" value="{{ edgQta }}" onChange="{{ setEdgQta }}" placeholder="12500" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      </div>
+      <button onClick="{{ generaNomint }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Genera e valida NOMINT</button>
+      <sc-if value="{{ edgErrore }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#B42318">{{ edgErrore }}</span></sc-if>
+      <sc-for list="{{ edgErrori }}" as="ee" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ ee.message }}</span></sc-for>
+      <sc-if value="{{ edgInfo }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--primText)">{{ edgInfo }}</span></sc-if>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px"><h3 style="margin:0;font-size:15px;font-weight:600">Documenti generati</h3><span style="font-size:12px;color:var(--ink3)">Ogni file è validato XSD e ha la sua impronta SHA-256.</span></div>
+        <sc-if value="{{ edgElencoErrore }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#B42318;padding-bottom:6px">{{ edgElencoErrore }}</span></sc-if>
+        <sc-for list="{{ edgRows }}" as="er" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:1.5fr .5fr .6fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ er.identificativo }}</span>
+            <span style="font-size:11.5px;color:var(--ink2)">v{{ er.versione }} · {{ er.tipo_documento }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ er.periodi }} per.</span>
+            <button onClick="{{ er.scarica }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Scarica XML</button>
+            <span style="grid-column:1 / -1;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)">{{ er.impronta }}</span>
+            <sc-for list="{{ er.avvisi }}" as="aw" hint-placeholder-count="1"><span style="grid-column:1 / -1;font-size:11px;color:#B54708">{{ aw.testo }}</span></sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Risposta del trasportatore · NOMRES</h3><span style="font-size:12px;color:var(--ink3)">Incolla il file ricevuto: viene abbinato da solo alla nomina che cita.</span></div>
+        <textarea value="{{ edgRisposta }}" onChange="{{ setEdgRisposta }}" rows="4" placeholder="&lt;NominationResponse_Document …&gt;" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px;resize:vertical"></textarea>
+        <button onClick="{{ leggiNomres }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Confronta con la nomina</button>
+        <sc-if value="{{ edgRispostaErrore }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#B42318">{{ edgRispostaErrore }}</span></sc-if>
+        <sc-if value="{{ edgRispostaInfo }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--primText)">{{ edgRispostaInfo }}</span></sc-if>
+        <sc-for list="{{ edgScostamenti }}" as="sc" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 0;border-top:1px solid var(--line)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2)">{{ sc.intervallo }}</span>
+            <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:{{ sc.bg }};color:{{ sc.fg }}">{{ sc.etichetta }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
 </section>
 </sc-if>
 

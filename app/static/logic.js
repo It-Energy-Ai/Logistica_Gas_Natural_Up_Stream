@@ -105,6 +105,11 @@
         wiz: null, disabled: {}, hiddenPunti: [], extraPunti: [], nextP: 1, newPunto: "", repCat: "tutti",
         nomList: [],
         nomPunto: "PSV", nomCiclo: "R4", nomQta: "",
+        edgTipo: "01G", edgTipoNomina: "A02", edgIdent: "", edgVersione: "1",
+        edgEmittente: "", edgDestinatario: "", edgConto: "", edgPunto: "", edgUnita: "KW1",
+        edgGiorno: "", edgControparte: "", edgDirezione: "Z02", edgQta: "",
+        edgNomine: [], edgErrore: "", edgElencoErrore: "", edgInfo: "", edgErroriCampo: [],
+        edgRisposta: "", edgRispostaErrore: "", edgRispostaInfo: "", edgScostamentiList: [],
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -282,6 +287,16 @@
       }
     }
 
+    async _caricaEdigas() {
+      if (!this._sessionEmail) return;
+      try {
+        const payload = await this._json("/api/edigas/nomine");
+        this.setState({ edgNomine: Array.isArray(payload.nomine) ? payload.nomine : [], edgElencoErrore: "" });
+      } catch (error) {
+        this.setState({ edgElencoErrore: `Elenco nomine EDIG@S non disponibile: ${error.message}` });
+      }
+    }
+
     async _caricaPdr() {
       if (!this._sessionEmail) return;
       this.setState({ pdrCaricamento: true, pdrErrore: "" });
@@ -299,7 +314,7 @@
     }
 
     async _caricaWorkspaceRegolatorio() {
-      await Promise.all([this._caricaRemit(), this._caricaPdr()]);
+      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas()]);
     }
 
     async _apriSessione(email) {
@@ -557,6 +572,131 @@
       ];
       const nomRows = [...this.state.nomList, ...nomDemo].map((r) => ({ ...r, bg: (nomStatoC[r.stato] || WAIT).bg, fg: (nomStatoC[r.stato] || WAIT).fg }));
       const addNomina = () => this.setState((st) => ({ nomList: [{ punto: cap(st.nomPunto, 120), ciclo: cap(st.nomCiclo, 120), qta: cap(st.nomQta || "500", 120), stato: "Inviata" }, ...st.nomList].slice(0, 500), nomQta: "" }));
+
+      // --- EDIG@S 6.1 ---------------------------------------------------
+      // I ruoli delle due parti non si scelgono: li fissa il tipo di
+      // documento secondo la decision table EASEE-gas.
+      const EDG_RUOLI = {
+        "01G": { emittente: "ZSH", destinatario: "ZSO", nomina: ["A01", "A02"], conControparti: true },
+        "02G": { emittente: "ZSH", destinatario: "ZUK", nomina: ["A02"], conControparti: true },
+        "03G": { emittente: "ZUM", destinatario: "ZUK", nomina: [], conControparti: true },
+        "04G": { emittente: "ZSH", destinatario: "ZSO", nomina: [], conControparti: false },
+      };
+      const EDG_NOMI = { ZSH: "shipper", ZSO: "trasportatore", ZUK: "area coordinator", ZUM: "clearing responsible" };
+      const edgRegole = EDG_RUOLI[this.state.edgTipo] || EDG_RUOLI["01G"];
+      const edgRuoli = `Emittente ${edgRegole.emittente} (${EDG_NOMI[edgRegole.emittente]}) → destinatario ${edgRegole.destinatario} (${EDG_NOMI[edgRegole.destinatario]}).`;
+
+      const setEdgTipo = (e) => {
+        const tipo = e.target.value;
+        const regole = EDG_RUOLI[tipo] || EDG_RUOLI["01G"];
+        // il tipo di nomina si allinea da solo: fuori lista non è ammesso
+        const attuale = this.state.edgTipoNomina;
+        const nomina = regole.nomina.includes(attuale) ? attuale : (regole.nomina[0] || "");
+        this.setState({ edgTipo: tipo, edgTipoNomina: nomina });
+      };
+
+      const edgPayload = () => {
+        const st = this.state;
+        const regole = EDG_RUOLI[st.edgTipo] || EDG_RUOLI["01G"];
+        const base = {
+          identificativo: cap(st.edgIdent, 35),
+          versione: cap(st.edgVersione || "1", 3),
+          tipo_documento: st.edgTipo,
+          emittente_eic: cap(st.edgEmittente, 16),
+          emittente_ruolo: regole.emittente,
+          destinatario_eic: cap(st.edgDestinatario, 16),
+          destinatario_ruolo: regole.destinatario,
+          giorno_gas: cap(st.edgGiorno, 10),
+          conto_interno: cap(st.edgConto, 35),
+          punto_eic: cap(st.edgPunto, 35),
+          unita: st.edgUnita,
+        };
+        if (st.edgTipoNomina) base.tipo_nomina = st.edgTipoNomina;
+        if (!regole.conControparti) {
+          base.direzione = st.edgDirezione;
+          base.quantita_giornaliera = cap(st.edgQta, 40);
+        } else {
+          base.controparti = [{ conto: cap(st.edgControparte, 35), direzione: st.edgDirezione, quantita_giornaliera: cap(st.edgQta, 40) }];
+        }
+        return base;
+      };
+
+      const generaNomint = async () => {
+        this.setState({ edgErrore: "", edgInfo: "", edgErroriCampo: [] });
+        try {
+          const esito = await this._json("/api/edigas/nomine", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(edgPayload()),
+          });
+          this.setState({
+            edgInfo: `NOMINT ${esito.identificativo} v${esito.versione} generato e validato contro lo schema EDIG@S ${esito.versione_edigas}.`,
+          });
+          await this._caricaEdigas();
+        } catch (error) {
+          this.setState({
+            edgErrore: `Nomina non generata: ${error.message}`,
+            edgErroriCampo: error.dettagli || [],
+          });
+        }
+      };
+
+      const leggiNomres = async () => {
+        this.setState({ edgRispostaErrore: "", edgRispostaInfo: "", edgScostamentiList: [] });
+        const testo = (this.state.edgRisposta || "").trim();
+        if (!testo) {
+          this.setState({ edgRispostaErrore: "Incolla il contenuto del file NOMRES ricevuto." });
+          return;
+        }
+        try {
+          const esito = await this._json("/api/edigas/risposte", {
+            method: "POST",
+            headers: { "Content-Type": "application/xml" },
+            body: testo,
+          });
+          const trovata = esito.nomina_trovata;
+          const scost = esito.scostamenti || [];
+          if (!esito.valido_xsd) {
+            // Senza questo l'operatore leggerebbe "confermata per intero" su
+            // un file che non rispetta lo schema e da cui non si è letto nulla.
+            const dettaglio = (esito.errori_schema || [])[0] || "";
+            this.setState({
+              edgScostamentiList: scost,
+              edgRispostaErrore: `Il file non è conforme allo schema EDIG@S e non può essere confrontato. ${dettaglio}`.trim(),
+            });
+            return;
+          }
+          this.setState({
+            edgScostamentiList: scost,
+            edgRispostaInfo: trovata
+              ? (scost.length
+                  ? `Risposta abbinata alla nomina ${esito.nomina_riferita.identificativo}: ${scost.length} scostamenti.`
+                  : `Risposta abbinata alla nomina ${esito.nomina_riferita.identificativo}: confermata per intero.`)
+              : `Risposta letta (${esito.righe.length} periodi), ma la nomina ${esito.nomina_riferita.identificativo} non è fra quelle generate qui: nessun confronto possibile.`,
+          });
+        } catch (error) {
+          this.setState({ edgRispostaErrore: `Risposta non leggibile: ${error.message}${_dettagli(error)}` });
+        }
+      };
+
+      const EDG_ESITI = {
+        ridotto: { bg: "#FEF0C7", fg: "#B54708" },
+        aumentato: { bg: "#FEF0C7", fg: "#B54708" },
+        "non nominato": { bg: "#FEE4E2", fg: "#B42318" },
+        "senza risposta": { bg: "#FEE4E2", fg: "#B42318" },
+      };
+      const edgRows = (this.state.edgNomine || []).map((n) => ({
+        ...n,
+        impronta: `SHA-256 ${String(n.sha256 || "").slice(0, 16)}…`,
+        avvisi: (n.avvisi || []).map((testo) => ({ testo })),
+        scarica: () => window.open(`/api/edigas/nomine/${n.id}/download`, "_blank"),
+      }));
+      const edgScostamenti = (this.state.edgScostamentiList || []).map((s) => {
+        const colori = EDG_ESITI[s.esito] || { bg: "var(--surface2)", fg: "var(--ink2)" };
+        const nominato = s.nominato === null || s.nominato === undefined ? "—" : s.nominato;
+        const confermato = s.quantita === null || s.quantita === undefined ? "—" : s.quantita;
+        return { ...s, ...colori, etichetta: `${s.esito}: ${nominato} → ${confermato}` };
+      });
       const oreSbil = !demoOn ? [] : [["04", 45], ["05", 28], ["06", -15], ["07", 62], ["08", 34], ["09", -48], ["10", 20], ["11", -25], ["12", 55], ["13", 12], ["14", -60], ["15", 38], ["16", -85], ["17", -87]].map(([h, v]) => ({ h, top: v > 0 ? Math.round(v * 0.9) + "%" : "0%", bot: v < 0 ? Math.round(-v * 0.9) + "%" : "0%", w: h === "17" ? 700 : 500, lc: h === "17" ? "var(--ink)" : "var(--ink3)" }));
       const bilKpis = demoOn ? [
         { label: "Posizione fisica prevista", value: "−312", unit: "MWh", delta: "Posizione corta", dBg: WARN.bg, dFg: WARN.fg },
@@ -1119,6 +1259,30 @@
         // silenziosi anche i select: la tendina mostra già il nuovo valore e
         // un re-render a metà interazione le farebbe perdere il focus
         setNomPunto: (e) => this.setSilent({ nomPunto: e.target.value }),
+        edgTipo: this.state.edgTipo, edgTipoNomina: this.state.edgTipoNomina, edgRuoli,
+        edgIdent: this.state.edgIdent, edgVersione: this.state.edgVersione,
+        edgEmittente: this.state.edgEmittente, edgDestinatario: this.state.edgDestinatario,
+        edgConto: this.state.edgConto, edgPunto: this.state.edgPunto, edgUnita: this.state.edgUnita,
+        edgGiorno: this.state.edgGiorno, edgControparte: this.state.edgControparte,
+        edgDirezione: this.state.edgDirezione, edgQta: this.state.edgQta,
+        edgErrore: this.state.edgErrore, edgElencoErrore: this.state.edgElencoErrore,
+        edgInfo: this.state.edgInfo, edgErrori: this.state.edgErroriCampo,
+        edgRisposta: this.state.edgRisposta, edgRispostaErrore: this.state.edgRispostaErrore,
+        edgRispostaInfo: this.state.edgRispostaInfo,
+        edgRows, edgScostamenti, generaNomint, leggiNomres, setEdgTipo,
+        setEdgTipoNomina: (e) => this.setSilent({ edgTipoNomina: e.target.value }),
+        setEdgIdent: (e) => this.setSilent({ edgIdent: e.target.value }),
+        setEdgVersione: (e) => this.setSilent({ edgVersione: e.target.value }),
+        setEdgEmittente: (e) => this.setSilent({ edgEmittente: e.target.value }),
+        setEdgDestinatario: (e) => this.setSilent({ edgDestinatario: e.target.value }),
+        setEdgConto: (e) => this.setSilent({ edgConto: e.target.value }),
+        setEdgPunto: (e) => this.setSilent({ edgPunto: e.target.value }),
+        setEdgUnita: (e) => this.setSilent({ edgUnita: e.target.value }),
+        setEdgGiorno: (e) => this.setSilent({ edgGiorno: e.target.value }),
+        setEdgControparte: (e) => this.setSilent({ edgControparte: e.target.value }),
+        setEdgDirezione: (e) => this.setSilent({ edgDirezione: e.target.value }),
+        setEdgQta: (e) => this.setSilent({ edgQta: e.target.value }),
+        setEdgRisposta: (e) => this.setSilent({ edgRisposta: e.target.value }),
         setNomCiclo: (e) => this.setSilent({ nomCiclo: e.target.value }),
         setNomQta: (e) => this.setSilent({ nomQta: e.target.value }),
         oreSbil, bilKpis, azioni, capRows, capChip, scadenze, stocKpis, stocCap, stocMov, stocServ, repFiles, repProg, repKpis, repCats,

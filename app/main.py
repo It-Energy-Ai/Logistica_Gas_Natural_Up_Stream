@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import uti, pdr, remit
+from . import edigas, uti, pdr, remit
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -164,6 +164,18 @@ def _risposta_remit_error(error: remit.RemitError):
     return JSONResponse(body, status_code=status)
 
 
+def _corpo_eccessivo(request: Request, massimo: int):
+    """Rifiuta in base a Content-Length, prima di bufferizzare il corpo."""
+
+    dichiarata = request.headers.get("content-length", "")
+    if dichiarata.isdecimal() and int(dichiarata) > massimo:
+        return JSONResponse(
+            {"errore": f"Corpo della richiesta troppo grande: il limite è {massimo // 1024} KB."},
+            status_code=413,
+        )
+    return None
+
+
 def _risposta_pdr_error(error: pdr.PdrError):
     status = 404 if isinstance(error, pdr.PdrNotFoundError) else 422
     return JSONResponse({"errore": str(error)}, status_code=status)
@@ -298,6 +310,160 @@ async def post_identificativo_acer(request: Request):
         }
     except uti.UtiError as errore:
         return JSONResponse({"errore": str(errore)}, status_code=422)
+
+
+@app.get("/api/edigas/catalogo")
+def get_edigas_catalogo(request: Request):
+    """Codici e schemi del protocollo, letti dagli XSD invece che ricopiati."""
+
+    if not _sessione(request):
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    return {
+        "versione": edigas.PACCHETTO["versione"],
+        "fonte": edigas.PACCHETTO["fonte"],
+        "schemi": edigas.catalogo_schemi(),
+        "tipi_documento": [
+            {
+                "codice": codice,
+                "etichetta": regole["etichetta"],
+                "emittente": regole["emittente"],
+                "destinatario": regole["destinatario"],
+                "tipi_nomina": list(regole["tipi_nomina"]),
+                "con_controparti": regole["con_controparti"],
+            }
+            for codice, regole in edigas.TIPI_DOCUMENTO.items()
+        ],
+        "ruoli": edigas.RUOLI,
+        "direzioni": edigas.DIREZIONI,
+        "unita": edigas.UNITA,
+        "tipi_nomina": edigas.TIPI_NOMINA,
+    }
+
+
+@app.get("/api/edigas/nomine")
+def get_edigas_nomine(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return {"nomine": db.elenca_nomine_edigas(conn, email)}
+
+
+@app.post("/api/edigas/nomine")
+async def post_edigas_nomina(request: Request):
+    """Genera un Nomination_Document validato e lo conserva per il download."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, edigas.MAX_RISPOSTA_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        documento = edigas.genera_nomina(payload)
+    except edigas.EdigasError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, OverflowError, TypeError, UnicodeError) as errore:
+        # Rete di sicurezza: un input che sfugge ai controlli di campo deve
+        # comunque tornare come errore comprensibile, non come 500 opaco.
+        return JSONResponse({"errore": f"Dati della nomina non validi: {errore}"}, status_code=422)
+
+    nomina_id = secrets.token_hex(8)
+    with db.connect() as conn:
+        db.crea_nomina_edigas(
+            conn,
+            nomina_id=nomina_id,
+            email=email,
+            identificativo=documento.identificativo,
+            versione=documento.versione,
+            tipo_documento=documento.tipo_documento,
+            giorno_gas=documento.giorno_gas,
+            punto=documento.punto,
+            periodi=documento.periodi,
+            avvisi="\n".join(documento.avvisi),
+            xml=documento.xml,
+            sha256=documento.xml_sha256,
+        )
+        record = db.leggi_nomina_edigas(conn, email, nomina_id)
+    return JSONResponse(
+        {
+            **{k: v for k, v in (record or {}).items() if k != "xml"},
+            "valido_xsd": True,
+            "schema_sha256": documento.schema_sha256,
+            "versione_edigas": documento.versione_edigas,
+            "size_bytes": documento.size_bytes,
+        },
+        status_code=201,
+    )
+
+
+@app.get("/api/edigas/nomine/{nomina_id}")
+def get_edigas_nomina(nomina_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = db.leggi_nomina_edigas(conn, email, nomina_id)
+    if not record:
+        return JSONResponse({"errore": "nomina non trovata"}, status_code=404)
+    return record
+
+
+@app.get("/api/edigas/nomine/{nomina_id}/download")
+def download_edigas_nomina(nomina_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = db.leggi_nomina_edigas(conn, email, nomina_id)
+    if not record:
+        return JSONResponse({"errore": "nomina non trovata"}, status_code=404)
+    nome = f"NOMINT_{record['identificativo']}_v{record['versione']}.xml".replace("/", "-")
+    return Response(
+        content=record["xml"],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nome)}"},
+        media_type="application/xml",
+    )
+
+
+@app.post("/api/edigas/risposte")
+async def post_edigas_risposta(request: Request):
+    """Legge un NOMRES e lo confronta con la nomina che cita, se presente."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, edigas.MAX_RISPOSTA_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    grezzo = await request.body()
+    if not grezzo:
+        return JSONResponse({"errore": "corpo della richiesta vuoto"}, status_code=400)
+    if len(grezzo) > edigas.MAX_RISPOSTA_BYTES:
+        return JSONResponse(
+            {"errore": f"File troppo grande: il limite è {edigas.MAX_RISPOSTA_BYTES // 1024} KB."},
+            status_code=413,
+        )
+    try:
+        risposta = edigas.leggi_risposta(grezzo)
+    except edigas.EdigasError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+
+    riferita = risposta["nomina_riferita"]
+    with db.connect() as conn:
+        nomina = db.trova_nomina_edigas(conn, email, riferita["identificativo"], riferita["versione"])
+    if nomina is None and not risposta["valido_xsd"]:
+        risposta = {**risposta, "nota": "Il file non è conforme allo schema EDIG@S: controlla gli errori riportati."}
+    scostamenti = edigas.confronta_con_nomina(nomina["xml"], risposta) if nomina else []
+    return {
+        **risposta,
+        "nomina_trovata": bool(nomina),
+        "nomina_id": nomina["id"] if nomina else None,
+        "scostamenti": scostamenti,
+    }
 
 
 @app.post("/api/remit/reports")

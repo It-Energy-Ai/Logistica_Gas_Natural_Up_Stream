@@ -581,3 +581,85 @@ test("limiti: nomina e punto troncati ai cap del backend", () => {
   app.renderVals().addPunto();
   assert.equal(app.state.extraPunti[0][0].length, 160);
 });
+
+// --- EDIG@S -----------------------------------------------------------
+
+test("EDIG@S: i ruoli sono decisi dal tipo di documento, non scelti a mano", () => {
+  const app = new App();
+  app.setState({ screen: "nomine" });
+  let v = app.renderVals();
+  assert.match(v.edgRuoli, /ZSH.*ZSO/); // 01G predefinito
+  v.setEdgTipo(ev("02G"));
+  v = app.renderVals();
+  assert.match(v.edgRuoli, /ZSH.*ZUK/);
+  v.setEdgTipo(ev("03G"));
+  v = app.renderVals();
+  assert.match(v.edgRuoli, /ZUM.*ZUK/);
+});
+
+test("EDIG@S: il tipo di nomina si allinea da solo al documento", () => {
+  const app = new App();
+  app.setState({ screen: "nomine", edgTipoNomina: "A01" });
+  // 02G ammette solo A02: A01 non deve sopravvivere al cambio
+  app.renderVals().setEdgTipo(ev("02G"));
+  assert.equal(app.state.edgTipoNomina, "A02");
+  // 03G non prevede il tipo di nomina: va svuotato
+  app.renderVals().setEdgTipo(ev("03G"));
+  assert.equal(app.state.edgTipoNomina, "");
+  // tornando a 01G resta valido
+  app.renderVals().setEdgTipo(ev("01G"));
+  assert.equal(app.state.edgTipoNomina, "A01");
+});
+
+test("EDIG@S: avvio pulito, nessuna nomina e nessun messaggio", () => {
+  const app = new App();
+  app.setState({ screen: "nomine" });
+  const v = app.renderVals();
+  assert.deepEqual(v.edgRows, []);
+  assert.deepEqual(v.edgScostamenti, []);
+  assert.equal(v.edgErrore, "");
+  assert.equal(v.edgInfo, "");
+});
+
+test("EDIG@S: le nomine generate espongono impronta, avvisi e download", () => {
+  const app = new App();
+  app.setState({
+    screen: "nomine",
+    edgNomine: [{ id: "abc123", identificativo: "NOMINT-1", versione: 2, tipo_documento: "01G", periodi: 24, sha256: "a".repeat(64), avvisi: ["giorno gas scoperto"] }],
+  });
+  const riga = app.renderVals().edgRows[0];
+  assert.equal(riga.impronta, `SHA-256 ${"a".repeat(16)}…`);
+  assert.deepEqual(riga.avvisi, [{ testo: "giorno gas scoperto" }]);
+  assert.equal(typeof riga.scarica, "function");
+});
+
+test("EDIG@S: gli scostamenti mostrano nominato e confermato", () => {
+  const app = new App();
+  app.setState({
+    screen: "nomine",
+    edgScostamentiList: [
+      { intervallo: "2026-08-03T04:00Z/2026-08-03T05:00Z", esito: "ridotto", nominato: "700", quantita: "400" },
+      { intervallo: "2026-08-03T05:00Z/2026-08-03T06:00Z", esito: "senza risposta", nominato: "500", quantita: null },
+    ],
+  });
+  const [primo, secondo] = app.renderVals().edgScostamenti;
+  assert.equal(primo.etichetta, "ridotto: 700 → 400");
+  assert.equal(primo.fg, "#B54708");
+  assert.equal(secondo.etichetta, "senza risposta: 500 → —");
+  assert.equal(secondo.fg, "#B42318");
+});
+
+test("EDIG@S: ogni binding del pannello ha un valore dal render", () => {
+  // Un binding orfano non rompe nulla a schermo: mostra un campo vuoto e
+  // basta. Va quindi verificato qui, non a occhio.
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf("Documento EDIG@S"), html.indexOf("screenBilancio"));
+  const app = new App();
+  app.setState({ screen: "nomine" });
+  const v = app.renderVals();
+  const locali = new Set(["er", "aw", "sc", "ee", "true", "false"]); // alias delle sc-for e letterali
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$]*)\s*\}\}/g)].map((m) => m[1]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
