@@ -12,6 +12,7 @@ come fuori copertura.
 |---|---|---|---|
 | `Nomination_Document` | NOMINT | shipper → trasportatore | Generato e validato XSD |
 | `NominationResponse_Document` | NOMRES | trasportatore → shipper | Letto, validato e confrontato |
+| `Acknowledgement_Document` | ACKNOW | trasportatore → shipper | Letto, archiviato e collegato alla nomina; generabile |
 
 Il modulo è in [`app/edigas.py`](../app/edigas.py); gli schemi ufficiali sono
 inclusi in `app/schemas/edigas/` e la loro impronta è verificata da un test.
@@ -124,6 +125,49 @@ risposta reale: `15G` e `18G` portano per specifica la direzione opposta a
 quella nominata, quindi non combacerebbero mai. Se il file non è conforme allo
 schema, il confronto non viene tentato e l'errore è mostrato all'operatore.
 
+## Il riscontro di ricezione (ACKNOW)
+
+È il documento con cui chi riceve dichiara di aver preso in carico — o di
+respingere — quello che gli è arrivato. La specifica lo richiede per la
+nomina, con una motivazione pratica: serve
+
+> «in order to avoid reclamations from the Balance Responsible Party if the
+> NOMINT had not been received»
+
+mentre per il NOMRES lo ritiene di norma superfluo, perché non aggiungerebbe
+nulla a chi lo riceve. La regola generale è che il riscontro accompagna
+l'informazione che sale — dallo shipper al trasportatore — non quella che
+scende. **Nel ciclo italiano lo shipper quindi il riscontro lo riceve**, ed è
+per questo che la funzione più importante è leggerlo e conservarlo.
+
+### Due tipi
+
+| `documentCode` | Significato | Quando arriva |
+|---|---|---|
+| `294` | Riscontro applicativo | Il documento è stato interpretato: viene accettato o respinto nel merito |
+| `AMU` | Riscontro tecnico | Un problema di sistema o di formato ha impedito l'elaborazione |
+
+### Cosa fa Vettore
+
+Il riscontro si incolla nella schermata Nomine. Viene validato contro l'XSD,
+**collegato da solo alla nomina che cita** e archiviato con la sua impronta
+SHA-256, perché è la prova che il documento è arrivato. Reimportare lo stesso
+file non crea un secondo riscontro: è lo stesso fatto.
+
+I **63 codici di motivazione** della `ReasonCodeTypeCodeList` sono tradotti in
+italiano, così l'operatore legge «Conto non riconosciuto» invece di `14G`. Il
+riscontro risulta una presa in carico solo se **tutte** le motivazioni lo sono
+e nessun punto di connessione è stato respinto: accettare in generale e
+rifiutare un punto non è un'accettazione.
+
+Un caso che va gestito e che è facile dimenticare: il trasportatore può
+riscontrare **un documento che non è riuscito a interpretare**. In quel caso al
+posto degli identificativi cita il nome del file ricevuto, e Vettore lo legge
+lo stesso.
+
+La generazione è disponibile (`genera_riscontro`) per completezza e per le
+prove, ma nel ciclo italiano è il caso meno frequente.
+
 ## Cosa NON è implementato, e perché
 
 Fuori copertura, non simulato: allocazione capacità (famiglia 1), trading
@@ -190,6 +234,8 @@ esempi EASEE-gas.
 | `GET` | `/api/edigas/nomine/{id}` | Dettaglio con XML |
 | `GET` | `/api/edigas/nomine/{id}/download` | Scarica il file |
 | `POST` | `/api/edigas/risposte` | Legge un NOMRES e lo confronta con la nomina |
+| `GET` | `/api/edigas/riscontri` | Registro dei riscontri ACKNOW archiviati |
+| `POST` | `/api/edigas/riscontri` | Importa un ACKNOW, lo collega alla nomina e lo conserva |
 
 Le nomine sono isolate per account, come il resto dello stato.
 
@@ -197,7 +243,6 @@ Le nomine sono isolate per account, come il resto dello stato.
 
 * Nessun invio automatico al trasportatore: Vettore produce il file, il canale
   di trasmissione (AS4, portale, e-mail) resta esterno.
-* Il messaggio di conferma `ACKNOW` non è gestito.
 * Le nomine single-sided delegate (`NOMAUT`) non sono coperte.
 * Dalla UI si indica una controparte per volta; l'API accetta più controparti e
   profili orari completi.

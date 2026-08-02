@@ -2,6 +2,18 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.6.0] — 2026-08-02
+
+### Aggiunto
+- **Documento ACKNOW: il riscontro di ricezione EDIG@S.** È il documento con cui il trasportatore dichiara di aver preso in carico — o di respingere — quello che gli è arrivato, e il protocollo lo richiede per la nomina: serve, cita la specifica, «in order to avoid reclamations from the Balance Responsible Party if the NOMINT had not been received».
+  - Il riscontro si incolla nella schermata Nomine, viene validato contro l'XSD ufficiale, **collegato da solo alla nomina che cita** e archiviato con la sua impronta SHA-256, perché è la prova che il documento è arrivato. Reimportare lo stesso file non crea un secondo riscontro.
+  - Distingue i due tipi previsti: `294` applicativo (il documento è stato interpretato) e `AMU` tecnico (un problema di formato o di sistema ne ha impedito l'elaborazione).
+  - I **63 codici di motivazione** della `ReasonCodeTypeCodeList` sono tradotti in italiano: l'operatore legge «Conto non riconosciuto» invece di `14G`.
+  - Un riscontro conta come presa in carico solo se **tutte** le motivazioni lo sono e nessun punto di connessione è stato respinto: accettare in generale e rifiutare un punto non è un'accettazione.
+  - Gestito anche il caso in cui il trasportatore riscontri **un documento che non è riuscito a interpretare**: al posto degli identificativi cita il nome del file ricevuto.
+  - Nuovi endpoint `GET|POST /api/edigas/riscontri`. La generazione (`genera_riscontro`) è disponibile per completezza, ma nel ciclo italiano lo shipper il riscontro lo riceve.
+- 25 nuovi test, fra cui la lettura dei **due esempi ACKNOW ufficiali** del pacchetto EASEE-gas e la verifica che ogni codice di motivazione abbia la sua traduzione.
+
 ## [1.5.2] — 2026-08-02
 
 Riallineamento dell'interfaccia, rimasta indietro mentre il backend cresceva con REMIT ed EDIG@S.

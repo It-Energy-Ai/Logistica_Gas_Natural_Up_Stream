@@ -726,3 +726,151 @@ def test_il_database_dei_fusi_e_una_dipendenza_dichiarata():
 def test_il_fuso_del_giorno_gas_e_caricabile():
     assert edigas.FUSO_GAS.key == "Europe/Rome"
     assert edigas.confini_giorno_gas(date(2026, 1, 15))[0].tzinfo is timezone.utc
+
+
+# ----------------------------------------------- riscontro di ricezione (ACKNOW)
+
+RISCONTRO = {
+    "identificativo": "ACKNOW-2026-0001",
+    "tipo_documento": "294",
+    "emittente_eic": "21X000000001234A",
+    "emittente_ruolo": "ZSO",
+    "destinatario_eic": "21X00000000567KB",
+    "destinatario_ruolo": "ZSH",
+    "documento_riscontrato": {
+        "identificativo": "NOMINT-20260803-001",
+        "versione": "1",
+        "tipo_documento": "01G",
+        "creato_il": "2026-08-02T10:00:00Z",
+    },
+    "motivazioni": [{"codice": "01G", "nota": "Nomina presa in carico"}],
+    "creato_il": "2026-08-02T10:05:00Z",
+}
+
+
+def riscontro(**modifiche):
+    dati = {**RISCONTRO, **modifiche}
+    for chiave, valore in list(dati.items()):
+        if valore is None:
+            del dati[chiave]
+    return edigas.genera_riscontro(dati)
+
+
+@pytest.mark.parametrize(
+    "nome,tipo,motivo,accettato",
+    [("ACKNOW-294", "294", "14G", False), ("ACKNOW-AMU", "AMU", "40G", False)],
+)
+def test_legge_i_riscontri_ufficiali(nome, tipo, motivo, accettato):
+    """I due esempi distribuiti da EASEE-gas devono leggersi per intero."""
+
+    letto = edigas.leggi_riscontro((ESEMPI / f"{nome}.xml").read_bytes())
+    assert letto["valido_xsd"] is True
+    assert letto["tipo_documento"] == tipo
+    assert letto["motivazioni"][0]["codice"] == motivo
+    assert letto["accettato"] is accettato
+    # il riscontro viaggia dal trasportatore allo shipper
+    assert letto["emittente_ruolo"] == "ZSO" and letto["destinatario_ruolo"] == "ZSH"
+    assert letto["documento_riscontrato"]["tipo_documento"] == "01G"
+    assert len(letto["sha256"]) == 64
+
+
+def test_ogni_motivazione_ufficiale_ha_una_traduzione():
+    """I 63 codici della ReasonCodeTypeCodeList vanno tutti spiegati in italiano."""
+
+    assert len(edigas.MOTIVAZIONI) == 63
+    assert all(v and not v.isupper() for v in edigas.MOTIVAZIONI.values())
+    assert edigas.MOTIVAZIONI["01G"] == "Elaborato e accettato"
+    assert edigas.MOTIVAZIONI["40G"] == "Errore sintattico nel messaggio"
+    # i codici di presa in carico sono un sottoinsieme di quelli noti
+    assert edigas.RISCONTRI_ACCETTAZIONE <= set(edigas.MOTIVAZIONI)
+
+
+def test_riscontro_generato_e_valido_e_rileggibile():
+    doc = riscontro()
+    assert doc.radice == "Acknowledgement_Document"
+    assert doc.xml.startswith("<?xml")
+    letto = edigas.leggi_riscontro(doc.xml)
+    assert letto["accettato"] is True
+    assert letto["documento_riscontrato"]["identificativo"] == "NOMINT-20260803-001"
+    assert letto["tipo_descrizione"] == "Riscontro applicativo"
+
+
+def test_la_versione_del_riscontro_e_sempre_uno():
+    """La decision table: «If used, it should always be version 1»."""
+
+    doc = riscontro()
+    radice = etree.fromstring(doc.xml.encode("utf-8"))
+    ns = edigas.SCHEMI["riscontro"]["namespace"]
+    assert radice.find(f"{{{ns}}}version").text == "1"
+
+
+def test_riscontro_di_documento_illeggibile_cita_il_file():
+    """Se il documento non è interpretabile si cita il nome del file ricevuto."""
+
+    doc = riscontro(
+        tipo_documento="AMU",
+        documento_riscontrato={"nome_file": "NOMINT_20260803.xml"},
+        motivazioni=[{"codice": "40G", "nota": "Il file non supera lo schema"}],
+    )
+    letto = edigas.leggi_riscontro(doc.xml)
+    assert letto["documento_riscontrato"]["nome_file"] == "NOMINT_20260803.xml"
+    assert letto["documento_riscontrato"]["identificativo"] == ""
+    assert letto["accettato"] is False
+
+
+def test_riscontro_senza_riferimenti_respinto():
+    with pytest.raises(edigas.EdigasError) as exc:
+        riscontro(documento_riscontrato={})
+    assert any("nome del file" in e["message"] for e in exc.value.errors)
+
+
+def test_la_motivazione_e_sempre_obbligatoria():
+    """Il tracciato non ammette un riscontro muto."""
+
+    with pytest.raises(edigas.EdigasError) as exc:
+        riscontro(motivazioni=[])
+    assert any("almeno una motivazione" in e["message"] for e in exc.value.errors)
+
+
+@pytest.mark.parametrize(
+    "modifiche,atteso",
+    [
+        ({"tipo_documento": "999"}, "ammessi 294"),
+        ({"motivazioni": [{"codice": "ZZZ"}]}, "non in elenco"),
+        ({"emittente_eic": "non-un-eic"}, "non è un codice EIC"),
+        ({"identificativo": ""}, "obbligatorio"),
+    ],
+)
+def test_riscontri_non_conformi_respinti(modifiche, atteso):
+    with pytest.raises(edigas.EdigasError) as exc:
+        riscontro(**modifiche)
+    assert any(atteso in e["message"] for e in exc.value.errors), exc.value.errors
+
+
+def test_un_riscontro_con_un_punto_respinto_non_e_accettazione():
+    """Accettare in generale e respingere un punto non è un'accettazione."""
+
+    ns = edigas.SCHEMI["riscontro"]["namespace"]
+    xml = (
+        f'<?xml version="1.0"?><Acknowledgement_Document xmlns="{ns}" schemaVersion="1">'
+        "<identification>A1</identification><version>1</version><documentCode>294</documentCode>"
+        "<creationDateTime>2026-08-02T10:00:00Z</creationDateTime>"
+        '<issuer_MarketParticipant.identification codingScheme="305">21X000000001234A</issuer_MarketParticipant.identification>'
+        "<issuer_MarketParticipant.marketRole.roleCode>ZSO</issuer_MarketParticipant.marketRole.roleCode>"
+        '<recipient_MarketParticipant.identification codingScheme="305">21X00000000567KB</recipient_MarketParticipant.identification>'
+        "<recipient_MarketParticipant.marketRole.roleCode>ZSH</recipient_MarketParticipant.marketRole.roleCode>"
+        "<receiving_Document.identification>NOM-1</receiving_Document.identification>"
+        '<Rejection_ConnectionPoint><identification>21Z0000000001234</identification>'
+        "<Reason><reasonCode>14G</reasonCode></Reason></Rejection_ConnectionPoint>"
+        "<Reason><reasonCode>01G</reasonCode></Reason>"
+        "</Acknowledgement_Document>"
+    ).encode()
+    letto = edigas.leggi_riscontro(xml)
+    assert letto["punti_respinti"][0]["punto"] == "21Z0000000001234"
+    assert letto["accettato"] is False, "un punto respinto rende il riscontro non pieno"
+
+
+def test_un_file_che_non_e_un_riscontro_viene_rifiutato():
+    with pytest.raises(edigas.EdigasError) as exc:
+        edigas.leggi_riscontro(nomina().xml)
+    assert "non è un riscontro" in str(exc.value)

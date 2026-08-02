@@ -113,6 +113,7 @@
         edgGiorno: "", edgControparte: "", edgDirezione: "Z02", edgQta: "",
         edgNomine: [], edgErrore: "", edgElencoErrore: "", edgInfo: "", edgErroriCampo: [],
         edgRisposta: "", edgRispostaErrore: "", edgRispostaInfo: "", edgScostamentiList: [],
+        edgAck: "", edgAckErrore: "", edgAckInfo: "", edgRiscontriList: [],
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -302,9 +303,16 @@
       const epoca = this._sessionEpoch;
       const miaSessione = () => epoca === this._sessionEpoch;
       try {
-        const payload = await this._json("/api/edigas/nomine");
+        const [payload, riscontri] = await Promise.all([
+          this._json("/api/edigas/nomine"),
+          this._json("/api/edigas/riscontri"),
+        ]);
         if (!miaSessione()) return;
-        this.setState({ edgNomine: Array.isArray(payload.nomine) ? payload.nomine : [], edgElencoErrore: "" });
+        this.setState({
+          edgNomine: Array.isArray(payload.nomine) ? payload.nomine : [],
+          edgRiscontriList: Array.isArray(riscontri.riscontri) ? riscontri.riscontri : [],
+          edgElencoErrore: "",
+        });
       } catch (error) {
         if (!miaSessione()) return;
         this.setState({ edgElencoErrore: `Elenco nomine EDIG@S non disponibile: ${error.message}` });
@@ -768,6 +776,48 @@
           this.setState({ edgRispostaErrore: `Risposta non leggibile: ${error.message}${_dettagli(error)}` });
         }
       };
+
+      const importaAck = unaVolta("importaAck", async () => {
+        this.setState({ edgAckErrore: "", edgAckInfo: "" });
+        const testo = (this.state.edgAck || "").trim();
+        if (!testo) {
+          this.setState({ edgAckErrore: "Incolla il contenuto del riscontro ACKNOW ricevuto." });
+          return;
+        }
+        try {
+          const esito = await this._json("/api/edigas/riscontri", {
+            method: "POST",
+            headers: { "Content-Type": "application/xml" },
+            body: testo,
+          });
+          if (!esito.valido_xsd) {
+            const dettaglio = (esito.errori_schema || [])[0] || "";
+            this.setState({ edgAckErrore: `Il riscontro non è conforme allo schema EDIG@S. ${dettaglio}`.trim() });
+            return;
+          }
+          const rif = esito.documento_riscontrato || {};
+          const quale = rif.identificativo || rif.nome_file || "documento non identificato";
+          const stato = esito.accettato ? "preso in carico" : "respinto";
+          this.setState({
+            edgAck: "",
+            edgAckInfo: esito.gia_importato
+              ? `Riscontro già archiviato in precedenza: ${quale} ${stato}.`
+              : `${quale}: ${stato}${esito.nomina_trovata ? ", collegato alla nomina" : " (nomina non fra le tue)"}.`,
+          });
+          await this._caricaEdigas();
+        } catch (error) {
+          this.setState({ edgAckErrore: `Riscontro non importato: ${error.message}${_dettagli(error)}` });
+        }
+      });
+
+      const edgRiscontri = (this.state.edgRiscontriList || []).map((r) => ({
+        ...r,
+        tipo: r.tipo_documento === "AMU" ? "Riscontro tecnico" : "Riscontro applicativo",
+        dettaglio: (r.motivazioni || []).join(" · ") || "senza motivazione",
+        esito: r.accettato ? "preso in carico" : "respinto",
+        bg: r.accettato ? "#D1FADF" : "#FEE4E2",
+        fg: r.accettato ? "#05603A" : "#B42318",
+      }));
 
       const EDG_ESITI = {
         ridotto: { bg: "#FEF0C7", fg: "#B54708" },
@@ -1385,6 +1435,10 @@
         edgRisposta: this.state.edgRisposta, edgRispostaErrore: this.state.edgRispostaErrore,
         edgRispostaInfo: this.state.edgRispostaInfo,
         edgRows, edgScostamenti, generaNomint, leggiNomres, setEdgTipo,
+        edgRiscontri, importaAck, edgAck: this.state.edgAck,
+        edgAckErrore: this.state.edgAckErrore, edgAckInfo: this.state.edgAckInfo,
+        edgAckVuoto: !(this.state.edgRiscontriList || []).length,
+        setEdgAck: (e) => this.setSilent({ edgAck: e.target.value }),
         setEdgTipoNomina: (e) => this.setSilent({ edgTipoNomina: e.target.value }),
         setEdgIdent: (e) => this.setSilent({ edgIdent: e.target.value }),
         setEdgVersione: (e) => this.setSilent({ edgVersione: e.target.value }),

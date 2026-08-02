@@ -69,6 +69,94 @@ SCHEMI: dict[str, dict[str, str]] = {
         "filename": "nomination/urn-easee-gas-eu-edigas-BrpNominationAndMatching-NominationResponseDocument-6-1.xsd",
         "sha256": "1831468ac7218989d88a63dc6393ccc715fc0ade1b21d7191e217bb08d063b42",
     },
+    "riscontro": {
+        "codice": "riscontro",
+        "etichetta": "Riscontro di ricezione · ACKNOW",
+        "radice": "Acknowledgement_Document",
+        "namespace": "urn:easee-gas.eu:edigas:General:AcknowledgementDocument:6:1",
+        "filename": "general/urn-easee-gas-eu-edigas-General-AcknowledgementDocument-6-1.xsd",
+        "sha256": "c76a3afa0ac8270edb0c79c4322ac03095954da496e15b071d976ff19dd55926",
+    },
+}
+
+# Tipi di riscontro (decision table del "General - Acknowledgement Document
+# Model Specification" v5r0, §3).
+TIPI_RISCONTRO = {
+    "294": "Riscontro applicativo",
+    "AMU": "Riscontro tecnico",
+}
+
+# Esiti del riscontro: il codice di motivazione dice se il documento è stato
+# preso in carico o respinto, e perché.  Un ACKNOW senza motivazione non
+# esiste: la decision table lo dichiara obbligatorio.
+RISCONTRI_ACCETTAZIONE = {"01G", "01H", "02G", "02H", "03G", "50G", "82G", "83G", "90G"}
+
+# I 63 codici della ReasonCodeTypeCodeList di EDIG@S 6.1, tradotti per
+# l'operatore italiano (fonte: edigas6_1-CodeListCoreComponents_v9r0, §2.2.22).
+MOTIVAZIONI = {
+    "01G": "Elaborato e accettato",
+    "01H": "Programma di trasporto accettato con riserve",
+    "02G": "Elaborato automaticamente",
+    "02H": "Accettato, ricevuto dopo la scadenza",
+    "03G": "Elaborato dopo verifica dell'operatore",
+    "04G": "Respinto: ricevuto dopo la scadenza",
+    "09G": "Gas di qualità insufficiente",
+    "11G": "Messaggio in ritardo",
+    "12G": "Messaggio mensile non valido",
+    "13G": "Messaggio settimanale non valido",
+    "14G": "Conto non riconosciuto",
+    "15G": "Valore di potere calorifico errato",
+    "20G": "Variazione di qualità",
+    "21G": "A titolo informativo",
+    "22G": "Indisponibilità non programmata",
+    "23G": "Messaggio rifiutato dall'operatore",
+    "25G": "Disponibilità programmata",
+    "35G": "Ha prevalso la nomina della controparte",
+    "36G": "Nessun abbinamento: ha prevalso la controparte",
+    "37G": "Quantità nominata ridotta",
+    "40G": "Errore sintattico nel messaggio",
+    "41G": "Errore semantico nel messaggio",
+    "44G": "Soggetto non registrato",
+    "45G": "Identificativo di una parte non riconosciuto",
+    "46G": "Identificativo di località non riconosciuto",
+    "47G": "Periodo incompleto",
+    "50G": "Messaggio già accettato",
+    "61G": "Mittente non valido",
+    "62G": "Unità di misura non valida",
+    "63G": "Nomina della controparte non pervenuta",
+    "64G": "Discordanza",
+    "65G": "Capacità insufficiente per il trasferimento",
+    "66G": "Contratto non valido",
+    "67G": "Conto sconosciuto",
+    "68G": "Altro",
+    "69G": "Bilancio del programma non corretto",
+    "71G": "Volume concordato in anticipo",
+    "72G": "Volume concordato a posteriori",
+    "73G": "Discordanza e volume concordato a posteriori",
+    "74G": "Smorzamento non riuscito, discordanza e volume riconcordato",
+    "75G": "Valuta non valida",
+    "76G": "Preavviso non valido",
+    "77G": "Quantità non valida",
+    "78G": "Controparte mancante",
+    "81G": "Tipo di programma di trasporto non ammesso",
+    "82G": "Vincolante contrattualmente",
+    "83G": "Quantità contrattuali mantenute",
+    "84G": "Dettaglio accettato, discordanza altrove",
+    "85G": "Rete non congestionata",
+    "86G": "Rete congestionata",
+    "87G": "Rischio di congestione",
+    "88G": "Quantità ridotta",
+    "89G": "Richiesta del trasportatore",
+    "90G": "Confermato",
+    "91G": "Respinto",
+    "92G": "Conti non corretti",
+    "93G": "Parametri di validazione non disponibili",
+    "94G": "Soggetti responsabili del bilanciamento rimossi",
+    "95G": "Modifiche nel passato ignorate",
+    "96G": "Soggetti responsabili del bilanciamento aggiunti",
+    "97G": "Coppie di conti sconosciute",
+    "98G": "Soggetti responsabili noti",
+    "99G": "Nessuna autorizzazione alla nomina",
 }
 
 # Schema di codifica dell'identificativo: 305 è il registro EIC, ZSO un codice
@@ -951,6 +1039,235 @@ def _schema(codice: str):
         return etree.XMLSchema(etree.parse(str(percorso)))
     except etree.XMLSchemaParseError as exc:
         raise EdigasError(f"Schema EDIG@S non compilabile ({meta['radice']}): {exc}") from exc
+
+
+# ------------------------------------------------------ riscontro di ricezione
+
+
+def leggi_riscontro(contenuto: bytes | str) -> dict[str, Any]:
+    """Legge un ACKNOW: il riscontro con cui il trasportatore prende in carico
+    o respinge un documento ricevuto.
+
+    Nel ciclo di nomina il riscontro viaggia dal trasportatore allo shipper: la
+    specifica lo richiede per il NOMINT — «in order to avoid reclamations […]
+    if the NOMINT had not been received» — mentre lo ritiene di norma superfluo
+    per il NOMRES, perché nulla di nuovo verrebbe comunicato.
+
+    Un riscontro può riferirsi a un documento che il trasportatore non è
+    riuscito nemmeno a interpretare: in quel caso al posto degli identificativi
+    porta il nome del file ricevuto, e va letto lo stesso.
+    """
+
+    if etree is None:  # pragma: no cover
+        raise EdigasError("lxml non è installato: impossibile leggere il riscontro EDIG@S.")
+
+    grezzo = contenuto.encode("utf-8") if isinstance(contenuto, str) else contenuto
+    try:
+        documento = etree.fromstring(grezzo, _parser_sicuro())
+    except etree.XMLSyntaxError as exc:
+        raise EdigasError(f"Il file non è XML valido: {exc}") from exc
+
+    meta = SCHEMI["riscontro"]
+    atteso = f"{{{meta['namespace']}}}{meta['radice']}"
+    if documento.tag != atteso:
+        raise EdigasError(
+            "Il file non è un riscontro EDIG@S 6.1 "
+            f"(radice attesa {meta['radice']}, trovata {etree.QName(documento).localname})."
+        )
+
+    schema = _schema("riscontro")
+    valido = bool(schema.validate(documento))
+    errori_schema = [f"Riga {e.line}: {e.message}" for e in list(schema.error_log)[:12]]
+    ns = {"e": meta["namespace"]}
+
+    def testo(percorso: str, radice=documento) -> str:
+        trovato = radice.find(percorso, ns)
+        return (trovato.text or "").strip() if trovato is not None else ""
+
+    def motivazioni(radice) -> list[dict[str, str]]:
+        fuori = []
+        for motivo in radice.iterfind("e:Reason", ns):
+            codice = testo("e:reasonCode", motivo)
+            fuori.append(
+                {
+                    "codice": codice,
+                    "descrizione": MOTIVAZIONI.get(codice, "Motivazione non in elenco"),
+                    "nota": testo("e:text", motivo),
+                    "accettazione": codice in RISCONTRI_ACCETTAZIONE,
+                }
+            )
+        return fuori
+
+    generali = motivazioni(documento)
+    punti = [
+        {
+            "punto": testo("e:identification", rifiuto),
+            "motivazioni": motivazioni(rifiuto),
+        }
+        for rifiuto in documento.iterfind("e:Rejection_ConnectionPoint", ns)
+    ]
+
+    # Il documento è preso in carico solo se TUTTE le motivazioni lo dicono e
+    # nessun punto di connessione è stato respinto: un riscontro che accetta
+    # in generale ma rifiuta un punto non è un'accettazione.
+    tutte = generali + [m for p in punti for m in p["motivazioni"]]
+    accettato = bool(tutte) and all(m["accettazione"] for m in tutte)
+    tipo = testo("e:documentCode")
+
+    return {
+        "identificativo": testo("e:identification"),
+        "versione": testo("e:version"),
+        "tipo_documento": tipo,
+        "tipo_descrizione": TIPI_RISCONTRO.get(tipo, "Riscontro"),
+        "creato_il": testo("e:creationDateTime"),
+        "periodo_validita": testo("e:validityPeriod"),
+        "emittente": testo("e:issuer_MarketParticipant.identification"),
+        "emittente_ruolo": testo("e:issuer_MarketParticipant.marketRole.roleCode"),
+        "destinatario": testo("e:recipient_MarketParticipant.identification"),
+        "destinatario_ruolo": testo("e:recipient_MarketParticipant.marketRole.roleCode"),
+        "documento_riscontrato": {
+            "identificativo": testo("e:receiving_Document.identification"),
+            "versione": testo("e:receiving_Document.version"),
+            "tipo_documento": testo("e:receiving_Document.documentCode"),
+            "creato_il": testo("e:receiving_Document.creationDateTime"),
+            # Presente solo quando il documento non è stato interpretabile.
+            "nome_file": testo("e:receiving_Document.payloadName"),
+        },
+        "accettato": accettato,
+        "motivazioni": generali,
+        "punti_respinti": punti,
+        "valido_xsd": valido,
+        "errori_schema": [] if valido else errori_schema,
+        "sha256": hashlib.sha256(grezzo).hexdigest(),
+    }
+
+
+def genera_riscontro(dati: dict[str, Any]) -> DocumentoEdigas:
+    """Costruisce un ACKNOW e lo valida contro l'XSD ufficiale.
+
+    Serve quando è l'applicazione a dover riscontrare un documento ricevuto.
+    Nel ciclo italiano è il caso meno frequente — lo shipper di norma il
+    riscontro lo riceve — ma il documento è lo stesso in entrambe le direzioni.
+    """
+
+    if etree is None:  # pragma: no cover
+        raise EdigasError("lxml non è installato: impossibile validare il riscontro EDIG@S.")
+
+    errors: list[dict[str, str]] = []
+    meta = SCHEMI["riscontro"]
+
+    identificativo = _testo(dati, "identificativo", errors, "Identificativo del riscontro")
+    _controlla(errors, "identificativo", identificativo, "IdentificationType", "Identificativo del riscontro")
+
+    tipo = _testo(dati, "tipo_documento", errors, "Tipo di riscontro")
+    if tipo and tipo not in TIPI_RISCONTRO:
+        elenco = ", ".join(f"{c} ({d})" for c, d in TIPI_RISCONTRO.items())
+        _errore(errors, "tipo_documento", f"Tipo di riscontro: ammessi {elenco}.")
+
+    emittente = _testo(dati, "emittente_eic", errors, "EIC dell'emittente")
+    _eic(errors, "emittente_eic", emittente, "EIC dell'emittente")
+    emittente_ruolo = _testo(dati, "emittente_ruolo", errors, "Ruolo dell'emittente")
+    destinatario = _testo(dati, "destinatario_eic", errors, "EIC del destinatario")
+    _eic(errors, "destinatario_eic", destinatario, "EIC del destinatario")
+    destinatario_ruolo = _testo(dati, "destinatario_ruolo", errors, "Ruolo del destinatario")
+
+    # Il documento riscontrato si cita per identificativo, oppure — se non è
+    # stato interpretabile — per nome del file. Uno dei due serve.
+    rif = dati.get("documento_riscontrato") or {}
+    if not isinstance(rif, dict):
+        _errore(errors, "documento_riscontrato", "Riferimento al documento riscontrato: formato non valido.")
+        rif = {}
+    rif_id = _testo(rif, "identificativo", errors, "Identificativo del documento riscontrato", obbligatorio=False)
+    rif_file = _testo(rif, "nome_file", errors, "Nome del file ricevuto", obbligatorio=False)
+    if not rif_id and not rif_file:
+        _errore(
+            errors,
+            "documento_riscontrato",
+            "Indica l'identificativo del documento riscontrato, oppure il nome del file se non è stato interpretabile.",
+        )
+
+    motivi = dati.get("motivazioni")
+    if not isinstance(motivi, list) or not motivi:
+        _errore(errors, "motivazioni", "Serve almeno una motivazione: il tracciato la richiede sempre.")
+        motivi = []
+    puliti: list[tuple[str, str]] = []
+    for indice, motivo in enumerate(motivi if isinstance(motivi, list) else []):
+        campo = f"motivazioni[{indice}]"
+        if not isinstance(motivo, dict):
+            _errore(errors, campo, f"Motivazione {indice + 1}: formato non valido.")
+            continue
+        codice = _testo(motivo, "codice", errors, f"Motivazione {indice + 1} · codice")
+        if codice and codice not in MOTIVAZIONI:
+            _errore(errors, f"{campo}.codice", f"Motivazione {indice + 1}: codice {codice} non in elenco EDIG@S.")
+        nota = _testo(motivo, "nota", errors, f"Motivazione {indice + 1} · nota", obbligatorio=False)
+        if codice:
+            puliti.append((codice, nota))
+
+    creato = datetime.now(timezone.utc).replace(microsecond=0)
+    if dati.get("creato_il"):
+        indicato = _momento(dati.get("creato_il"), "creato_il", "Data di creazione", errors)
+        if indicato is not None:
+            creato = indicato
+
+    if errors:
+        raise EdigasError("Il riscontro EDIG@S non è conforme: correggi i campi segnalati.", errors)
+
+    ns = meta["namespace"]
+    radice = etree.Element(f"{{{ns}}}{meta['radice']}", nsmap={None: ns})
+    radice.set("schemaVersion", "1")
+
+    def figlio(padre, nome: str, testo_valore: str, **attrs: str):
+        el = etree.SubElement(padre, f"{{{ns}}}{nome}")
+        el.text = testo_valore
+        for chiave, valore in attrs.items():
+            el.set(chiave, valore)
+        return el
+
+    figlio(radice, "identification", identificativo)
+    # La decision table: «May be used. If used, it should always be version 1».
+    figlio(radice, "version", "1")
+    figlio(radice, "documentCode", tipo)
+    figlio(radice, "creationDateTime", creato.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    figlio(radice, "issuer_MarketParticipant.identification", emittente, codingScheme=CODIFICA_EIC)
+    figlio(radice, "issuer_MarketParticipant.marketRole.roleCode", emittente_ruolo)
+    figlio(radice, "recipient_MarketParticipant.identification", destinatario, codingScheme=CODIFICA_EIC)
+    figlio(radice, "recipient_MarketParticipant.marketRole.roleCode", destinatario_ruolo)
+    if rif_id:
+        figlio(radice, "receiving_Document.identification", rif_id)
+        versione_rif = _testo(rif, "versione", [], "", obbligatorio=False)
+        if versione_rif:
+            figlio(radice, "receiving_Document.version", versione_rif)
+        tipo_rif = _testo(rif, "tipo_documento", [], "", obbligatorio=False)
+        if tipo_rif:
+            figlio(radice, "receiving_Document.documentCode", tipo_rif)
+        creato_rif = _testo(rif, "creato_il", [], "", obbligatorio=False)
+        if creato_rif:
+            figlio(radice, "receiving_Document.creationDateTime", creato_rif)
+    if rif_file:
+        figlio(radice, "receiving_Document.payloadName", rif_file)
+    for codice, nota in puliti:
+        motivo_el = etree.SubElement(radice, f"{{{ns}}}Reason")
+        figlio(motivo_el, "reasonCode", codice)
+        if nota:
+            figlio(motivo_el, "text", nota)
+
+    xml = etree.tostring(radice, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+    _valida(xml, "riscontro")
+    return DocumentoEdigas(
+        codice="riscontro",
+        radice=meta["radice"],
+        tipo_documento=tipo,
+        identificativo=identificativo,
+        versione=1,
+        giorno_gas="",
+        punto="",
+        versione_edigas=PACCHETTO["versione"],
+        schema_sha256=meta["sha256"],
+        xml=xml.decode("utf-8"),
+        xml_sha256=hashlib.sha256(xml).hexdigest(),
+        size_bytes=len(xml),
+        periodi=0,
+    )
 
 
 # --------------------------------------------------- risposta del trasportatore

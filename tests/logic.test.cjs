@@ -828,3 +828,57 @@ test("il logout sblocca il pulsante di accesso", () => {
   app._reimpostaDopoLogout();
   assert.equal(app._loginInCorso, false, "restando chiuso, «Accedi» non risponderebbe più");
 });
+
+// --- riscontro ACKNOW --------------------------------------------------------
+
+test("ACKNOW: i riscontri archiviati distinguono presa in carico e rifiuto", () => {
+  const app = new App();
+  app.setState({
+    screen: "nomine",
+    edgRiscontriList: [
+      { riferimento: "NOM-1", tipo_documento: "294", accettato: true, motivazioni: ["01G · Elaborato e accettato"] },
+      { riferimento: "NOM-2", tipo_documento: "AMU", accettato: false, motivazioni: ["40G · Errore sintattico nel messaggio"] },
+    ],
+  });
+  const [primo, secondo] = app.renderVals().edgRiscontri;
+  assert.equal(primo.tipo, "Riscontro applicativo");
+  assert.equal(primo.esito, "preso in carico");
+  assert.equal(secondo.tipo, "Riscontro tecnico");
+  assert.equal(secondo.esito, "respinto");
+  assert.equal(secondo.dettaglio, "40G · Errore sintattico nel messaggio");
+  assert.equal(app.renderVals().edgAckVuoto, false);
+});
+
+test("ACKNOW: a portale pulito il pannello spiega a cosa serve", () => {
+  const app = new App();
+  app.setState({ screen: "nomine" });
+  const v = app.renderVals();
+  assert.deepEqual(v.edgRiscontri, []);
+  assert.equal(v.edgAckVuoto, true);
+  assert.equal(v.edgAckErrore, "");
+});
+
+test("ACKNOW: un riscontro non conforme allo schema non viene spacciato per valido", async () => {
+  const app = new App();
+  app.setState({ screen: "nomine", edgAck: "<Acknowledgement_Document/>" });
+  global.fetch = async () => ({
+    ok: true, status: 201,
+    json: async () => ({ valido_xsd: false, errori_schema: ["Riga 2: elemento mancante"], accettato: true }),
+    text: async () => "",
+  });
+  await app.renderVals().importaAck();
+  assert.match(app.state.edgAckErrore, /non è conforme allo schema/);
+  assert.equal(app.state.edgAckInfo, "");
+  global.fetch = FETCH_OK;
+});
+
+test("ACKNOW: senza testo incollato non parte nessuna richiesta", async () => {
+  const app = new App();
+  app.setState({ screen: "nomine", edgAck: "   " });
+  let chiamate = 0;
+  global.fetch = async () => { chiamate++; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; };
+  await app.renderVals().importaAck();
+  assert.equal(chiamate, 0);
+  assert.match(app.state.edgAckErrore, /Incolla il contenuto/);
+  global.fetch = FETCH_OK;
+});

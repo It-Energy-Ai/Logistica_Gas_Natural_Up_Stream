@@ -851,7 +851,10 @@ def test_edigas_catalogo_espone_i_codici_dello_schema(client):
     assert [s["radice"] for s in catalogo["schemi"]] == [
         "Nomination_Document",
         "NominationResponse_Document",
+        "Acknowledgement_Document",
     ]
+    assert catalogo["tipi_riscontro"]["294"] == "Riscontro applicativo"
+    assert len(catalogo["motivazioni"]) == 63
 
 
 def test_edigas_ciclo_nomina_download_e_risposta(client):
@@ -1126,3 +1129,120 @@ def test_edigas_i_metadati_salvati_sono_quelli_normalizzati(client):
     ).json()
     assert creata["giorno_gas"] == "2026-08-03"
     assert creata["punto"] == "21Z0000000001234"
+
+
+def _acknow_per(nomina_xml: str, *, motivo: str = "01G", nota: str = "Presa in carico") -> bytes:
+    """Il riscontro che il trasportatore invierebbe per quella nomina."""
+
+    from lxml import etree
+
+    from app import edigas
+
+    ns_n = edigas.SCHEMI["nomina"]["namespace"]
+    origine = etree.fromstring(nomina_xml.encode("utf-8"))
+
+    def valore(nome):
+        el = origine.find(f"{{{ns_n}}}{nome}")
+        return (el.text or "").strip() if el is not None else ""
+
+    documento = edigas.genera_riscontro({
+        "identificativo": f"ACKNOW-{valore('identification')}",
+        "tipo_documento": "294",
+        # il trasportatore riscontra allo shipper: ruoli invertiti rispetto alla nomina
+        "emittente_eic": valore("recipient_MarketParticipant.identification"),
+        "emittente_ruolo": "ZSO",
+        "destinatario_eic": valore("issuer_MarketParticipant.identification"),
+        "destinatario_ruolo": "ZSH",
+        "documento_riscontrato": {
+            "identificativo": valore("identification"),
+            "versione": valore("version"),
+            "tipo_documento": valore("documentCode"),
+            "creato_il": valore("creationDateTime"),
+        },
+        "motivazioni": [{"codice": motivo, "nota": nota}],
+    })
+    return documento.xml.encode("utf-8")
+
+
+def test_edigas_riscontro_si_collega_alla_nomina(client):
+    """Il ciclo completo: nomina inviata, riscontro ricevuto, prova conservata."""
+
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+
+    r = client.post("/api/edigas/riscontri", content=_acknow_per(xml))
+    assert r.status_code == 201, r.json()
+    corpo = r.json()
+    assert corpo["valido_xsd"] is True
+    assert corpo["accettato"] is True
+    assert corpo["nomina_trovata"] is True
+    assert corpo["nomina_id"] == creata["id"]
+    assert corpo["motivazioni"][0]["descrizione"] == "Elaborato e accettato"
+
+    elenco = client.get("/api/edigas/riscontri").json()["riscontri"]
+    assert len(elenco) == 1
+    assert elenco[0]["nomina_id"] == creata["id"]
+    assert elenco[0]["accettato"] is True
+
+
+def test_edigas_riscontro_di_rifiuto(client):
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+    r = client.post("/api/edigas/riscontri", content=_acknow_per(xml, motivo="14G", nota="conto ignoto"))
+    assert r.json()["accettato"] is False
+    assert r.json()["motivazioni"][0]["descrizione"] == "Conto non riconosciuto"
+
+
+def test_edigas_lo_stesso_riscontro_non_si_duplica(client):
+    """Reimportare lo stesso file è lo stesso fatto, non un secondo riscontro."""
+
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+    ack = _acknow_per(xml)
+    primo = client.post("/api/edigas/riscontri", content=ack)
+    secondo = client.post("/api/edigas/riscontri", content=ack)
+    assert primo.status_code == 201 and secondo.status_code == 200
+    assert secondo.json()["gia_importato"] is True
+    assert len(client.get("/api/edigas/riscontri").json()["riscontri"]) == 1
+
+
+def test_edigas_riscontro_di_una_nomina_sconosciuta(client):
+    """Un riscontro che cita un documento non nostro si legge comunque."""
+
+    client.post("/api/login", json={})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+    ack = _acknow_per(xml).replace(b"<receiving_Document.identification>NOMINT-20260803-001",
+                                   b"<receiving_Document.identification>ALTRA-NOMINA")
+    r = client.post("/api/edigas/riscontri", content=ack)
+    assert r.status_code == 201
+    assert r.json()["nomina_trovata"] is False
+    assert r.json()["accettato"] is True
+
+
+def test_edigas_riscontri_richiedono_la_sessione(client):
+    assert client.get("/api/edigas/riscontri").status_code == 401
+    assert client.post("/api/edigas/riscontri", content=b"<x/>").status_code == 401
+
+
+def test_edigas_riscontri_isolati_per_account(client):
+    client.post("/api/login", json={"email": "primo@azienda.it"})
+    creata = client.post("/api/edigas/nomine", json=_nomina_valida()).json()
+    xml = client.get(f"/api/edigas/nomine/{creata['id']}/download").text
+    client.post("/api/edigas/riscontri", content=_acknow_per(xml))
+    from app.main import app
+
+    with TestClient(app) as altro:
+        altro.post("/api/login", json={"email": "secondo@azienda.it"})
+        assert altro.get("/api/edigas/riscontri").json()["riscontri"] == []
+
+
+def test_edigas_riscontro_malformato_non_rompe(client):
+    client.post("/api/login", json={})
+    assert client.post("/api/edigas/riscontri", content=b"").status_code == 400
+    assert client.post("/api/edigas/riscontri", content=b"<rotto>").status_code == 422
+    # un NOMRES non è un ACKNOW
+    assert client.post("/api/edigas/riscontri", content=b'<?xml version="1.0"?><Altro/>').status_code == 422

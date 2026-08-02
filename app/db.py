@@ -85,6 +85,27 @@ CREATE INDEX IF NOT EXISTS idx_edigas_nomina_email ON edigas_nomina(email, giorn
 CREATE UNIQUE INDEX IF NOT EXISTS idx_edigas_nomina_identita
     ON edigas_nomina(email, identificativo, versione);
 
+-- Riscontri ACKNOW ricevuti: il trasportatore dichiara di aver preso in
+-- carico (o respinto) un documento inviato. Sono immutabili come le ricevute
+-- PDR: valgono come prova di trasmissione.
+CREATE TABLE IF NOT EXISTS edigas_riscontro (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    nomina_id TEXT,
+    identificativo TEXT NOT NULL,
+    tipo_documento TEXT NOT NULL,
+    riferimento TEXT NOT NULL,
+    accettato INTEGER NOT NULL,
+    motivazioni TEXT NOT NULL,
+    creato_il TEXT NOT NULL,
+    xml TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    importato_il TEXT NOT NULL,
+    UNIQUE (email, sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_edigas_riscontro_nomina
+    ON edigas_riscontro(email, nomina_id, importato_il DESC);
+
 CREATE TABLE IF NOT EXISTS remit_migrazione (
     email TEXT NOT NULL,
     source_hash TEXT NOT NULL,
@@ -560,6 +581,72 @@ def trova_nomina_edigas(
         (email, identificativo, numero),
     ).fetchone()
     return _riga_nomina(row, con_xml=True) if row else None
+
+
+def crea_riscontro_edigas(
+    conn: sqlite3.Connection,
+    *,
+    riscontro_id: str,
+    email: str,
+    nomina_id: str | None,
+    identificativo: str,
+    tipo_documento: str,
+    riferimento: str,
+    accettato: bool,
+    motivazioni: str,
+    creato_il: str,
+    xml: str,
+    sha256: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO edigas_riscontro (id, email, nomina_id, identificativo, tipo_documento, riferimento, "
+        "accettato, motivazioni, creato_il, xml, sha256, importato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (
+            riscontro_id, email, nomina_id, identificativo, tipo_documento, riferimento,
+            1 if accettato else 0, motivazioni, creato_il, xml, sha256,
+        ),
+    )
+
+
+def _riga_riscontro(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "nomina_id": row["nomina_id"],
+        "identificativo": row["identificativo"],
+        "tipo_documento": row["tipo_documento"],
+        "riferimento": row["riferimento"],
+        "accettato": bool(row["accettato"]),
+        "motivazioni": _json_o_righe(row["motivazioni"]),
+        "creato_il": row["creato_il"],
+        "sha256": row["sha256"],
+        "importato_il": row["importato_il"],
+    }
+
+
+CAMPI_RISCONTRO = (
+    "id, nomina_id, identificativo, tipo_documento, riferimento, accettato, motivazioni, "
+    "creato_il, sha256, importato_il"
+)
+
+
+def elenca_riscontri_edigas(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_RISCONTRO} FROM edigas_riscontro WHERE email = ? "
+        "ORDER BY importato_il DESC, rowid DESC LIMIT 500",
+        (email,),
+    ).fetchall()
+    return [_riga_riscontro(r) for r in righe]
+
+
+def riscontro_edigas_per_impronta(conn: sqlite3.Connection, email: str, sha256: str) -> dict | None:
+    """Un riscontro già importato non va duplicato: si riconosce dall'impronta."""
+
+    row = conn.execute(
+        f"SELECT {CAMPI_RISCONTRO} FROM edigas_riscontro WHERE email = ? AND sha256 = ?",
+        (email, sha256),
+    ).fetchone()
+    return _riga_riscontro(row) if row else None
 
 
 def crea_artifact_remit(

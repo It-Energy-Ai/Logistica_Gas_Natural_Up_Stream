@@ -358,6 +358,8 @@ def get_edigas_catalogo(request: Request):
         "direzioni": edigas.DIREZIONI,
         "unita": edigas.UNITA,
         "tipi_nomina": edigas.TIPI_NOMINA,
+        "tipi_riscontro": edigas.TIPI_RISCONTRO,
+        "motivazioni": edigas.MOTIVAZIONI,
     }
 
 
@@ -460,6 +462,82 @@ def download_edigas_nomina(nomina_id: str, request: Request):
         content=record["xml"],
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nome)}"},
         media_type="application/xml",
+    )
+
+
+@app.get("/api/edigas/riscontri")
+def get_edigas_riscontri(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return {"riscontri": db.elenca_riscontri_edigas(conn, email)}
+
+
+@app.post("/api/edigas/riscontri")
+async def post_edigas_riscontro(request: Request):
+    """Importa un ACKNOW e lo collega alla nomina che riscontra.
+
+    Il riscontro è la prova che il trasportatore ha ricevuto il documento: la
+    specifica lo richiede per la nomina proprio «per evitare contestazioni se
+    il NOMINT non fosse arrivato». Va quindi conservato, non solo letto.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, edigas.MAX_RISPOSTA_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    grezzo = await request.body()
+    if not grezzo:
+        return JSONResponse({"errore": "corpo della richiesta vuoto"}, status_code=400)
+    if len(grezzo) > edigas.MAX_RISPOSTA_BYTES:
+        return JSONResponse(
+            {"errore": f"File troppo grande: il limite è {edigas.MAX_RISPOSTA_BYTES // 1024} KB."},
+            status_code=413,
+        )
+    try:
+        riscontro = edigas.leggi_riscontro(grezzo)
+    except edigas.EdigasError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+
+    rif = riscontro["documento_riscontrato"]
+    with db.connect() as conn:
+        gia_visto = db.riscontro_edigas_per_impronta(conn, email, riscontro["sha256"])
+        if gia_visto:
+            # Reimportare lo stesso file non crea un secondo riscontro: è lo
+            # stesso fatto, e duplicarlo falserebbe il registro.
+            return {**riscontro, "nomina_trovata": bool(gia_visto["nomina_id"]),
+                    "nomina_id": gia_visto["nomina_id"], "riscontro_id": gia_visto["id"],
+                    "gia_importato": True}
+        nomina = db.trova_nomina_edigas(conn, email, rif["identificativo"], rif["versione"])
+        riscontro_id = secrets.token_hex(8)
+        db.crea_riscontro_edigas(
+            conn,
+            riscontro_id=riscontro_id,
+            email=email,
+            nomina_id=nomina["id"] if nomina else None,
+            identificativo=riscontro["identificativo"],
+            tipo_documento=riscontro["tipo_documento"],
+            riferimento=rif["identificativo"] or rif["nome_file"],
+            accettato=riscontro["accettato"],
+            motivazioni=json.dumps(
+                [f"{m['codice']} · {m['descrizione']}" for m in riscontro["motivazioni"]]
+            ),
+            creato_il=riscontro["creato_il"],
+            xml=grezzo.decode("utf-8", "replace"),
+            sha256=riscontro["sha256"],
+        )
+    return JSONResponse(
+        {
+            **riscontro,
+            "nomina_trovata": bool(nomina),
+            "nomina_id": nomina["id"] if nomina else None,
+            "riscontro_id": riscontro_id,
+            "gia_importato": False,
+        },
+        status_code=201,
     )
 
 
