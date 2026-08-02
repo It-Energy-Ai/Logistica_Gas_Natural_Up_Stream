@@ -26,6 +26,7 @@ Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://k
 - **Cambio account e login offline**: logout e login successivo ripartono da uno stato pulito, mentre l'hub non viene più aperto se il backend non conferma l'accesso.
 - **Sync**: una sola richiesta di salvataggio resta in volo alla volta, così una risposta fuori ordine non può ripristinare un valore precedente.
 - **Release macOS**: un fallimento consultivo dello smoke test aggiorna un'unica issue diagnostica invece di aprirne una per ogni esecuzione.
+- **Smoke test della release**: la verifica del contenuto non usa più `curl | grep -q`. Con `pipefail`, `grep -q` chiudeva la pipe al primo match e curl falliva per SIGPIPE (exit 23), così lo smoke risultava fallito **anche a server sano** — causa reale dei fallimenti macOS attribuiti ai runner e, con la pagina cresciuta a ~124 KB, anche di quelli Linux. Ora la pagina si scarica su file e si verifica dopo, e lo smoke torna bloccante su tutte le piattaforme.
 
 ### Sicurezza
 - Aggiunti CSP, intestazioni anti-framing e anti-MIME-sniffing, policy per le API non memorizzabili in cache e normalizzazione dell'email di sessione.

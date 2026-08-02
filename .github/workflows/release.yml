@@ -73,11 +73,6 @@ jobs:
       - name: Smoke test (unix)
         id: smoke
         if: runner.os != 'Windows'
-        # I runner macos-latest (immagine 26.4) bloccano l'avvio dei binari
-        # server non firmati: lo smoke lì è consultivo finché non guariscono.
-        # Il binario macOS viene comunque verificato sull'hardware reale
-        # dopo la pubblicazione. Su Linux lo smoke resta bloccante.
-        continue-on-error: ${{ matrix.os == 'macos-latest' }}
         shell: bash
         run: |
           # porta alta e improbabile: i runner ospitati a volte occupano la 8080
@@ -88,7 +83,9 @@ jobs:
           ok=""
           for i in $(seq 1 150); do
             if ! kill -0 "$PID" 2>/dev/null; then echo "processo terminato" >> server.log; break; fi
-            if curl -sf http://127.0.0.1:8123/ | grep -q "data-screen-label"; then ok=1; break; fi
+            # niente pipe: grep -q chiude presto e curl morirebbe di SIGPIPE
+            # (con pipefail la pipeline risulterebbe fallita anche a pagina corretta)
+            if curl -sf http://127.0.0.1:8123/ -o pagina.html && grep -q "data-screen-label" pagina.html; then ok=1; break; fi
             sleep 2
           done
           curl -sf -o /dev/null http://127.0.0.1:8123/static/logic.js || ok=""
