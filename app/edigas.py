@@ -25,6 +25,7 @@ reale di quel giorno.
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -39,6 +40,8 @@ try:  # Il requisito applicativo rende lxml disponibile; il messaggio resta chia
 except ImportError:  # pragma: no cover - esercitato solo in installazioni incomplete
     etree = None  # type: ignore[assignment]
 
+
+logger = logging.getLogger(__name__)
 
 SCHEMA_DIR = Path(__file__).with_name("schemas") / "edigas"
 FUSO_GAS = ZoneInfo("Europe/Rome")
@@ -380,7 +383,17 @@ def _facet_ricorsivo(codice: str, tipo: str, _profondita: int) -> dict[str, Any]
     EDIG@S viene aggiornato, invece di ricopiare i valori a mano.
     """
 
-    if codice not in SCHEMI or _profondita > 6:
+    if codice not in SCHEMI:
+        return {}
+    if _profondita > 10:
+        # Nel pacchetto 6.1 la catena più lunga misurata è profonda 3: se si
+        # arriva qui, EDIG@S ha cambiato struttura e i vincoli andrebbero
+        # persi in silenzio. Meglio dirlo che tacere.
+        logger.warning(
+            "Catena di derivazione XSD oltre il limite per %s/%s: "
+            "vincoli non risolti, verificare il pacchetto EDIG@S.",
+            codice, tipo,
+        )
         return {}
     st = _definizioni(codice).get(tipo)
     if st is None:
@@ -1005,7 +1018,9 @@ def _eic(errors: list[dict[str, str]], campo: str, valore: str, etichetta: str, 
 def _valida(xml: bytes, codice: str) -> None:
     meta = SCHEMI[codice]
     schema = _schema(codice)
-    documento = etree.fromstring(xml)
+    # L'XML qui è prodotto da noi, ma il parser esplicito è la convenzione di
+    # tutto il modulo: la sicurezza non deve dipendere da chi chiama.
+    documento = etree.fromstring(xml, _parser_sicuro())
     if schema.validate(documento):
         return
     errori = [
@@ -1402,7 +1417,9 @@ def confronta_con_nomina(nomina_xml: bytes | str, risposta: dict[str, Any]) -> l
 
     grezzo = nomina_xml.encode("utf-8") if isinstance(nomina_xml, str) else nomina_xml
     ns = {"e": SCHEMI["nomina"]["namespace"]}
-    documento = etree.fromstring(grezzo)
+    # Stessa convenzione di leggi_risposta/leggi_riscontro: parser esplicito
+    # senza DTD, entità o rete, anche se l'XML viene dal nostro database.
+    documento = etree.fromstring(grezzo, _parser_sicuro())
 
     # I Period pendono da External_Account quando c'è una controparte e dal
     # punto di connessione nelle nomine non-matching: vanno letti entrambi,

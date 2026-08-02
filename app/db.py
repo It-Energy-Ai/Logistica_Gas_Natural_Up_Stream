@@ -755,7 +755,14 @@ def prossimo_progressivo_pdr(
         "RETURNING prossimo - 1 AS progressivo",
         (data_file, schema_nome, schema_versione, codice_acer),
     ).fetchone()
-    assert row is not None
+    if row is None:
+        # Mai un assert qui: con `python -O` sparirebbe e un problema del
+        # database diventerebbe un progressivo corrotto nel nome file PDR.
+        raise RuntimeError(
+            "Impossibile riservare il progressivo PDR "
+            f"({data_file}/{schema_nome}/{schema_versione}/{codice_acer}): "
+            "il database non ha restituito il valore atteso."
+        )
     return int(row["progressivo"])
 
 
