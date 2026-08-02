@@ -2,7 +2,15 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
-## [1.5.1] — 2026-08-02
+## [1.5.2] — 2026-08-02
+
+Riallineamento dell'interfaccia, rimasta indietro mentre il backend cresceva con REMIT ed EDIG@S.
+
+### Modificato
+- **La dashboard mostra lo stato regolatorio reale**: quattro tessere cliccabili con bozze REMIT da validare, XML già generati, documenti EDIG@S del giorno gas e avvisi da leggere. Sono dati veri dell'utente, quindi restano visibili anche a modalità demo spenta, a differenza dei numeri di scena che continuano a mostrare `—`. Il conteggio del giorno gas usa `Europe/Rome`: contare sulla mezzanotte locale avrebbe dato zero alle due di notte, in pieno intraday.
+- **L'hub racconta il prodotto di oggi**: le card citano EDIG@S 6.1, la validazione XSD e il generatore UTI. Sparisce la dicitura «invii reali simulati», che descriveva una versione precedente, e «REMIT · Workspace» diventa «REMIT · XML ACER» in tutta la navigazione, briciole comprese.
+- **La schermata Nomine dichiara il confine.** Il documento EDIG@S — l'unico che produce un file da trasmettere — sale in cima; il vecchio pannello scende sotto ed è ora chiamato per quello che è, un **registro interno dei cicli** che non genera nulla. Prima i due convivevano senza che si capisse quale dei due facesse sul serio: il pulsante diceva «Invia nomina» e non inviava niente.
+- **Stati vuoti** in REMIT, EDIG@S e preflight PDR: a portale pulito una tabella vuota senza spiegazione fa sembrare rotta un'applicazione che sta solo aspettando il primo dato. Il preflight, che senza XML era un vicolo cieco, offre ora il collegamento a REMIT.
 
 Da una revisione a tappeto di tutti i moduli e di tutte le pagine: ogni difetto è stato riprodotto eseguendo codice e poi verificato una seconda volta in modo indipendente. Trenta difetti confermati, tutti corretti.
 

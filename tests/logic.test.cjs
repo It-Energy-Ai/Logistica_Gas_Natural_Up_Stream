@@ -113,7 +113,7 @@ test("dashboard: giorno gas e KPI si muovono con offset", () => {
   assert.equal(app.state.dashOff, 7);
 });
 
-test("nomina: invio aggiunge in testa con stato Inviata e sincronizza", () => {
+test("registro interno: l'annotazione va in testa con stato Registrata", () => {
   const app = new App();
   app.setState({ screen: "nomine" });
   let v = app.renderVals();
@@ -125,7 +125,7 @@ test("nomina: invio aggiunge in testa con stato Inviata e sincronizza", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].punto, "Passo Gries");
   assert.equal(rows[0].qta, "750");
-  assert.equal(rows[0].stato, "Inviata");
+  assert.equal(rows[0].stato, "Registrata");
   assert.ok("nomList" in app._pending, "nomList in attesa di sync col backend");
   assert.equal(app.state.nomQta, "");
 });
@@ -332,7 +332,7 @@ test("login: non apre l'hub se l'API non risponde", async () => {
 
 test("logout e nuovo login non conservano i dati dell'utente precedente", async () => {
   const app = new App();
-  app.idrata({ email: "prima@azienda.it", nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Inviata" }] });
+  app.idrata({ email: "prima@azienda.it", nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Registrata" }] });
   app._reimpostaDopoLogout();
   assert.equal(app.state.screen, "login");
   assert.deepEqual(app.state.nomList, []);
@@ -379,7 +379,7 @@ test("boot: idratazione dallo stato salvato separa email e salta il login", () =
   const app = new App();
   app.idrata({
     email: "operazioni@gasadriatica.it",
-    nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Inviata" }],
+    nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Registrata" }],
     demoMode: true,
   });
   assert.equal(app.state.screen, "hub"); // sessione presente → niente login

@@ -412,12 +412,12 @@
         config: [{ label: "Moduli", t: "hub" }, { label: "Configuratore" }],
         cfgSis: [{ label: "Moduli", t: "hub" }, { label: "Configuratore", t: "config" }, { label: "Sistema" }],
         cfgImp: [{ label: "Moduli", t: "hub" }, { label: "Configuratore", t: "config" }, { label: "Impostazioni" }],
-        nomine: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Nomine & Programmazione" }],
+        nomine: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Nomine · EDIG@S" }],
         bilancio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Bilanciamento" }],
         capacita: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Capacità & Contratti" }],
         stoccaggio: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Stoccaggio" }],
         report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
-        remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT" }],
+        remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT · XML ACER" }],
         pdr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "PDR · GME" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
@@ -470,17 +470,54 @@
       const unitOpts = seg("unit", ["MWh", "Smc"]);
       const cicloOpts = seg("ciclo", ["D−1", "Intraday"]);
       const nAbil = punti.filter((x) => x.on).length;
+      // Contatori REALI del workspace regolatorio: non sono scenografia, quindi
+      // restano visibili anche a demo spenta. Il giorno gas non e' la mezzanotte
+      // locale: alle 02:00, in pieno intraday, contare su new Date() direbbe
+      // zero documenti con cinque nomine aperte.
+      const GIORNO_GAS_ISO = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit",
+      });
+      const giornoGasIso = (d = new Date()) => GIORNO_GAS_ISO.format(new Date(d.getTime() - 6 * 3600 * 1000));
+      const _rem = this.state.remReports || [];
+      const _edg = this.state.edgNomine || [];
+      const oggiGG = giornoGasIso();
+      const regCaricamento = !!(this.state.remCaricamento || this.state.pdrCaricamento);
+      const nReg = {
+        bozze: _rem.filter((r) => r.status === "bozza").length,
+        xml: _rem.filter((r) => r.status === "xml_validato_xsd").length,
+        nomineOggi: _edg.filter((n) => n.giorno_gas === oggiGG).length,
+        avvisi: _edg.reduce((tot, n) => tot + ((n.avvisi || []).length), 0),
+      };
+
+      const regTessera = (area, n, unita, pieno, vuoto, tono, dove) => ({
+        area, unita, go: go(dove),
+        value: regCaricamento ? "—" : String(n),
+        // "—" significa "non ancora saputo", "0" significa "non hai nulla":
+        // sono due cose diverse e vanno distinte a schermo.
+        hint: regCaricamento ? "caricamento…" : (n ? pieno : vuoto),
+        bg: (!regCaricamento && n) ? tono.bg : "var(--surface2)",
+        fg: (!regCaricamento && n) ? tono.fg : "var(--ink3)",
+      });
+      const regKpis = [
+        regTessera("REMIT · BOZZE", nReg.bozze, "record", "da validare", "nessuna in lavorazione", WAIT, "remit"),
+        regTessera("REMIT · XML", nReg.xml, "file", "validati XSD", "nessun file generato", OK, "remit"),
+        regTessera("EDIG@S · GIORNO GAS", nReg.nomineOggi, "documenti", "NOMINT generati oggi", "nessuna nomina oggi", RUN, "nomine"),
+        regTessera("EDIG@S · AVVISI", nReg.avvisi, "avvisi", "da leggere", "nessun avviso", WARN, "nomine"),
+      ];
+
       const moduli = [
         { title: "Dashboard", desc: "Posizione del giorno gas, sbilanciamento e prezzi PSV a colpo d'occhio.", stat: "G+0", statLabel: "giorno gas corrente", primary: true, go: go("dash"), cursor: "pointer", border: "color-mix(in oklab, var(--prim) 40%, var(--line))" },
-        { title: "Nomine & Programmazione", desc: "Invio e monitoraggio di nomine e rinomine sui punti della rete.", stat: "5", statLabel: "cicli oggi", primary: true, go: go("nomine"), cursor: "pointer", border: "var(--line)" },
+        { title: "Nomine & Programmazione", desc: "Nomine EDIG@S 6.1: NOMINT validato, risposta NOMRES del trasportatore e cicli di rinomina.", stat: String(nReg.nomineOggi), statLabel: "documenti del giorno gas", reale: true, primary: true, go: go("nomine"), cursor: "pointer", border: "var(--line)" },
         { title: "Bilanciamento", desc: "Posizione fisica e commerciale, esposizione e azioni correttive.", stat: "−312", statLabel: "MWh previsti", primary: true, go: go("bilancio"), cursor: "pointer", border: "var(--line)" },
         { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
         { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
-        { title: "REMIT · Workspace", desc: "Bozze, validazione locale, audit ed export per la revisione RRM.", stat: "0", statLabel: "invii reali simulati", primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
-        { title: "PDR · GME", desc: "Readiness PDR, ambiente di test e preflight dei requisiti di upload.", stat: "test", statLabel: "nessuna credenziale locale", primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
+        { title: "REMIT · XML ACER", desc: "Bozze auditabili, validazione XSD, generatore UTI ed export per PDR.", stat: String(nReg.bozze), statLabel: "bozze da validare", reale: true, primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
+        { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
       ];
-      if (!demoOn) for (const m of moduli) m.stat = "—"; // i numeri delle card sono scenografia
+      // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
+      // veri dell'utente e restano visibili anche a portale pulito.
+      if (!demoOn) for (const m of moduli) if (!m.reale) m.stat = "—";
       const off = this.state.dashOff;
       const fmtN = (n) => n.toLocaleString("it-IT");
       const dNom = 12480 + off * 260;
@@ -600,7 +637,11 @@
         const init = ((st.wiz.nome[0] || "N") + (st.wiz.cognome[0] || "U")).toUpperCase();
         return { extraUsers: [...st.extraUsers, [k, init, cap(wName || "Nuovo utente " + n, 160), cap(wEmail, 160)]], users: { ...st.users, [k]: st.wiz.perm }, nextU: n + 1, wiz: null };
       });
-      const nomStatoC = { "Confermata": OK, "In corso": RUN, "Inviata": RUN, "In attesa": WAIT };
+      const nomStatoC = {
+        // "Registrata" è l'annotazione interna; "Inviata" resta per le righe
+        // già salvate nei database dei clienti prima di questa distinzione.
+        "Registrata": WAIT, "Confermata": OK, "In corso": RUN, "Inviata": RUN, "In attesa": WAIT,
+      };
       // Le nomine demo compaiono DOPO quelle reali e non vengono mai salvate.
       const nomDemo = !demoOn ? [] : [
         { punto: "PSV", ciclo: "R3", qta: "4.850", stato: "In corso" },
@@ -620,7 +661,7 @@
         }
       };
 
-      const addNomina = () => this.setState((st) => ({ nomList: [{ punto: cap(st.nomPunto, 120), ciclo: cap(st.nomCiclo, 120), qta: cap(st.nomQta || "500", 120), stato: "Inviata" }, ...st.nomList].slice(0, 500), nomQta: "" }));
+      const addNomina = () => this.setState((st) => ({ nomList: [{ punto: cap(st.nomPunto, 120), ciclo: cap(st.nomCiclo, 120), qta: cap(st.nomQta || "500", 120), stato: "Registrata" }, ...st.nomList].slice(0, 500), nomQta: "" }));
 
       // --- EDIG@S 6.1 ---------------------------------------------------
       // I ruoli delle due parti non si scelgono: li fissa il tipo di
@@ -1245,6 +1286,11 @@
 
       return {
         hasBack: !!backMap[s], goBack: go(backMap[s] || "hub"), hubCards,
+        regKpis,
+        // Stati vuoti: una tabella vuota senza spiegazione fa sembrare rotta
+        // un'applicazione che sta solo aspettando il primo dato.
+        remVuoto: !remRows.length, edgVuoto: !edgRows.length,
+        pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
         loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr",
