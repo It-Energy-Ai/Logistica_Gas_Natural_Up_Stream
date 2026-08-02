@@ -42,10 +42,10 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | | |
 |:---:|:---:|
 | <img src="docs/screenshots/login.png" alt="Login con SSO aziendale"><br>**Login** · email/password o SSO aziendale con scelta account | <img src="docs/screenshots/hub.png" alt="Hub moduli"><br>**Hub** · moduli come carte da gioco, con effetto mazzo all'hover |
-| <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · invio per punto/ciclo e nomina EDIG@S 6.1 validata | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
+| <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · documento EDIG@S 6.1 validato e registro interno dei cicli | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
 
-E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, lettura della risposta NOMRES del trasportatore), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
 > Screenshot e tour mostrano la **modalità demo** attiva; al primo avvio il portale parte pulito (vedi sotto).
 
@@ -107,6 +107,7 @@ I dati di scena che vedi negli screenshot (KPI, grafici, cicli, contratti) sono 
 |---|---|
 | Identità dal login, navigazione, wizard, tema chiaro/scuro | Dati di mercato: KPI, prezzi PSV, giacenze, cicli |
 | Sessioni con cookie, login/logout | Login e SSO accettano qualunque credenziale |
+| **Tessere e contatori regolatori** (bozze REMIT, XML, documenti EDIG@S, avvisi): sempre dati veri | |
 | **Persistenza SQLite** di nomine, configurazione, punti, utenti, audit REMIT e artefatti XML | Integrazioni Snam / SSO: interfacce pronte, nessuna chiamata ai sistemi veri |
 | Sync client→server con retry, gestione sessione scaduta, validazione a whitelist | |
 
@@ -126,6 +127,8 @@ Istruzioni, fonti ufficiali, versioni degli schemi e prerequisiti di esercizio s
 
 La schermata Nomine genera la **nomina di trasporto nel protocollo EDIG@S 6.1** (`Nomination_Document`, NOMINT), validata contro gli schemi ufficiali EASEE-gas inclusi nel repository, e legge la **risposta del trasportatore** (`NominationResponse_Document`, NOMRES) abbinandola da sola alla nomina che cita, con gli scostamenti riga per riga.
 
+Il ciclo si chiude con il **riscontro di ricezione** (`Acknowledgement_Document`, ACKNOW): la prova con cui il trasportatore dichiara di aver preso in carico — o respinto — il documento. Viene validato, collegato da solo alla nomina che cita e archiviato con la sua impronta; i 63 codici di motivazione sono tradotti in italiano e l'esito distingue **accettato, accettato con riserva e respinto** (alcuni codici dicono letteralmente *accepted, but…*: mostrarli come rifiuti direbbe il contrario del vero). Ogni nomina in elenco porta il proprio stato, «in attesa di riscontro» compreso.
+
 Sono coperti i quattro tipi di nomina — punto di connessione, PSV OTC, PSV borsa e cliente finale — ciascuno con i ruoli e la struttura che gli impone la decision table EASEE-gas. Il giorno gas è calcolato su `Europe/Rome`, quindi i giorni di cambio ora durano davvero 23 e 25 ore. I codici ammessi sono letti dagli XSD a runtime, non ricopiati nel codice.
 
 Dettagli, tabelle dei codici e limiti dichiarati in [docs/edigas.md](docs/edigas.md).
@@ -139,7 +142,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-La suite copre sessioni, isolamento dello stato, generazione XML REMIT, validazione XSD, progressivi PDR, audit, blocco dell'invio reale, runtime e sincronizzazione del frontend.
+Quasi trecento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 
