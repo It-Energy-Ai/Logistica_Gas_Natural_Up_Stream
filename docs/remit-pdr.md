@@ -132,10 +132,15 @@ canale PDR autorizzato.
 
 ```bash
 python3 build_frontend.py
-python -m pytest -q
+python -m pytest -q                    # include tests/test_sicurezza.py
 node tests/logic.test.cjs
 node tests/runtime.test.cjs
 ```
+
+`tests/test_sicurezza.py` presidia le difese invece delle funzioni: entità XML
+esterne, payload ostili, tetti sui corpi, isolamento fra account, immutabilità
+delle ricevute e intestazioni del browser. Ogni test fallisce se la protezione
+corrispondente viene tolta.
 
 La suite API copre Table 1, Table 2, validazione XSD, progressivi PDR,
 isolamento per utente, audit e blocco dell'invio reale.

@@ -6,6 +6,7 @@ ricevute ufficiali.
 """
 
 import json
+import os
 import re
 import sqlite3
 import secrets
@@ -22,6 +23,24 @@ from . import edigas, uti, pdr, remit
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
+
+# Durata della sessione: si cambia senza toccare il codice, perché è la
+# politica che varia da azienda ad azienda, non il programma.
+GIORNI_SESSIONE = max(1, min(365, int(os.environ.get("VETTORE_GIORNI_SESSIONE", "30") or 30)))
+
+# Questo login accetta qualunque credenziale: è una scelta dichiarata per un
+# portale che gira in locale, non una svista. Chi prova ad avviarlo come
+# ambiente di produzione va fermato, non rassicurato con una password fissa:
+# servirebbe un vero IdP (OIDC/SAML), e fingere di averlo sarebbe peggio che
+# non averlo.
+if os.environ.get("VETTORE_ENV", "").strip().lower() in {"production", "produzione", "prod"}:
+    raise SystemExit(
+        "VETTORE_ENV=production: questo portale non ha autenticazione reale.\n"
+        "Il login accetta qualunque credenziale e il server si lega a 127.0.0.1.\n"
+        "Per un uso produttivo servono un provider di identità (OIDC/SAML), TLS con\n"
+        "reverse proxy e isolamento per azienda: vedi la sezione «Cosa sostituire per\n"
+        "andare in produzione» nella documentazione. L'avvio è interrotto di proposito."
+    )
 
 # Chiavi di stato accettate dal client, con un validatore di forma ciascuna.
 _is_bool = lambda v: isinstance(v, bool)
@@ -222,7 +241,7 @@ async def login(request: Request, response: Response):
         token,
         httponly=True,
         samesite="lax",
-        max_age=60 * 60 * 24 * 30,
+        max_age=60 * 60 * 24 * GIORNI_SESSIONE,
         path="/",
     )
     return {"ok": True, "email": email}

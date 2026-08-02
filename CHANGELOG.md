@@ -2,6 +2,18 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.6.1] — 2026-08-02
+
+Da una revisione esterna di sicurezza: le difese c'erano, ma nessun test le presidiava.
+
+### Aggiunto
+- **`tests/test_sicurezza.py`**: 38 verifiche che falliscono se una protezione viene rimossa — entità XML esterne (file, rete, bomba di espansione) sui tre lettori di XML di terzi, surrogati non codificabili, corpi JSON ostili sul login, forme non valide dello stato, tetti sui corpi verificati prima della bufferizzazione, path traversal e injection sugli identificativi di percorso, isolamento fra account, immutabilità delle ricevute, intestazioni di sicurezza e cookie `HttpOnly`.
+- **Guardrail di produzione**: avviare con `VETTORE_ENV=production` **interrompe l'avvio** con la spiegazione di cosa manca (IdP, TLS, isolamento per azienda). Fingere un'autenticazione con una password fissa sarebbe peggio che non averla.
+- **Durata della sessione configurabile** con `VETTORE_GIORNI_SESSIONE` (1–365, default 30): è una politica aziendale, non una costante del programma.
+
+### Corretto
+- **Un file XML con entità dichiarate ma non risolte causava un errore interno.** Il parser bloccava correttamente l'XXE — nessun contenuto veniva letto — ma il validatore di schema esplodeva subito dopo, e l'endpoint rispondeva 500 invece di «documento non valido». Trovato dai test nuovi appena scritti.
+
 ## [1.6.0] — 2026-08-02
 
 ### Aggiunto

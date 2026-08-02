@@ -1033,6 +1033,25 @@ def _valida(xml: bytes, codice: str) -> None:
     )
 
 
+def _esito_validazione(codice: str, documento) -> tuple[bool, list[str]]:
+    """Valida senza far esplodere il chiamante su documenti ostili.
+
+    Un file con entità dichiarate ma non risolte (il caso XXE, che il parser
+    blocca correttamente) manda in errore interno il validatore di libxml2:
+    l'esito è comunque «non valido», e va riportato come tale invece di
+    diventare un 500.
+    """
+
+    schema = _schema(codice)
+    try:
+        valido = bool(schema.validate(documento))
+    except etree.XMLSchemaValidateError as exc:
+        return False, [f"Documento non validabile: {exc}"]
+    if valido:
+        return True, []
+    return False, [f"Riga {e.line}: {e.message}" for e in list(schema.error_log)[:12]]
+
+
 def _parser_sicuro():
     """Parser per i file di terzi: niente entità esterne, DTD o rete.
 
@@ -1102,9 +1121,7 @@ def leggi_riscontro(contenuto: bytes | str) -> dict[str, Any]:
             f"(radice attesa {meta['radice']}, trovata {etree.QName(documento).localname})."
         )
 
-    schema = _schema("riscontro")
-    valido = bool(schema.validate(documento))
-    errori_schema = [f"Riga {e.line}: {e.message}" for e in list(schema.error_log)[:12]]
+    valido, errori_schema = _esito_validazione("riscontro", documento)
     ns = {"e": meta["namespace"]}
 
     def testo(percorso: str, radice=documento) -> str:
@@ -1329,9 +1346,7 @@ def leggi_risposta(contenuto: bytes | str) -> dict[str, Any]:
             f"(radice attesa {meta['radice']}, trovata {etree.QName(documento).localname})."
         )
 
-    schema = _schema("risposta")
-    valido = bool(schema.validate(documento))
-    errori_schema = [f"Riga {e.line}: {e.message}" for e in list(schema.error_log)[:12]]
+    valido, errori_schema = _esito_validazione("risposta", documento)
 
     ns = {"e": meta["namespace"]}
 
