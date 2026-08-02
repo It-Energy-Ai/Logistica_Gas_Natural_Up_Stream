@@ -2,6 +2,25 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.7.0] — 2026-08-02
+
+### Aggiunto
+- **Modulo EMIR REFIT, separato dal REMIT, con card e schermata proprie.** Sono due obblighi distinti verso destinatari distinti — REMIT va all'ACER tramite un RRM, EMIR a un Trade Repository registrato — e lo stesso forward sul gas può richiederli entrambi. Anche gli identificativi si chiamano allo stesso modo ma seguono regole diverse: l'UTI ACER ha 45 caratteri e un algoritmo pubblicato, quello EMIR da 20 a 52 con il LEI in testa. Tenerli insieme avrebbe reso impossibile dire quale file è stato prodotto per quale regolatore.
+  - **Segnalazione `auth.030.001.03`** generata e validata contro lo schema ufficiale ESMA incluso in `app/schemas/emir/`, in tutte e otto le azioni: nuova operazione, modifica, correzione, componente di posizione, riattivazione, cessazione anticipata, aggiornamento della valutazione, annullamento per errore.
+  - **Il tipo di azione non è un campo: è il nome dell'elemento** che avvolge la segnalazione (`New`, `Mod`, `Crrctn`, `PosCmpnt`, `Rvv`, `Termntn`, `ValtnUpd`, `Err`). Cercare un `<ActnTp>` nel messaggio non porta a nulla — esiste solo nell'esito che torna dal registro.
+  - Ogni azione porta la **forma che le impone lo schema**: il tipo di evento è obbligatorio per due azioni, facoltativo per una e vietato per cinque; cessazione, valutazione e annullamento non ammettono la controparte estesa né i dati di contratto; il componente di posizione resta a livello di operazione e richiede l'UTI della posizione. Il modulo intercetta questi casi con un messaggio comprensibile invece di lasciarli arrivare allo schema.
+  - **Profilo gas completo**: ramo merce `NRGY/NGAS`, indice del punto (TTF, NBP, NCG, GASPOOL, GNL), punto di consegna EIC, tipo di carico, intervalli e capacità di consegna con l'unità di misura.
+  - **Esito del Trade Repository `auth.092.001.04`**: si incolla, viene validato, abbinato da solo agli UTI inviati e mostrato riga per riga con lo stato e **le regole di validazione violate**. Le righe che riguardano altri operatori vengono scartate: cercare nei propri file la causa di un rifiuto altrui è tempo perso. Gli esiti sono immutabili come le ricevute PDR.
+  - **Intestazione `head.001.001.01`** generabile e validata — con l'avvertenza che ESMA *non* pubblica l'involucro che la unisce al messaggio in un unico file: quello lo definisce ciascun Trade Repository, e il portale non lo inventa.
+  - **Il LEI viene verificato con le sue cifre di controllo** (ISO 17442 → ISO/IEC 7064 MOD 97-10, la stessa aritmetica dell'IBAN). Un LEI con una cifra sbagliata supera qualsiasi espressione regolare e verrebbe respinto dal registro giorni dopo. Da non confondere con l'algoritmo di Luhn, che accetterebbe LEI sbagliati e ne rifiuterebbe di buoni.
+  - **Nessun codice ricopiato a mano.** Le tendine sono costruite a runtime dai facet degli XSD e un test verifica che l'insieme delle traduzioni italiane coincida *esattamente* con i valori ammessi dallo schema: un codice inventato fa cadere la suite, uno nuovo aggiunto da ESMA viene segnalato invece di restare fuori in silenzio. Codici come `FORE`, `BIL`, `PTNG`, `NCC`, `TCTC` e `IRDS` circolano negli esempi ma non esistono in `auth.030.001.03`.
+  - **UTI generato solo se manca**, nella forma ISO 23897 e con coda deterministica sulla chiave dell'operazione, così due invii dello stesso contratto non producono due identificativi. La regola della coda è nostra e viene dichiarata come avviso: lo standard fissa la forma, non la derivazione.
+  - Nuovi endpoint `/api/emir/catalogo`, `/api/emir/segnalazioni` (elenco, creazione, dettaglio, download), `/api/emir/intestazioni`, `/api/emir/esiti`.
+- **68 nuove verifiche** fra Python e Node: le otto azioni contro lo XSD reale, la copertura esatta delle enumerazioni, il controllo del LEI, la lettura dell'esito, l'isolamento fra account, l'immutabilità degli esiti e la protezione dalle entità esterne sul documento che arriva dal registro.
+
+### Modificato
+- Le tessere regolatorie in dashboard passano da quattro a sei, su tre colonne: si aggiungono **EMIR · segnalazioni** ed **EMIR · respinte**. Un rifiuto è l'unico numero EMIR che chiede un'azione, e si conta a parte dagli accolti.
+
 ## [1.6.1] — 2026-08-02
 
 Da una revisione esterna di sicurezza: le difese c'erano, ma nessun test le presidiava.

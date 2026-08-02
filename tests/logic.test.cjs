@@ -923,3 +923,199 @@ test("ACKNOW: senza testo incollato non parte nessuna richiesta", async () => {
   assert.match(app.state.edgAckErrore, /Incolla il contenuto/);
   global.fetch = FETCH_OK;
 });
+
+// --- EMIR ------------------------------------------------------------------
+
+const CATALOGO_EMIR = {
+  azioni: [
+    { codice: "nuovo", sigla: "NEWT", etichetta: "Nuova operazione", descrizione: "Primo invio.", profilo: "completo" },
+    { codice: "cessazione", sigla: "TERM", etichetta: "Cessazione anticipata", descrizione: "Chiusura anticipata.", profilo: "cessazione" },
+    { codice: "valutazione", sigla: "VALU", etichetta: "Aggiornamento della valutazione", descrizione: "Nuovo valore.", profilo: "valutazione" },
+  ],
+  nature: [{ codice: "NFC", etichetta: "Controparte non finanziaria (NFC)" }],
+  sezioni_nace: [{ codice: "D", etichetta: "D · Fornitura di energia" }],
+  prodotti: [{ codice: "gas", etichetta: "Gas naturale" }, { codice: "elettricita", etichetta: "Energia elettrica" }],
+  contratti: [{ codice: "FORW", etichetta: "Contratto a termine (forward)" }],
+  consegne: [{ codice: "PHYS", etichetta: "Consegna fisica" }],
+  accordi: [{ codice: "EFMA", etichetta: "EFET Master Agreement" }],
+  eventi: [{ codice: "TRAD", etichetta: "Conclusione o rinegoziazione" }],
+  carichi: [{ codice: "GASD", etichetta: "Giorno gas" }],
+  dettagli_gas: [{ codice: "TTFG", etichetta: "TTF" }],
+  dettagli_elettricita: [{ codice: "BSLD", etichetta: "Carico di base" }],
+  valutazioni: [{ codice: "MTMO", etichetta: "Mark to model" }],
+  livelli: [{ codice: "TCTN", etichetta: "Operazione singola" }],
+  lati: [{ codice: "BYER", etichetta: "Acquirente" }],
+};
+
+test("EMIR: avvio pulito, nessuna segnalazione e nessun messaggio", () => {
+  const app = new App();
+  app.setState({ screen: "emir" });
+  const v = app.renderVals();
+  assert.deepEqual(v.emrRows, []);
+  assert.deepEqual(v.emrRighe, []);
+  assert.equal(v.emrVuoto, true);
+  assert.equal(v.emrEsitiVuoto, true);
+  assert.equal(v.emrErrore, "");
+  assert.equal(v.emrInfo, "");
+});
+
+test("EMIR: è un modulo a sé, con card e schermata proprie", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title.startsWith("EMIR"));
+  assert.ok(card, "manca la card EMIR nella griglia dei moduli");
+  assert.equal(card.reale, true);
+  // La card EMIR non deve portare a REMIT: sono due obblighi distinti.
+  card.go();
+  assert.equal(app.state.screen, "emir");
+  v.moduli.find((m) => m.title.startsWith("REMIT")).go();
+  assert.equal(app.state.screen, "remit");
+  assert.ok(v.regKpis.some((k) => k.area.startsWith("EMIR")));
+});
+
+test("EMIR: le tendine arrivano dal catalogo del server, non da costanti locali", () => {
+  const app = new App();
+  app.setState({ screen: "emir", emrCatalogo: CATALOGO_EMIR });
+  const v = app.renderVals();
+  assert.deepEqual(v.emrOpzAzioni.map((o) => o.id), ["nuovo", "cessazione", "valutazione"]);
+  assert.match(v.emrOpzAccordi[0].label, /EFET/);
+  // Senza catalogo le tendine restano vuote invece di inventare codici.
+  const vuoto = new App();
+  vuoto.setState({ screen: "emir" });
+  assert.deepEqual(vuoto.renderVals().emrOpzContratti, []);
+});
+
+test("EMIR: il pannello cambia forma con il profilo dell'azione", () => {
+  const app = new App();
+  app.setState({ screen: "emir", emrCatalogo: CATALOGO_EMIR });
+  let v = app.renderVals();
+  assert.equal(v.emrMostraContratto, true);
+  assert.equal(v.emrMostraCessazione, false);
+
+  app.setState({ emrAzione: "cessazione" });
+  v = app.renderVals();
+  assert.equal(v.emrMostraContratto, false);
+  assert.equal(v.emrMostraCessazione, true);
+  assert.match(v.emrDescrizioneAzione, /anticipata/);
+
+  app.setState({ emrAzione: "valutazione" });
+  v = app.renderVals();
+  assert.equal(v.emrMostraValutazione, true);
+});
+
+test("EMIR: l'indice del prodotto segue il prodotto scelto", () => {
+  const app = new App();
+  app.setState({ screen: "emir", emrCatalogo: CATALOGO_EMIR });
+  assert.deepEqual(app.renderVals().emrOpzDettagli.map((o) => o.id), ["TTFG"]);
+  app.setState({ emrProdotto: "elettricita" });
+  assert.deepEqual(app.renderVals().emrOpzDettagli.map((o) => o.id), ["BSLD"]);
+});
+
+test("EMIR: il payload legge lo stato al momento dell'invio", async () => {
+  const app = new App();
+  app.setState({ screen: "emir" });
+  const azioni = app.renderVals();
+  // I setter usano setSilent e non ri-renderizzano: se il payload usasse le
+  // variabili catturate a inizio render, invierebbe i valori vecchi.
+  azioni.setEmrSegnalante(ev("529900T8BM49AURSDO55"));
+  azioni.setEmrNozionale(ev("1000000"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 201, json: async () => ({ sigla_azione: "NEWT", radice: "auth.030.001.03", uti: "X" }), text: async () => "" };
+  };
+  await azioni.generaEmir();
+  assert.equal(inviato.url, "/api/emir/segnalazioni");
+  assert.equal(inviato.body.segnalante_lei, "529900T8BM49AURSDO55");
+  assert.equal(inviato.body.nozionale, "1000000");
+  // Se non è indicato, chi trasmette è il segnalante stesso.
+  assert.equal(inviato.body.mittente_lei, "529900T8BM49AURSDO55");
+  global.fetch = FETCH_OK;
+});
+
+test("EMIR: gli errori per campo del server arrivano a schermo", async () => {
+  const app = new App();
+  app.setState({ screen: "emir" });
+  global.fetch = async () => ({
+    ok: false, status: 422,
+    json: async () => ({ errore: "campi da correggere", errors: [{ field: "cfi", message: "codice CFI non valido" }] }),
+    text: async () => "",
+  });
+  await app.renderVals().generaEmir();
+  assert.match(app.state.emrErrore, /campi da correggere/);
+  assert.deepEqual(app.state.emrErroriCampo.map((e) => e.field), ["cfi"]);
+  global.fetch = FETCH_OK;
+});
+
+test("EMIR: le segnalazioni generate espongono impronta e download", () => {
+  const app = new App();
+  app.setState({
+    screen: "emir",
+    emrSegnalazioni: [{
+      id: "abc123", uti: "529900T8BM49AURSDO55GAS1", sigla_azione: "NEWT", livello: "TCTN",
+      sha256: "a".repeat(64), avvisi: ["UTI generato"],
+    }],
+  });
+  const riga = app.renderVals().emrRows[0];
+  assert.match(riga.impronta, /^SHA-256 a{16}…$/);
+  assert.deepEqual(riga.avvisi, [{ testo: "UTI generato" }]);
+  assert.equal(typeof riga.scarica, "function");
+});
+
+test("EMIR: dell'esito si mostrano solo le righe che riguardano noi", () => {
+  const app = new App();
+  app.setState({
+    screen: "emir",
+    emrEsitiList: [{
+      righe: [
+        { uti: "MIO1", nostro: true, accolto: false, stato_etichetta: "Respinto", azione_etichetta: "Nuova operazione", regole: [{ id: "VR-30-001", descrizione: "nozionale incoerente" }] },
+        { uti: "ALTRUI", nostro: false, accolto: false, stato_etichetta: "Respinto", regole: [] },
+        { uti: "MIO2", nostro: true, accolto: true, stato_etichetta: "Accettato", azione_etichetta: "Modifica", regole: [] },
+      ],
+    }],
+  });
+  const righe = app.renderVals().emrRighe;
+  assert.deepEqual(righe.map((r) => r.uti), ["MIO1", "MIO2"]);
+  assert.deepEqual(righe[0].regole, [{ testo: "VR-30-001 · nozionale incoerente" }]);
+  assert.notEqual(righe[0].bg, righe[1].bg);
+});
+
+test("EMIR: un esito non conforme allo schema non viene dato per buono", async () => {
+  const app = new App();
+  app.setState({ screen: "emir", emrEsito: "<Document/>" });
+  global.fetch = async () => ({
+    ok: true, status: 201,
+    json: async () => ({ valido_xsd: false, errori_schema: ["Riga 3: elemento inatteso"], righe: [] }),
+    text: async () => "",
+  });
+  await app.renderVals().importaEsitoEmir();
+  assert.match(app.state.emrEsitoErrore, /non è conforme allo schema/);
+  assert.equal(app.state.emrEsitoInfo, "");
+  global.fetch = FETCH_OK;
+});
+
+test("EMIR: senza testo incollato non parte nessuna richiesta", async () => {
+  const app = new App();
+  app.setState({ screen: "emir", emrEsito: "  " });
+  let chiamate = 0;
+  global.fetch = async () => { chiamate++; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; };
+  await app.renderVals().importaEsitoEmir();
+  assert.equal(chiamate, 0);
+  assert.match(app.state.emrEsitoErrore, /Incolla il documento/);
+  global.fetch = FETCH_OK;
+});
+
+test("EMIR: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf("Segnalazione EMIR REFIT"), html.indexOf("</x-dc>"));
+  assert.ok(blocco.length > 2000, "blocco EMIR non trovato in index.html");
+  const app = new App();
+  app.setState({ screen: "emir" });
+  const v = app.renderVals();
+  const locali = new Set(["es", "ay", "eg", "er2", "ex", "oa", "ol", "on", "os", "op", "op2", "oc", "od", "oq", "ov", "ok", "oe", "ow", "true", "false"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$]*)\s*\}\}/g)].map((m) => m[1]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});

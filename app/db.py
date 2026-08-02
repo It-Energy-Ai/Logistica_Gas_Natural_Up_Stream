@@ -107,6 +107,59 @@ CREATE TABLE IF NOT EXISTS edigas_riscontro (
 CREATE INDEX IF NOT EXISTS idx_edigas_riscontro_nomina
     ON edigas_riscontro(email, nomina_id, importato_il DESC);
 
+-- Segnalazioni EMIR REFIT. Tabella separata da quelle REMIT perché sono due
+-- obblighi distinti verso destinatari diversi: mescolarle renderebbe
+-- impossibile dire quale file è stato prodotto per quale regolatore.
+CREATE TABLE IF NOT EXISTS emir_segnalazione (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    uti TEXT NOT NULL,
+    azione TEXT NOT NULL,
+    sigla_azione TEXT NOT NULL,
+    livello TEXT NOT NULL,
+    controparte TEXT NOT NULL,
+    avvisi TEXT NOT NULL,
+    xml TEXT NOT NULL,
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    creato_il TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_emir_segnalazione_email
+    ON emir_segnalazione(email, creato_il DESC);
+-- Lo stesso UTI può tornare più volte (nuovo → modifica → valutazione), ma
+-- non due volte con la stessa azione: sarebbe un doppio invio.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_emir_segnalazione_identita
+    ON emir_segnalazione(email, uti, azione);
+
+-- Esiti auth.092 ricevuti dal Trade Repository: come le ricevute PDR valgono
+-- come prova di cosa è stato accolto, quindi sono immutabili.
+CREATE TABLE IF NOT EXISTS emir_esito (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    data_riferimento TEXT NOT NULL,
+    accolte INTEGER NOT NULL,
+    respinte INTEGER NOT NULL,
+    righe TEXT NOT NULL,
+    riepilogo TEXT NOT NULL,
+    xml TEXT NOT NULL,
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    importato_il TEXT NOT NULL,
+    UNIQUE (email, sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_emir_esito_email
+    ON emir_esito(email, importato_il DESC);
+
+CREATE TRIGGER IF NOT EXISTS emir_esito_no_update
+BEFORE UPDATE ON emir_esito
+BEGIN
+    SELECT RAISE(ABORT, 'Gli esiti EMIR sono immutabili');
+END;
+
+CREATE TRIGGER IF NOT EXISTS emir_esito_no_delete
+BEFORE DELETE ON emir_esito
+BEGIN
+    SELECT RAISE(ABORT, 'Gli esiti EMIR sono immutabili');
+END;
+
 CREATE TABLE IF NOT EXISTS remit_migrazione (
     email TEXT NOT NULL,
     source_hash TEXT NOT NULL,
@@ -650,6 +703,123 @@ def riscontro_edigas_per_impronta(conn: sqlite3.Connection, email: str, sha256: 
         (email, sha256),
     ).fetchone()
     return _riga_riscontro(row) if row else None
+
+
+# ------------------------------------------------------------------- EMIR
+
+CAMPI_SEGNALAZIONE = (
+    "id, uti, azione, sigla_azione, livello, controparte, avvisi, sha256, creato_il"
+)
+
+
+def _riga_segnalazione(row: sqlite3.Row, *, con_xml: bool = False) -> dict:
+    dati = {
+        "id": row["id"],
+        "uti": row["uti"],
+        "azione": row["azione"],
+        "sigla_azione": row["sigla_azione"],
+        "livello": row["livello"],
+        "controparte": row["controparte"],
+        "avvisi": _json_o_righe(row["avvisi"]),
+        "sha256": row["sha256"],
+        "creato_il": row["creato_il"],
+    }
+    if con_xml:
+        dati["xml"] = row["xml"]
+    return dati
+
+
+def crea_segnalazione_emir(
+    conn: sqlite3.Connection,
+    *,
+    segnalazione_id: str,
+    email: str,
+    uti: str,
+    azione: str,
+    sigla_azione: str,
+    livello: str,
+    controparte: str,
+    avvisi: str,
+    xml: str,
+    sha256: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO emir_segnalazione (id, email, uti, azione, sigla_azione, livello, controparte, "
+        "avvisi, xml, sha256, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (segnalazione_id, email, uti, azione, sigla_azione, livello, controparte, avvisi, xml, sha256),
+    )
+
+
+def elenca_segnalazioni_emir(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_SEGNALAZIONE} FROM emir_segnalazione WHERE email = ? "
+        "ORDER BY creato_il DESC, rowid DESC LIMIT 500",
+        (email,),
+    ).fetchall()
+    return [_riga_segnalazione(r) for r in righe]
+
+
+def leggi_segnalazione_emir(conn: sqlite3.Connection, email: str, segnalazione_id: str) -> dict | None:
+    row = conn.execute(
+        f"SELECT {CAMPI_SEGNALAZIONE}, xml FROM emir_segnalazione WHERE email = ? AND id = ?",
+        (email, segnalazione_id),
+    ).fetchone()
+    return _riga_segnalazione(row, con_xml=True) if row else None
+
+
+CAMPI_ESITO = "id, data_riferimento, accolte, respinte, righe, riepilogo, sha256, importato_il"
+
+
+def _riga_esito(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "data_riferimento": row["data_riferimento"],
+        "accolte": row["accolte"],
+        "respinte": row["respinte"],
+        "righe": json.loads(row["righe"]) if row["righe"] else [],
+        "riepilogo": json.loads(row["riepilogo"]) if row["riepilogo"] else {},
+        "sha256": row["sha256"],
+        "importato_il": row["importato_il"],
+    }
+
+
+def crea_esito_emir(
+    conn: sqlite3.Connection,
+    *,
+    esito_id: str,
+    email: str,
+    data_riferimento: str,
+    accolte: int,
+    respinte: int,
+    righe: str,
+    riepilogo: str,
+    xml: str,
+    sha256: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO emir_esito (id, email, data_riferimento, accolte, respinte, righe, riepilogo, "
+        "xml, sha256, importato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (esito_id, email, data_riferimento, accolte, respinte, righe, riepilogo, xml, sha256),
+    )
+
+
+def elenca_esiti_emir(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_ESITO} FROM emir_esito WHERE email = ? "
+        "ORDER BY importato_il DESC, rowid DESC LIMIT 200",
+        (email,),
+    ).fetchall()
+    return [_riga_esito(r) for r in righe]
+
+
+def esito_emir_per_impronta(conn: sqlite3.Connection, email: str, sha256: str) -> dict | None:
+    """Un esito già importato non va duplicato: si riconosce dall'impronta."""
+
+    row = conn.execute(
+        f"SELECT {CAMPI_ESITO} FROM emir_esito WHERE email = ? AND sha256 = ?",
+        (email, sha256),
+    ).fetchone()
+    return _riga_esito(row) if row else None
 
 
 def crea_artifact_remit(

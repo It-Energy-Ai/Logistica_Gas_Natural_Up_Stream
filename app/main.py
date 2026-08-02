@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import edigas, uti, pdr, remit
+from . import edigas, emir, uti, pdr, remit
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -596,6 +596,207 @@ async def post_edigas_risposta(request: Request):
         "nomina_id": nomina["id"] if nomina else None,
         "scostamenti": scostamenti,
     }
+
+
+@app.get("/api/emir/catalogo")
+def get_emir_catalogo(request: Request):
+    """Codici e schemi EMIR, letti dagli XSD ESMA invece che ricopiati."""
+
+    if not _sessione(request):
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    return emir.catalogo()
+
+
+@app.get("/api/emir/segnalazioni")
+def get_emir_segnalazioni(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return {"segnalazioni": db.elenca_segnalazioni_emir(conn, email)}
+
+
+@app.post("/api/emir/segnalazioni")
+async def post_emir_segnalazione(request: Request):
+    """Genera una segnalazione auth.030 validata e la conserva per il download."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, emir.MAX_ESITO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        documento = emir.genera_segnalazione(payload)
+    except emir.EmirError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, OverflowError, TypeError, UnicodeError) as errore:
+        # Rete di sicurezza: un input che sfugge ai controlli di campo deve
+        # tornare come errore comprensibile, non come 500 opaco.
+        return JSONResponse({"errore": f"Dati della segnalazione non validi: {errore}"}, status_code=422)
+
+    segnalazione_id = secrets.token_hex(8)
+    try:
+        with db.connect() as conn:
+            db.crea_segnalazione_emir(
+                conn,
+                segnalazione_id=segnalazione_id,
+                email=email,
+                uti=documento.uti,
+                azione=documento.azione,
+                sigla_azione=documento.sigla_azione,
+                livello=documento.livello,
+                controparte=documento.controparte,
+                avvisi=json.dumps(list(documento.avvisi)),
+                xml=documento.xml,
+                sha256=documento.xml_sha256,
+            )
+            record = db.leggi_segnalazione_emir(conn, email, segnalazione_id)
+    except sqlite3.IntegrityError:
+        return JSONResponse(
+            {
+                "errore": (
+                    f"Esiste già una segnalazione «{emir.AZIONI[documento.azione]['etichetta']}» "
+                    f"per l'UTI {documento.uti}. Per un aggiornamento scegli un'altra azione."
+                )
+            },
+            status_code=409,
+        )
+    return JSONResponse(
+        {
+            **{k: v for k, v in (record or {}).items() if k != "xml"},
+            "valido_xsd": True,
+            "schema_sha256": documento.schema_sha256,
+            "radice": documento.radice,
+            "size_bytes": documento.size_bytes,
+        },
+        status_code=201,
+    )
+
+
+@app.get("/api/emir/segnalazioni/{segnalazione_id}")
+def get_emir_segnalazione(segnalazione_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = db.leggi_segnalazione_emir(conn, email, segnalazione_id)
+    if not record:
+        return JSONResponse({"errore": "segnalazione non trovata"}, status_code=404)
+    return record
+
+
+@app.get("/api/emir/segnalazioni/{segnalazione_id}/download")
+def download_emir_segnalazione(segnalazione_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = db.leggi_segnalazione_emir(conn, email, segnalazione_id)
+    if not record:
+        return JSONResponse({"errore": "segnalazione non trovata"}, status_code=404)
+    nome = f"EMIR_{record['sigla_azione']}_{record['uti']}.xml".replace("/", "-")
+    return Response(
+        content=record["xml"],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nome)}"},
+        media_type="application/xml",
+    )
+
+
+@app.post("/api/emir/intestazioni")
+async def post_emir_intestazione(request: Request):
+    """Genera l'AppHdr head.001 da accompagnare alla segnalazione.
+
+    Non viene conservato: senza l'involucro definito dal Trade Repository non
+    è un file trasmissibile da solo, e archiviarlo come tale sarebbe
+    fuorviante.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        documento = emir.genera_intestazione(payload)
+    except emir.EmirError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    return JSONResponse(
+        {
+            "radice": documento.radice,
+            "xml": documento.xml,
+            "sha256": documento.xml_sha256,
+            "schema_sha256": documento.schema_sha256,
+            "size_bytes": documento.size_bytes,
+            "avvisi": list(documento.avvisi),
+            "valido_xsd": True,
+        },
+        status_code=201,
+    )
+
+
+@app.get("/api/emir/esiti")
+def get_emir_esiti(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return {"esiti": db.elenca_esiti_emir(conn, email)}
+
+
+@app.post("/api/emir/esiti")
+async def post_emir_esito(request: Request):
+    """Importa l'auth.092 del Trade Repository e lo abbina agli UTI inviati."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, emir.MAX_ESITO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    grezzo = await request.body()
+    if not grezzo:
+        return JSONResponse({"errore": "corpo della richiesta vuoto"}, status_code=400)
+    if len(grezzo) > emir.MAX_ESITO_BYTES:
+        return JSONResponse(
+            {"errore": f"File troppo grande: il limite è {emir.MAX_ESITO_BYTES // 1024} KB."},
+            status_code=413,
+        )
+    try:
+        esito = emir.leggi_esito(grezzo)
+    except emir.EmirError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+
+    with db.connect() as conn:
+        gia_visto = db.esito_emir_per_impronta(conn, email, esito["sha256"])
+        if gia_visto:
+            # Reimportare lo stesso file non crea un secondo esito: è lo
+            # stesso fatto, e duplicarlo falserebbe i conteggi.
+            return {**esito, "righe": gia_visto["righe"], "esito_id": gia_visto["id"], "gia_importato": True}
+        inviati = [r["uti"] for r in db.elenca_segnalazioni_emir(conn, email)]
+        righe = emir.abbina_esito(esito, inviati)
+        nostre = [r for r in righe if r["nostro"]]
+        esito_id = secrets.token_hex(8)
+        db.crea_esito_emir(
+            conn,
+            esito_id=esito_id,
+            email=email,
+            data_riferimento=esito["riepilogo"].get("data", ""),
+            accolte=sum(1 for r in nostre if r["accolto"]),
+            respinte=sum(1 for r in nostre if not r["accolto"]),
+            righe=json.dumps(righe),
+            riepilogo=json.dumps(esito["riepilogo"]),
+            xml=grezzo.decode("utf-8", "replace"),
+            sha256=esito["sha256"],
+        )
+    return JSONResponse(
+        {**esito, "righe": righe, "esito_id": esito_id, "gia_importato": False},
+        status_code=201,
+    )
 
 
 @app.post("/api/remit/reports")

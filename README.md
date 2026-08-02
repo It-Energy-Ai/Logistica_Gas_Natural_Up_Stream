@@ -45,8 +45,9 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | <img src="docs/screenshots/nomine.png" alt="Nomine e programmazione"><br>**Nomine** · documento EDIG@S 6.1 validato e registro interno dei cicli | <img src="docs/screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro"><br>**Bilanciamento** · disequilibrio DS, azioni correttive — tema scuro |
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
 | <img src="docs/screenshots/remit.png" alt="REMIT · XML ACER"><br>**REMIT · XML ACER** · registro nei tre stati, validazione XSD, UTI, audit ed export | <img src="docs/screenshots/pdr.png" alt="PDR · GME"><br>**PDR · GME** · profilo, schemi fissati, preflight per artefatto e ricevute |
+| <img src="docs/screenshots/emir.png" alt="EMIR · Trade Repository"><br>**EMIR · Trade Repository** · segnalazione ISO 20022 auth.030 ed esito del registro | |
 
-E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **EMIR · Trade Repository** (segnalazione ISO 20022 `auth.030` nelle otto azioni, validata contro gli schemi ESMA, esito `auth.092` abbinato agli UTI inviati), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
 > Screenshot e tour mostrano la **modalità demo** attiva per i dati di mercato; bozze REMIT, documenti EDIG@S con i riscontri e tessere regolatorie sono invece **dati reali** creati nel portale. Al primo avvio tutto parte pulito (vedi sotto).
 
@@ -134,6 +135,16 @@ Sono coperti i quattro tipi di nomina — punto di connessione, PSV OTC, PSV bor
 
 Dettagli, tabelle dei codici e limiti dichiarati in [docs/edigas.md](docs/edigas.md).
 
+## EMIR REFIT
+
+La schermata **EMIR · Trade Repository** genera la segnalazione ISO 20022 del derivato (`auth.030.001.03`), validata contro gli schemi ufficiali ESMA inclusi nel repository, e legge l'esito del registro (`auth.092.001.04`) abbinandolo da solo agli UTI inviati, con le regole di validazione violate riga per riga.
+
+È un modulo **separato dal REMIT**, con card, schermata e registro propri: sono due obblighi distinti verso destinatari distinti, e lo stesso forward sul gas può richiederli entrambi con identificativi generati in modi diversi.
+
+Sono coperte tutte e otto le azioni — nuova operazione, modifica, correzione, componente di posizione, riattivazione, cessazione anticipata, aggiornamento della valutazione, annullamento per errore — ciascuna con la forma che le impone lo schema: nel tracciato EMIR il tipo di azione non è un campo ma il nome dell'elemento che avvolge la segnalazione, e il tipo di evento è obbligatorio in due casi, vietato in cinque. I codici delle tendine sono letti dai facet degli XSD a runtime e un test verifica che le traduzioni italiane coincidano esattamente con i valori ammessi: un codice inventato fa cadere la suite. Il LEI viene verificato con le sue cifre di controllo (ISO 17442, MOD 97-10), non con una semplice espressione regolare.
+
+Restano fuori, dichiarati: l'involucro che unisce intestazione e messaggio in un unico file (ESMA non lo pubblica, lo definisce ciascun Trade Repository), la trasmissione, e la tabella completa delle *Validation Rules*. Dettagli e limiti in [docs/emir.md](docs/emir.md).
+
 ## Test e qualità
 
 ```bash
@@ -143,7 +154,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Quasi trecento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Quasi quattrocento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

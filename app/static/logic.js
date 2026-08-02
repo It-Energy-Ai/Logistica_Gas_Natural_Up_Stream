@@ -114,6 +114,17 @@
         edgNomine: [], edgErrore: "", edgElencoErrore: "", edgInfo: "", edgErroriCampo: [],
         edgRisposta: "", edgRispostaErrore: "", edgRispostaInfo: "", edgScostamentiList: [],
         edgAck: "", edgAckErrore: "", edgAckInfo: "", edgRiscontriList: [],
+        emrAzione: "nuovo", emrUti: "", emrLivello: "TCTN",
+        emrSegnalante: "", emrControparte: "", emrMittente: "",
+        emrNatura: "NFC", emrSettore: "D", emrSopraSoglia: false, emrAttivitaCollegata: true, emrLato: "BYER",
+        emrContratto: "FORW", emrClasse: "COMM", emrCfi: "JCXXXX", emrValuta: "EUR",
+        emrNozionale: "", emrQuantita: "", emrPrezzo: "", emrConsegna: "PHYS",
+        emrEsecuzione: "", emrEfficacia: "", emrScadenza: "",
+        emrAccordo: "EFMA", emrEvento: "TRAD", emrDataEvento: "",
+        emrProdotto: "gas", emrDettaglio: "TTFG", emrPunto: "", emrCarico: "GASD",
+        emrValore: "", emrMomentoValore: "", emrTipoValore: "MTMO", emrDataCessazione: "",
+        emrSegnalazioni: [], emrErrore: "", emrElencoErrore: "", emrInfo: "", emrErroriCampo: [],
+        emrEsito: "", emrEsitoErrore: "", emrEsitoInfo: "", emrEsitiList: [], emrCatalogo: null,
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -319,6 +330,32 @@
       }
     }
 
+    async _caricaEmir() {
+      if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
+      try {
+        // Il catalogo arriva dal server perché è ricavato dai facet degli XSD
+        // ESMA: se lo si ricopiasse qui, una tendina potrebbe offrire un
+        // codice che lo schema rifiuta.
+        const [payload, esiti, catalogo] = await Promise.all([
+          this._json("/api/emir/segnalazioni"),
+          this._json("/api/emir/esiti"),
+          this.state.emrCatalogo ? Promise.resolve(this.state.emrCatalogo) : this._json("/api/emir/catalogo"),
+        ]);
+        if (!miaSessione()) return;
+        this.setState({
+          emrSegnalazioni: Array.isArray(payload.segnalazioni) ? payload.segnalazioni : [],
+          emrEsitiList: Array.isArray(esiti.esiti) ? esiti.esiti : [],
+          emrCatalogo: catalogo || null,
+          emrElencoErrore: "",
+        });
+      } catch (error) {
+        if (!miaSessione()) return;
+        this.setState({ emrElencoErrore: `Registro EMIR non disponibile: ${error.message}` });
+      }
+    }
+
     async _caricaPdr() {
       if (!this._sessionEmail) return;
       const epoca = this._sessionEpoch;
@@ -340,7 +377,7 @@
     }
 
     async _caricaWorkspaceRegolatorio() {
-      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas()]);
+      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir()]);
     }
 
     async _apriSessione(email) {
@@ -427,6 +464,7 @@
         report: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Report & Analisi" }],
         remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT · XML ACER" }],
         pdr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "PDR · GME" }],
+        emir: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "EMIR · Trade Repository" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -488,6 +526,8 @@
       const giornoGasIso = (d = new Date()) => GIORNO_GAS_ISO.format(new Date(d.getTime() - 6 * 3600 * 1000));
       const _rem = this.state.remReports || [];
       const _edg = this.state.edgNomine || [];
+      const _emr = this.state.emrSegnalazioni || [];
+      const _emrEsiti = this.state.emrEsitiList || [];
       const oggiGG = giornoGasIso();
       const regCaricamento = !!(this.state.remCaricamento || this.state.pdrCaricamento);
       const nReg = {
@@ -495,6 +535,10 @@
         xml: _rem.filter((r) => r.status === "xml_validato_xsd").length,
         nomineOggi: _edg.filter((n) => n.giorno_gas === oggiGG).length,
         avvisi: _edg.reduce((tot, n) => tot + ((n.avvisi || []).length), 0),
+        emirFile: _emr.length,
+        // Un rifiuto è l'unico numero EMIR che chiede un'azione: si conta a
+        // parte dagli accolti, che non richiedono nulla.
+        emirRespinte: _emrEsiti.reduce((tot, e) => tot + (e.respinte || 0), 0),
       };
 
       const regTessera = (area, n, unita, pieno, vuoto, tono, dove) => ({
@@ -511,6 +555,8 @@
         regTessera("REMIT · XML", nReg.xml, "file", "validati XSD", "nessun file generato", OK, "remit"),
         regTessera("EDIG@S · GIORNO GAS", nReg.nomineOggi, "documenti", "NOMINT generati oggi", "nessuna nomina oggi", RUN, "nomine"),
         regTessera("EDIG@S · AVVISI", nReg.avvisi, "avvisi", "da leggere", "nessun avviso", WARN, "nomine"),
+        regTessera("EMIR · SEGNALAZIONI", nReg.emirFile, "file", "validati XSD ESMA", "nessuna segnalazione", OK, "emir"),
+        regTessera("EMIR · RESPINTE", nReg.emirRespinte, "operazioni", "da correggere", "nessun rifiuto", NEG, "emir"),
       ];
 
       const moduli = [
@@ -522,6 +568,7 @@
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
         { title: "REMIT · XML ACER", desc: "Bozze auditabili, validazione XSD, generatore UTI ed export per PDR.", stat: String(nReg.bozze), statLabel: "bozze da validare", reale: true, primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
         { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
+        { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
       // veri dell'utente e restano visibili anche a portale pulito.
@@ -935,7 +982,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1127,6 +1174,137 @@
           this.setState({ pdrErrore: `Profilo PDR non salvato: ${error.message}` });
         }
       });
+
+      // --- EMIR REFIT: segnalazione al Trade Repository, separata da REMIT ---
+      // I due obblighi non si sovrappongono: REMIT va all'ACER tramite un RRM,
+      // EMIR a un Trade Repository registrato. Stesso forward, due file, due
+      // destinatari — quindi due schermate e due registri.
+      const emrCat = this.state.emrCatalogo || {};
+      const opzioni = (chiave) => (emrCat[chiave] || []).map((v) => ({ id: v.codice, label: `${v.codice} · ${v.etichetta}` }));
+      const emrAzioneCorrente = (emrCat.azioni || []).find((a) => a.codice === this.state.emrAzione) || null;
+      const emrProfilo = emrAzioneCorrente ? emrAzioneCorrente.profilo : "completo";
+      // La forma del pannello segue il profilo dell'azione, non i gusti: una
+      // cessazione non porta né contratto né merce, e mostrarne i campi
+      // inviterebbe a compilarli per vederli scartati.
+      const emrMostraContratto = emrProfilo === "completo" || emrProfilo === "posizione";
+      const emrMostraValutazione = emrProfilo === "valutazione";
+      const emrMostraCessazione = emrProfilo === "cessazione";
+      const emrDettagli = this.state.emrProdotto === "elettricita" ? "dettagli_elettricita" : "dettagli_gas";
+
+      const emrPayload = () => ({
+        azione: this.state.emrAzione,
+        livello: this.state.emrLivello,
+        uti: cap(this.state.emrUti, 52),
+        segnalante_lei: cap(this.state.emrSegnalante, 20),
+        controparte_lei: cap(this.state.emrControparte, 20),
+        mittente_lei: cap(this.state.emrMittente || this.state.emrSegnalante, 20),
+        segnalante_natura: this.state.emrNatura,
+        segnalante_settore: cap(this.state.emrSettore, 4),
+        segnalante_sopra_soglia: !!this.state.emrSopraSoglia,
+        segnalante_attivita_collegata: !!this.state.emrAttivitaCollegata,
+        segnalante_lato: this.state.emrLato,
+        controparte_obbligo: true,
+        contratto_tipo: this.state.emrContratto,
+        classe_attivo: this.state.emrClasse,
+        cfi: cap(this.state.emrCfi, 6),
+        valuta_regolamento: cap(this.state.emrValuta, 3),
+        su_cripto: false,
+        nozionale: cap(this.state.emrNozionale, 30),
+        valuta_nozionale: cap(this.state.emrValuta, 3),
+        quantita: cap(this.state.emrQuantita, 30),
+        prezzo: cap(this.state.emrPrezzo, 30),
+        valuta_prezzo: cap(this.state.emrValuta, 3),
+        consegna: this.state.emrConsegna,
+        momento_esecuzione: cap(this.state.emrEsecuzione, 32),
+        data_efficacia: cap(this.state.emrEfficacia, 32),
+        data_scadenza: cap(this.state.emrScadenza, 32),
+        accordo_tipo: this.state.emrAccordo,
+        evento_tipo: this.state.emrEvento,
+        evento_data: cap(this.state.emrDataEvento, 32),
+        prodotto: this.state.emrProdotto,
+        dettaglio_prodotto: this.state.emrDettaglio,
+        punti_consegna: cap(this.state.emrPunto, 400),
+        tipo_carico: this.state.emrCarico,
+        valutazione_valore: cap(this.state.emrValore, 30),
+        valutazione_valuta: cap(this.state.emrValuta, 3),
+        valutazione_momento: cap(this.state.emrMomentoValore, 32),
+        valutazione_tipo: this.state.emrTipoValore,
+        data_cessazione: cap(this.state.emrDataCessazione, 32),
+      });
+
+      const generaEmir = unaVolta("generaEmir", async () => {
+        this.setState({ emrErrore: "", emrInfo: "", emrErroriCampo: [] });
+        try {
+          const esito = await this._json("/api/emir/segnalazioni", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(emrPayload()),
+          });
+          this.setState({
+            emrInfo: `Segnalazione ${esito.sigla_azione} generata e validata contro lo schema ESMA ${esito.radice}. UTI ${esito.uti}.`,
+          });
+          await this._caricaEmir();
+        } catch (error) {
+          this.setState({ emrErrore: `Segnalazione non generata: ${error.message}`, emrErroriCampo: error.dettagli || [] });
+        }
+      });
+
+      const importaEsitoEmir = unaVolta("importaEsitoEmir", async () => {
+        this.setState({ emrEsitoErrore: "", emrEsitoInfo: "" });
+        const testo = (this.state.emrEsito || "").trim();
+        if (!testo) {
+          this.setState({ emrEsitoErrore: "Incolla il documento auth.092 ricevuto dal Trade Repository." });
+          return;
+        }
+        try {
+          const esito = await this._json("/api/emir/esiti", {
+            method: "POST",
+            headers: { "Content-Type": "application/xml" },
+            body: testo,
+          });
+          if (!esito.valido_xsd) {
+            const dettaglio = (esito.errori_schema || [])[0] || "";
+            this.setState({ emrEsitoErrore: `L'esito non è conforme allo schema ESMA. ${dettaglio}`.trim() });
+            return;
+          }
+          const nostre = (esito.righe || []).filter((r) => r.nostro);
+          const respinte = nostre.filter((r) => !r.accolto).length;
+          this.setState({
+            emrEsito: "",
+            emrEsitoInfo: esito.gia_importato
+              ? "Esito già presente in registro: non è stato duplicato."
+              : `Esito del ${esito.riepilogo.data || "—"} importato: ${nostre.length} operazioni tue, ${respinte} respinte.`,
+          });
+          await this._caricaEmir();
+        } catch (error) {
+          this.setState({ emrEsitoErrore: `Esito non importato: ${error.message}${_dettagli(error)}` });
+        }
+      });
+
+      const emrRows = (this.state.emrSegnalazioni || []).map((s) => ({
+        ...s,
+        impronta: `SHA-256 ${String(s.sha256 || "").slice(0, 16)}…`,
+        avvisi: (s.avvisi || []).map((testo) => ({ testo })),
+        scarica: () => window.open(`/api/emir/segnalazioni/${s.id}/download`, "_blank"),
+      }));
+
+      // Le righe dell'esito che non sono nostre restano fuori: un rifiuto
+      // altrui mandato in cerca di una causa nei propri file è tempo perso.
+      const emrRighe = [];
+      for (const esito of this.state.emrEsitiList || []) {
+        for (const riga of esito.righe || []) {
+          if (!riga.nostro) continue;
+          const tono = riga.accolto ? OK : NEG;
+          emrRighe.push({
+            uti: riga.uti,
+            stato: riga.stato_etichetta || riga.stato,
+            azione: riga.azione_etichetta || riga.azione,
+            bg: tono.bg,
+            fg: tono.fg,
+            regole: (riga.regole || []).map((g) => ({ testo: `${g.id}${g.descrizione ? " · " + g.descrizione : ""}` })),
+          });
+        }
+      }
 
       // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
       const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
@@ -1365,7 +1543,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -1460,6 +1638,65 @@
         edgRiscontri, importaAck, edgAck: this.state.edgAck,
         edgAckErrore: this.state.edgAckErrore, edgAckInfo: this.state.edgAckInfo,
         edgAckVuoto: !(this.state.edgRiscontriList || []).length,
+        emrAzione: this.state.emrAzione, emrLivello: this.state.emrLivello, emrUti: this.state.emrUti,
+        emrSegnalante: this.state.emrSegnalante, emrControparte: this.state.emrControparte,
+        emrMittente: this.state.emrMittente, emrNatura: this.state.emrNatura, emrSettore: this.state.emrSettore,
+        emrLato: this.state.emrLato, emrContratto: this.state.emrContratto, emrClasse: this.state.emrClasse,
+        emrCfi: this.state.emrCfi, emrValuta: this.state.emrValuta, emrNozionale: this.state.emrNozionale,
+        emrQuantita: this.state.emrQuantita, emrPrezzo: this.state.emrPrezzo, emrConsegna: this.state.emrConsegna,
+        emrEsecuzione: this.state.emrEsecuzione, emrEfficacia: this.state.emrEfficacia,
+        emrScadenza: this.state.emrScadenza, emrAccordo: this.state.emrAccordo, emrEvento: this.state.emrEvento,
+        emrDataEvento: this.state.emrDataEvento, emrProdotto: this.state.emrProdotto,
+        emrDettaglio: this.state.emrDettaglio, emrPunto: this.state.emrPunto, emrCarico: this.state.emrCarico,
+        emrValore: this.state.emrValore, emrMomentoValore: this.state.emrMomentoValore,
+        emrTipoValore: this.state.emrTipoValore, emrDataCessazione: this.state.emrDataCessazione,
+        emrErrore: this.state.emrErrore, emrInfo: this.state.emrInfo, emrErrori: this.state.emrErroriCampo,
+        emrElencoErrore: this.state.emrElencoErrore, emrEsito: this.state.emrEsito,
+        emrEsitoErrore: this.state.emrEsitoErrore, emrEsitoInfo: this.state.emrEsitoInfo,
+        emrRows, emrRighe, generaEmir, importaEsitoEmir,
+        emrVuoto: !emrRows.length, emrEsitiVuoto: !emrRighe.length,
+        emrMostraContratto, emrMostraValutazione, emrMostraCessazione,
+        emrDescrizioneAzione: emrAzioneCorrente ? emrAzioneCorrente.descrizione : "",
+        emrOpzAzioni: (emrCat.azioni || []).map((a) => ({ id: a.codice, label: `${a.sigla} · ${a.etichetta}` })),
+        emrOpzNature: (emrCat.nature || []).map((v) => ({ id: v.codice, label: v.etichetta })),
+        emrOpzSettori: (emrCat.sezioni_nace || []).map((v) => ({ id: v.codice, label: v.etichetta })),
+        emrOpzProdotti: (emrCat.prodotti || []).map((v) => ({ id: v.codice, label: v.etichetta })),
+        emrOpzLati: opzioni("lati"), emrOpzContratti: opzioni("contratti"),
+        emrOpzConsegne: opzioni("consegne"), emrOpzAccordi: opzioni("accordi"),
+        emrOpzEventi: opzioni("eventi"), emrOpzCarichi: opzioni("carichi"),
+        emrOpzDettagli: opzioni(emrDettagli), emrOpzValutazioni: opzioni("valutazioni"),
+        emrOpzLivelli: opzioni("livelli"),
+        setEmrAzione: (e) => this.setSilent({ emrAzione: e.target.value }),
+        setEmrLivello: (e) => this.setSilent({ emrLivello: e.target.value }),
+        setEmrUti: (e) => this.setSilent({ emrUti: e.target.value }),
+        setEmrSegnalante: (e) => this.setSilent({ emrSegnalante: e.target.value }),
+        setEmrControparte: (e) => this.setSilent({ emrControparte: e.target.value }),
+        setEmrMittente: (e) => this.setSilent({ emrMittente: e.target.value }),
+        setEmrNatura: (e) => this.setSilent({ emrNatura: e.target.value }),
+        setEmrSettore: (e) => this.setSilent({ emrSettore: e.target.value }),
+        setEmrLato: (e) => this.setSilent({ emrLato: e.target.value }),
+        setEmrContratto: (e) => this.setSilent({ emrContratto: e.target.value }),
+        setEmrCfi: (e) => this.setSilent({ emrCfi: e.target.value }),
+        setEmrValuta: (e) => this.setSilent({ emrValuta: e.target.value }),
+        setEmrNozionale: (e) => this.setSilent({ emrNozionale: e.target.value }),
+        setEmrQuantita: (e) => this.setSilent({ emrQuantita: e.target.value }),
+        setEmrPrezzo: (e) => this.setSilent({ emrPrezzo: e.target.value }),
+        setEmrConsegna: (e) => this.setSilent({ emrConsegna: e.target.value }),
+        setEmrEsecuzione: (e) => this.setSilent({ emrEsecuzione: e.target.value }),
+        setEmrEfficacia: (e) => this.setSilent({ emrEfficacia: e.target.value }),
+        setEmrScadenza: (e) => this.setSilent({ emrScadenza: e.target.value }),
+        setEmrAccordo: (e) => this.setSilent({ emrAccordo: e.target.value }),
+        setEmrEvento: (e) => this.setSilent({ emrEvento: e.target.value }),
+        setEmrDataEvento: (e) => this.setSilent({ emrDataEvento: e.target.value }),
+        setEmrProdotto: (e) => this.setSilent({ emrProdotto: e.target.value }),
+        setEmrDettaglio: (e) => this.setSilent({ emrDettaglio: e.target.value }),
+        setEmrPunto: (e) => this.setSilent({ emrPunto: e.target.value }),
+        setEmrCarico: (e) => this.setSilent({ emrCarico: e.target.value }),
+        setEmrValore: (e) => this.setSilent({ emrValore: e.target.value }),
+        setEmrMomentoValore: (e) => this.setSilent({ emrMomentoValore: e.target.value }),
+        setEmrTipoValore: (e) => this.setSilent({ emrTipoValore: e.target.value }),
+        setEmrDataCessazione: (e) => this.setSilent({ emrDataCessazione: e.target.value }),
+        setEmrEsito: (e) => this.setSilent({ emrEsito: e.target.value }),
         setEdgAck: (e) => this.setSilent({ edgAck: e.target.value }),
         setEdgTipoNomina: (e) => this.setSilent({ edgTipoNomina: e.target.value }),
         setEdgIdent: (e) => this.setSilent({ edgIdent: e.target.value }),

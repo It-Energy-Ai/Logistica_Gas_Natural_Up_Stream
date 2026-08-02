@@ -263,7 +263,7 @@ input::placeholder{color:var(--ink3)}
       </div>
     </sc-for>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px">
     <sc-for list="{{ regKpis }}" as="rk" hint-placeholder-count="4">
       <div onClick="{{ rk.go }}" style="display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;cursor:pointer;transition:border-color .15s" data-vh="9">
         <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--ink3)">{{ rk.area }}</span>
@@ -1074,6 +1074,125 @@ input::placeholder{color:var(--ink3)}
     </div>
   </div>
   <span style="display:block;margin-top:14px;font-size:11.5px;color:var(--ink3)">Corrispettivo indicativo PDR 2026 per upload esterno: {{ pdrFeeAnnual }}. Verifica sempre condizioni, contratto e documentazione GME vigenti.</span>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenEmir }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Emir" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">EMIR · Trade Repository</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Segnalazione ISO 20022 auth.030 → validazione XSD ESMA → esito del Trade Repository</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Obbligo distinto dal REMIT</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="color:var(--primText)">Confine operativo</strong><span>EMIR e REMIT sono obblighi diversi: lo stesso forward sul gas può richiedere entrambi, ma i file vanno a destinatari distinti. Qui si produce la segnalazione validata contro lo schema ESMA; la trasmissione, le credenziali e l'involucro del file restano definiti dal Trade Repository scelto.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Segnalazione EMIR REFIT</h3><span style="font-size:12px;color:var(--ink3)">Documento auth.030.001.03, validato contro lo schema ESMA incluso.</span></div>
+      <div style="display:grid;grid-template-columns:1.3fr .7fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Azione<select value="{{ emrAzione }}" onChange="{{ setEmrAzione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzAzioni }}" sc-as="oa" hint-placeholder-count="8" value="{{ oa.id }}">{{ oa.label }}</option></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Livello<select value="{{ emrLivello }}" onChange="{{ setEmrLivello }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzLivelli }}" sc-as="ol" hint-placeholder-count="2" value="{{ ol.id }}">{{ ol.label }}</option></select></label>
+      </div>
+      <span style="font-size:11.5px;color:var(--ink3);text-wrap:pretty">{{ emrDescrizioneAzione }}</span>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">UTI<input type="text" value="{{ emrUti }}" onChange="{{ setEmrUti }}" maxlength="52" placeholder="lascia vuoto per generarlo dal LEI" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      <div style="height:1px;background:var(--line);margin:2px 0"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">LEI segnalante<input type="text" value="{{ emrSegnalante }}" onChange="{{ setEmrSegnalante }}" maxlength="20" placeholder="20 caratteri" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">LEI controparte<input type="text" value="{{ emrControparte }}" onChange="{{ setEmrControparte }}" maxlength="20" placeholder="20 caratteri" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">LEI di chi trasmette<input type="text" value="{{ emrMittente }}" onChange="{{ setEmrMittente }}" maxlength="20" placeholder="se vuoto vale il LEI del segnalante" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+      <sc-if value="{{ emrMostraContratto }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:1fr 1.4fr .6fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Natura<select value="{{ emrNatura }}" onChange="{{ setEmrNatura }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzNature }}" sc-as="on" hint-placeholder-count="4" value="{{ on.id }}">{{ on.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Settore<select value="{{ emrSettore }}" onChange="{{ setEmrSettore }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzSettori }}" sc-as="os" hint-placeholder-count="6" value="{{ os.id }}">{{ os.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Lato<select value="{{ emrLato }}" onChange="{{ setEmrLato }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzLati }}" sc-as="op" hint-placeholder-count="2" value="{{ op.id }}">{{ op.label }}</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1.3fr .7fr .6fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo di contratto<select value="{{ emrContratto }}" onChange="{{ setEmrContratto }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzContratti }}" sc-as="oc" hint-placeholder-count="9" value="{{ oc.id }}">{{ oc.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">CFI<input type="text" value="{{ emrCfi }}" onChange="{{ setEmrCfi }}" maxlength="6" placeholder="JCXXXX" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Valuta<input type="text" value="{{ emrValuta }}" onChange="{{ setEmrValuta }}" maxlength="3" placeholder="EUR" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Nozionale<input type="text" value="{{ emrNozionale }}" onChange="{{ setEmrNozionale }}" maxlength="30" placeholder="1.000.000,00" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Quantità<input type="text" value="{{ emrQuantita }}" onChange="{{ setEmrQuantita }}" maxlength="30" placeholder="24000" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prezzo<input type="text" value="{{ emrPrezzo }}" onChange="{{ setEmrPrezzo }}" maxlength="30" placeholder="32,45" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Consegna<select value="{{ emrConsegna }}" onChange="{{ setEmrConsegna }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzConsegne }}" sc-as="od" hint-placeholder-count="3" value="{{ od.id }}">{{ od.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Accordo quadro<select value="{{ emrAccordo }}" onChange="{{ setEmrAccordo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzAccordi }}" sc-as="oq" hint-placeholder-count="14" value="{{ oq.id }}">{{ oq.label }}</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr .9fr .9fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Esecuzione (UTC)<input type="text" value="{{ emrEsecuzione }}" onChange="{{ setEmrEsecuzione }}" maxlength="32" placeholder="2026-08-01T14:30:00Z" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Efficacia<input type="date" value="{{ emrEfficacia }}" onChange="{{ setEmrEfficacia }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Scadenza<input type="date" value="{{ emrScadenza }}" onChange="{{ setEmrScadenza }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+        <div style="height:1px;background:var(--line);margin:2px 0"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Prodotto<select value="{{ emrProdotto }}" onChange="{{ setEmrProdotto }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzProdotti }}" sc-as="op2" hint-placeholder-count="2" value="{{ op2.id }}">{{ op2.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Indice o punto<select value="{{ emrDettaglio }}" onChange="{{ setEmrDettaglio }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzDettagli }}" sc-as="oe" hint-placeholder-count="6" value="{{ oe.id }}">{{ oe.label }}</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1.3fr .7fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Punto di consegna (EIC)<input type="text" value="{{ emrPunto }}" onChange="{{ setEmrPunto }}" maxlength="400" placeholder="21Y100A1001A1011" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Carico<select value="{{ emrCarico }}" onChange="{{ setEmrCarico }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzCarichi }}" sc-as="ok" hint-placeholder-count="7" value="{{ ok.id }}">{{ ok.label }}</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1.3fr .7fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Evento<select value="{{ emrEvento }}" onChange="{{ setEmrEvento }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzEventi }}" sc-as="ov" hint-placeholder-count="11" value="{{ ov.id }}">{{ ov.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Data evento<input type="date" value="{{ emrDataEvento }}" onChange="{{ setEmrDataEvento }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+      </sc-if>
+      <sc-if value="{{ emrMostraValutazione }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Valore del contratto<input type="text" value="{{ emrValore }}" onChange="{{ setEmrValore }}" maxlength="30" placeholder="-125000.50" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo<select value="{{ emrTipoValore }}" onChange="{{ setEmrTipoValore }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ emrOpzValutazioni }}" sc-as="ow" hint-placeholder-count="3" value="{{ ow.id }}">{{ ow.label }}</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Momento (UTC)<input type="text" value="{{ emrMomentoValore }}" onChange="{{ setEmrMomentoValore }}" maxlength="32" placeholder="2026-08-31T22:00:00Z" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Data evento<input type="date" value="{{ emrDataEvento }}" onChange="{{ setEmrDataEvento }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+      </sc-if>
+      <sc-if value="{{ emrMostraCessazione }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Cessazione anticipata<input type="date" value="{{ emrDataCessazione }}" onChange="{{ setEmrDataCessazione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Data evento<input type="date" value="{{ emrDataEvento }}" onChange="{{ setEmrDataEvento }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+      </sc-if>
+      <button onClick="{{ generaEmir }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Genera e valida la segnalazione</button>
+      <sc-if value="{{ emrErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ emrErrore }}</span></sc-if>
+      <sc-for list="{{ emrErrori }}" as="ex" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ ex.message }}</span></sc-for>
+      <sc-if value="{{ emrInfo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--primText)">{{ emrInfo }}</span></sc-if>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Segnalazioni generate</h3><span style="font-size:12px;color:var(--ink3)">Ogni file è validato contro lo XSD ESMA prima di essere prodotto.</span></div>
+        <sc-if value="{{ emrElencoErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ emrElencoErrore }}</span></sc-if>
+        <sc-if value="{{ emrVuoto }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessuna segnalazione EMIR generata. Compila il pannello qui a fianco: il documento viene validato contro lo schema ESMA prima di essere prodotto.</span></div></sc-if><sc-for list="{{ emrRows }}" as="es" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:1.6fr .6fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600">{{ es.uti }}</span>
+            <span style="font-size:11.5px;color:var(--ink2)">{{ es.sigla_azione }} · {{ es.livello }}</span>
+            <button onClick="{{ es.scarica }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Scarica XML</button>
+            <span style="grid-column:1 / -1;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3)">{{ es.impronta }}</span>
+            <sc-for list="{{ es.avvisi }}" as="ay" hint-placeholder-count="1"><span style="grid-column:1 / -1;font-size:11px;color:#B54708">{{ ay.testo }}</span></sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Esito del Trade Repository</h3><span style="font-size:12px;color:var(--ink3)">Documento auth.092: dice quali operazioni sono state accolte e quali regole hanno fatto respingere le altre.</span></div>
+        <textarea value="{{ emrEsito }}" onChange="{{ setEmrEsito }}" rows="4" placeholder="&lt;Document xmlns=&quot;urn:iso:std:iso:20022:tech:xsd:auth.092.001.04&quot;&gt;…" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px;resize:vertical"></textarea>
+        <button onClick="{{ importaEsitoEmir }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Importa e abbina agli UTI inviati</button>
+        <sc-if value="{{ emrEsitoErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ emrEsitoErrore }}</span></sc-if>
+        <sc-if value="{{ emrEsitoInfo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--primText)">{{ emrEsitoInfo }}</span></sc-if>
+        <sc-if value="{{ emrEsitiVuoto }}" hint-placeholder-val="{{ false }}"><div style="margin-top:4px;padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessun esito importato. Le righe che riguardano altri operatori vengono scartate: qui restano solo gli UTI che risultano inviati da questo portale.</span></div></sc-if><sc-for list="{{ emrRighe }}" as="eg" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:1.6fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600">{{ eg.uti }}</span>
+            <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:{{ eg.bg }};color:{{ eg.fg }}">{{ eg.stato }}</span>
+            <span style="grid-column:1 / -1;font-size:11px;color:var(--ink3)">{{ eg.azione }}</span>
+            <sc-for list="{{ eg.regole }}" as="er2" hint-placeholder-count="1"><span style="grid-column:1 / -1;font-size:11px;color:#B42318">· {{ er2.testo }}</span></sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
 </section>
 </sc-if>
 
