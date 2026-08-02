@@ -2,7 +2,7 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
-## [Non rilasciato]
+## [1.3.0] — 2026-08-02
 
 ### Aggiunto
 - **REMIT XML ACER**: generazione deterministica di `REMITTable1 V3` (TradeReport) e `REMITTable2 V1` (non-standard a prezzo fisso), con validazione XSD reale, impronta SHA-256 degli schemi e artefatto XML scaricabile.
@@ -113,6 +113,7 @@ Prima release pubblica.
 - Script di avvio `avvio.sh` / `avvio.bat` per chi ha solo Python; Docker come terza opzione.
 - Suite di test: 8 test API (pytest) + 18 test della logica frontend (node:test), CI su ogni push.
 
+[1.3.0]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.3.0
 [1.2.1]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.2.1
 [1.1.3]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.3
 [1.1.2]: https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/tag/v1.1.2
