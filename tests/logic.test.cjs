@@ -1109,13 +1109,138 @@ test("EMIR: senza testo incollato non parte nessuna richiesta", async () => {
 test("EMIR: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf("Segnalazione EMIR REFIT"), html.indexOf("</x-dc>"));
+  const blocco = html.slice(html.indexOf("Segnalazione EMIR REFIT"), html.indexOf('data-screen-label="Trasporto"'));
   assert.ok(blocco.length > 2000, "blocco EMIR non trovato in index.html");
   const app = new App();
   app.setState({ screen: "emir" });
   const v = app.renderVals();
   const locali = new Set(["es", "ay", "eg", "er2", "ex", "oa", "ol", "on", "os", "op", "op2", "oc", "od", "oq", "ov", "ok", "oe", "ow", "true", "false"]);
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$]*)\s*\}\}/g)].map((m) => m[1]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+// --- Trasporto: interruzioni ricevute e UIOLI -------------------------------
+
+test("Trasporto: avvio pulito, registro vuoto e nessun messaggio", () => {
+  const app = new App();
+  app.setState({ screen: "trasporto" });
+  const v = app.renderVals();
+  assert.deepEqual(v.trsRows, []);
+  assert.deepEqual(v.trsNoteRows, []);
+  assert.equal(v.trsVuoto, true);
+  assert.equal(v.trsNoteVuoto, true);
+  assert.equal(v.trsUtilizzoEsito, null);
+  assert.equal(v.trsErrore, "");
+});
+
+test("Trasporto: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title.startsWith("Trasporto"));
+  assert.ok(card, "manca la card Trasporto");
+  assert.equal(card.reale, true);
+  card.go();
+  assert.equal(app.state.screen, "trasporto");
+});
+
+test("Trasporto: il payload dell'interruzione legge lo stato al momento dell'invio", async () => {
+  const app = new App();
+  app.setState({ screen: "trasporto" });
+  const azioni = app.renderVals();
+  azioni.setTrsPunto(ev("Tarvisio"));
+  azioni.setTrsInizio(ev("2026-01-10"));
+  azioni.setTrsGiorni(ev("3"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 201, json: async () => ({ punto: "Tarvisio", giorni: 3, anno_termico: 2025, avvisi: [] }), text: async () => "" };
+  };
+  await azioni.registraInterruzione();
+  assert.equal(inviato.url, "/api/trasporto/interruzioni");
+  assert.equal(inviato.body.punto, "Tarvisio");
+  assert.equal(inviato.body.giorni, "3");
+  assert.match(app.state.trsInfo, /registrata/);
+  global.fetch = FETCH_OK;
+});
+
+test("Trasporto: un'interruzione con avviso lo dice, non lo nasconde", async () => {
+  const app = new App();
+  app.setState({ screen: "trasporto" });
+  global.fetch = async () => ({
+    ok: true, status: 201,
+    json: async () => ({ punto: "Tarvisio", giorni: 2, anno_termico: 2025, avvisi: ["Solo 2 giorni pieni…"] }),
+    text: async () => "",
+  });
+  await app.renderVals().registraInterruzione();
+  assert.match(app.state.trsInfo, /contestare/);
+  global.fetch = FETCH_OK;
+});
+
+test("Trasporto: l'utilizzo sotto soglia è un rischio e si colora come tale", () => {
+  const app = new App();
+  app.setState({
+    screen: "trasporto",
+    trsUtilizzo: { percentuale: 75, periodo: "1 ottobre – 31 marzo", sotto_soglia: true, nota: "..." },
+  });
+  const sotto = app.renderVals().trsUtilizzoEsito;
+  // La condizione b) richiede entrambi i semestri: il badge di un semestre
+  // solo non deve dichiararla verificata.
+  assert.match(sotto.badge, /in questo semestre/);
+  assert.doesNotMatch(sotto.badge, /condizione b\) verificata/);
+  app.setState({ trsUtilizzo: { percentuale: 91.2, periodo: "1 aprile – 30 settembre", sotto_soglia: false, nota: "..." } });
+  const sopra = app.renderVals().trsUtilizzoEsito;
+  assert.match(sopra.badge, /sopra l'80% in questo semestre/);
+  assert.notEqual(sotto.bg, sopra.bg);
+});
+
+test("Trasporto: le righe del registro espongono avvisi, dettaglio e rimozione", () => {
+  const app = new App();
+  app.setState({
+    screen: "trasporto",
+    trsInterruzioni: [{
+      id: "a1", punto: "Tarvisio", tipo: "parziale", data_inizio: "2026-01-10", data_fine: "2026-01-12",
+      giorni: 3, capacita: 500000, preavviso_ore: 48, riferimento: "PROT-1", note: "",
+      anno_termico: 2025, avvisi: ["da contestare"],
+    }],
+    trsRiepilogoList: [{ punto: "Tarvisio", anno_termico: 2025, etichetta: "2025/2026", interruzioni: 2, giorni_totali: 5, giorni_parziali: 2, giorni_massimi_consecutivi: 5, con_avvisi: 1 }],
+  });
+  const v = app.renderVals();
+  const riga = v.trsRows[0];
+  assert.equal(riga.periodo, "2026-01-10 → 2026-01-12");
+  assert.match(riga.dettaglio, /500000 kWh\/g · preavviso 48h · rif\. PROT-1/);
+  assert.deepEqual(riga.avvisi, [{ testo: "da contestare" }]);
+  assert.equal(typeof riga.elimina, "function");
+  assert.match(v.trsRiepilogo[0].testo, /Tarvisio · AT 2025\/2026: 2 interruzioni, 5 giorni \(di cui 2 parziali\) · max 5 consecutivi/);
+});
+
+test("Trasporto: la nota fuori termine è marcata in rosso e resta scaricabile", () => {
+  const app = new App();
+  app.setState({
+    screen: "trasporto",
+    trsNote: [
+      { id: "n1", punto: "Tarvisio", anno_termico: 2025, scadenza: "2026-10-09", fuori_termine: false },
+      { id: "n2", punto: "Gorizia", anno_termico: 2020, scadenza: "2021-10-11", fuori_termine: true },
+    ],
+  });
+  const righe = app.renderVals().trsNoteRows;
+  assert.match(righe[0].stato, /entro il 2026-10-09/);
+  assert.equal(righe[1].stato, "fuori termine");
+  assert.notEqual(righe[0].statoBg, righe[1].statoBg);
+  assert.equal(typeof righe[0].scarica, "function");
+});
+
+test("Trasporto: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Trasporto"'), html.indexOf("</x-dc>"));
+  assert.ok(blocco.length > 2000, "blocco Trasporto non trovato in index.html");
+  const app = new App();
+  app.setState({ screen: "trasporto" });
+  const v = app.renderVals();
+  const locali = new Set(["tex", "ue", "ri", "ir", "ia", "tp", "ne", "nr", "true", "false"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);
 });

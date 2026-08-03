@@ -160,6 +160,49 @@ BEGIN
     SELECT RAISE(ABORT, 'Gli esiti EMIR sono immutabili');
 END;
 
+-- Interruzioni della capacità interrompibile comunicate da Snam: lo shipper
+-- le riceve, non le decide. Trascrizioni manuali dell'operatore, quindi
+-- correggibili (a differenza di ricevute ed esiti, che sono prove).
+CREATE TABLE IF NOT EXISTS trasporto_interruzione (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    punto TEXT NOT NULL COLLATE NOCASE,
+    tipo TEXT NOT NULL CHECK (tipo IN ('totale', 'parziale')),
+    data_inizio TEXT NOT NULL,
+    data_fine TEXT NOT NULL,
+    giorni INTEGER NOT NULL CHECK (giorni BETWEEN 1 AND 366),
+    capacita REAL,
+    preavviso_ore INTEGER,
+    riferimento TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    anno_termico INTEGER NOT NULL,
+    avvisi TEXT NOT NULL,
+    creato_il TEXT NOT NULL,
+    UNIQUE (email, punto, data_inizio)
+);
+CREATE INDEX IF NOT EXISTS idx_trasporto_interruzione_email
+    ON trasporto_interruzione(email, anno_termico DESC, data_inizio DESC);
+
+-- Note giustificative UIOLI preparate (Cap. 7, §4.3): il portale le produce
+-- e le fa scaricare, la trasmissione resta dell'operatore.
+CREATE TABLE IF NOT EXISTS uioli_nota (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    punto TEXT NOT NULL,
+    anno_termico INTEGER NOT NULL,
+    capacita_detrazione REAL NOT NULL,
+    durata TEXT NOT NULL,
+    motivazioni TEXT NOT NULL,
+    mittente TEXT NOT NULL,
+    scadenza TEXT NOT NULL,
+    fuori_termine INTEGER NOT NULL DEFAULT 0,
+    testo TEXT NOT NULL,
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    creato_il TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_uioli_nota_email
+    ON uioli_nota(email, creato_il DESC);
+
 CREATE TABLE IF NOT EXISTS remit_migrazione (
     email TEXT NOT NULL,
     source_hash TEXT NOT NULL,
@@ -810,6 +853,133 @@ def elenca_esiti_emir(conn: sqlite3.Connection, email: str) -> list[dict]:
         (email,),
     ).fetchall()
     return [_riga_esito(r) for r in righe]
+
+
+CAMPI_INTERRUZIONE = (
+    "id, punto, tipo, data_inizio, data_fine, giorni, capacita, preavviso_ore, "
+    "riferimento, note, anno_termico, avvisi, creato_il"
+)
+
+
+def _riga_interruzione(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "punto": row["punto"],
+        "tipo": row["tipo"],
+        "data_inizio": row["data_inizio"],
+        "data_fine": row["data_fine"],
+        "giorni": row["giorni"],
+        "capacita": row["capacita"],
+        "preavviso_ore": row["preavviso_ore"],
+        "riferimento": row["riferimento"],
+        "note": row["note"],
+        "anno_termico": row["anno_termico"],
+        "avvisi": _json_o_righe(row["avvisi"]),
+        "creato_il": row["creato_il"],
+    }
+
+
+def crea_interruzione(conn: sqlite3.Connection, *, interruzione_id: str, email: str,
+                      record: dict) -> None:
+    conn.execute(
+        "INSERT INTO trasporto_interruzione (id, email, punto, tipo, data_inizio, data_fine, "
+        "giorni, capacita, preavviso_ore, riferimento, note, anno_termico, avvisi, creato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (
+            interruzione_id, email, record["punto"], record["tipo"], record["data_inizio"],
+            record["data_fine"], record["giorni"], record["capacita"], record["preavviso_ore"],
+            record["riferimento"], record["note"], record["anno_termico"],
+            json.dumps(record["avvisi"]),
+        ),
+    )
+
+
+def elenca_interruzioni(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_INTERRUZIONE} FROM trasporto_interruzione WHERE email = ? "
+        "ORDER BY data_inizio DESC, rowid DESC LIMIT 500",
+        (email,),
+    ).fetchall()
+    return [_riga_interruzione(r) for r in righe]
+
+
+def tutte_interruzioni(conn: sqlite3.Connection, email: str) -> list[dict]:
+    """Elenco integrale, per i controlli del Codice: sovrapposizioni e 4 giorni.
+
+    L'elenco da mostrare è limitato a 500 righe; i controlli invece devono
+    vedere tutto, altrimenti la 501esima interruzione sfugge al confronto.
+    """
+
+    righe = conn.execute(
+        f"SELECT {CAMPI_INTERRUZIONE} FROM trasporto_interruzione WHERE email = ? "
+        "ORDER BY data_inizio",
+        (email,),
+    ).fetchall()
+    return [_riga_interruzione(r) for r in righe]
+
+
+def elimina_interruzione(conn: sqlite3.Connection, email: str, interruzione_id: str) -> bool:
+    cursore = conn.execute(
+        "DELETE FROM trasporto_interruzione WHERE email = ? AND id = ?",
+        (email, interruzione_id),
+    )
+    return cursore.rowcount > 0
+
+
+CAMPI_NOTA_UIOLI = (
+    "id, punto, anno_termico, capacita_detrazione, durata, motivazioni, mittente, "
+    "scadenza, fuori_termine, sha256, creato_il"
+)
+
+
+def _riga_nota_uioli(row: sqlite3.Row, *, con_testo: bool = False) -> dict:
+    dati = {
+        "id": row["id"],
+        "punto": row["punto"],
+        "anno_termico": row["anno_termico"],
+        "capacita_detrazione": row["capacita_detrazione"],
+        "durata": row["durata"],
+        "motivazioni": row["motivazioni"],
+        "mittente": row["mittente"],
+        "scadenza": row["scadenza"],
+        "fuori_termine": bool(row["fuori_termine"]),
+        "sha256": row["sha256"],
+        "creato_il": row["creato_il"],
+    }
+    if con_testo:
+        dati["testo"] = row["testo"]
+    return dati
+
+
+def crea_nota_uioli(conn: sqlite3.Connection, *, nota_id: str, email: str, record: dict) -> None:
+    conn.execute(
+        "INSERT INTO uioli_nota (id, email, punto, anno_termico, capacita_detrazione, durata, "
+        "motivazioni, mittente, scadenza, fuori_termine, testo, sha256, creato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        (
+            nota_id, email, record["punto"], record["anno_termico"],
+            record["capacita_detrazione"], record["durata"], record["motivazioni"],
+            record["mittente"], record["scadenza"], int(record["fuori_termine"]),
+            record["testo"], record["sha256"],
+        ),
+    )
+
+
+def elenca_note_uioli(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_NOTA_UIOLI} FROM uioli_nota WHERE email = ? "
+        "ORDER BY creato_il DESC, rowid DESC LIMIT 200",
+        (email,),
+    ).fetchall()
+    return [_riga_nota_uioli(r) for r in righe]
+
+
+def leggi_nota_uioli(conn: sqlite3.Connection, email: str, nota_id: str) -> dict | None:
+    row = conn.execute(
+        f"SELECT {CAMPI_NOTA_UIOLI}, testo FROM uioli_nota WHERE email = ? AND id = ?",
+        (email, nota_id),
+    ).fetchone()
+    return _riga_nota_uioli(row, con_testo=True) if row else None
 
 
 def esito_emir_per_impronta(conn: sqlite3.Connection, email: str, sha256: str) -> dict | None:

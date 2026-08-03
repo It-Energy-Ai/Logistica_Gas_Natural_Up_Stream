@@ -125,6 +125,12 @@
         emrValore: "", emrMomentoValore: "", emrTipoValore: "MTMO", emrDataCessazione: "",
         emrSegnalazioni: [], emrErrore: "", emrElencoErrore: "", emrInfo: "", emrErroriCampo: [],
         emrEsito: "", emrEsitoErrore: "", emrEsitoInfo: "", emrEsitiList: [], emrCatalogo: null,
+        trsPunto: "", trsTipo: "totale", trsInizio: "", trsGiorni: "", trsCapacita: "", trsPreavviso: "", trsRiferimento: "",
+        trsInterruzioni: [], trsRiepilogoList: [], trsErrore: "", trsInfo: "", trsErroriCampo: [], trsElencoErrore: "",
+        trsSemestre: "invernale", trsImmessi: "", trsConferita: "", trsDisposizione: "", trsIndisponibile: "", trsAttestati: "",
+        trsUtilizzo: null, trsUtilizzoErrore: "", trsUtilizzoErrori: [],
+        trsNotaPunto: "Tarvisio", trsNotaAnno: "", trsNotaCapacita: "", trsNotaDurata: "", trsNotaMotivazioni: "", trsNotaMittente: "",
+        trsNote: [], trsNotaErrore: "", trsNotaInfo: "", trsNotaErrori: [], trsCatalogo: null,
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -356,6 +362,34 @@
       }
     }
 
+    async _caricaTrasporto() {
+      if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
+      try {
+        const [interruzioni, note, catalogo] = await Promise.all([
+          this._json("/api/trasporto/interruzioni"),
+          this._json("/api/trasporto/note"),
+          this.state.trsCatalogo ? Promise.resolve(this.state.trsCatalogo) : this._json("/api/trasporto/catalogo"),
+        ]);
+        if (!miaSessione()) return;
+        this.setState({
+          trsInterruzioni: Array.isArray(interruzioni.interruzioni) ? interruzioni.interruzioni : [],
+          trsRiepilogoList: Array.isArray(interruzioni.riepilogo) ? interruzioni.riepilogo : [],
+          trsNote: Array.isArray(note.note) ? note.note : [],
+          trsCatalogo: catalogo || null,
+          // L'Anno Termico di Riferimento proposto è quello su cui l'operatore
+          // sta davvero lavorando: prima della scadenza della nota è ancora
+          // quello appena chiuso.
+          trsNotaAnno: this.state.trsNotaAnno || String((catalogo || {}).anno_termico_riferimento || ""),
+          trsElencoErrore: "",
+        });
+      } catch (error) {
+        if (!miaSessione()) return;
+        this.setState({ trsElencoErrore: `Registro trasporto non disponibile: ${error.message}` });
+      }
+    }
+
     async _caricaPdr() {
       if (!this._sessionEmail) return;
       const epoca = this._sessionEpoch;
@@ -377,7 +411,7 @@
     }
 
     async _caricaWorkspaceRegolatorio() {
-      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir()]);
+      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir(), this._caricaTrasporto()]);
     }
 
     async _apriSessione(email) {
@@ -465,6 +499,7 @@
         remit: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "REMIT · XML ACER" }],
         pdr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "PDR · GME" }],
         emir: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "EMIR · Trade Repository" }],
+        trasporto: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Trasporto · Interruzioni e UIOLI" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -569,6 +604,7 @@
         { title: "REMIT · XML ACER", desc: "Bozze auditabili, validazione XSD, generatore UTI ed export per PDR.", stat: String(nReg.bozze), statLabel: "bozze da validare", reale: true, primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
         { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
         { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
+        { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
       // veri dell'utente e restano visibili anche a portale pulito.
@@ -982,7 +1018,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1306,6 +1342,142 @@
         }
       }
 
+      // --- Trasporto: interruzioni ricevute e UIOLI, lato shipper ----------
+      // Nel Codice di Rete interruzioni e ritiri UIOLI li esegue Snam: qui si
+      // registrano le comunicazioni ricevute, si controllano le regole che il
+      // Codice fissa nel testo (4 giorni fra interruzioni; 20% per le
+      // parziali aggiuntive, non verificabile dal solo registro) e si prepara la nota
+      // giustificativa — l'unico atto attivo che spetta allo shipper.
+      const trsCat = this.state.trsCatalogo || {};
+
+      const registraInterruzione = unaVolta("registraInterruzione", async () => {
+        this.setState({ trsErrore: "", trsInfo: "", trsErroriCampo: [] });
+        try {
+          const esito = await this._json("/api/trasporto/interruzioni", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              punto: cap(this.state.trsPunto, 160),
+              tipo: this.state.trsTipo,
+              data_inizio: cap(this.state.trsInizio, 10),
+              giorni: cap(this.state.trsGiorni, 3),
+              capacita: cap(this.state.trsCapacita, 30),
+              preavviso_ore: cap(this.state.trsPreavviso, 5),
+              riferimento: cap(this.state.trsRiferimento, 160),
+            }),
+          });
+          this.setState({
+            trsInfo: (esito.avvisi || []).length
+              ? "Interruzione registrata, con un elemento da contestare: leggi l'avviso in elenco."
+              : `Interruzione registrata su ${esito.punto} (${esito.giorni} gg, Anno Termico ${esito.anno_termico}/${esito.anno_termico + 1}).`,
+          });
+          await this._caricaTrasporto();
+        } catch (error) {
+          this.setState({ trsErrore: `Interruzione non registrata: ${error.message}`, trsErroriCampo: error.dettagli || [] });
+        }
+      });
+
+      const calcolaUtilizzo = unaVolta("calcolaUtilizzo", async () => {
+        this.setState({ trsUtilizzoErrore: "", trsUtilizzoErrori: [], trsUtilizzo: null });
+        try {
+          const esito = await this._json("/api/trasporto/utilizzo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              semestre: this.state.trsSemestre,
+              immessi: cap(this.state.trsImmessi, 30),
+              capacita_conferita: cap(this.state.trsConferita, 30),
+              messa_disposizione: cap(this.state.trsDisposizione, 30),
+              non_disponibile: cap(this.state.trsIndisponibile, 30),
+              attestati: cap(this.state.trsAttestati, 30),
+            }),
+          });
+          this.setState({ trsUtilizzo: esito });
+        } catch (error) {
+          this.setState({ trsUtilizzoErrore: `Utilizzo Medio non calcolato: ${error.message}`, trsUtilizzoErrori: error.dettagli || [] });
+        }
+      });
+
+      const preparaNota = unaVolta("preparaNota", async () => {
+        this.setState({ trsNotaErrore: "", trsNotaInfo: "", trsNotaErrori: [] });
+        try {
+          const esito = await this._json("/api/trasporto/note", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              punto: this.state.trsNotaPunto,
+              anno_termico: cap(this.state.trsNotaAnno, 4),
+              capacita_detrazione: cap(this.state.trsNotaCapacita, 30),
+              durata: cap(this.state.trsNotaDurata, 160),
+              motivazioni: cap(this.state.trsNotaMotivazioni, 4000),
+              mittente: cap(this.state.trsNotaMittente, 160),
+            }),
+          });
+          this.setState({
+            trsNotaInfo: esito.fuori_termine
+              ? `Nota preparata, ma il termine (${esito.scadenza}) è già passato: leggi l'avviso.`
+              : `Nota preparata per ${esito.punto}, Anno Termico ${esito.etichetta}: scaricala e trasmettila secondo le modalità pubblicate da Snam.`,
+          });
+          await this._caricaTrasporto();
+        } catch (error) {
+          this.setState({ trsNotaErrore: `Nota non preparata: ${error.message}`, trsNotaErrori: error.dettagli || [] });
+        }
+      });
+
+      const trsRows = (this.state.trsInterruzioni || []).map((i) => ({
+        ...i,
+        periodo: `${i.data_inizio} → ${i.data_fine}`,
+        etichettaTipo: i.tipo === "parziale" ? "parziale" : "totale",
+        dettaglio: [
+          i.capacita ? `${i.capacita} kWh/g` : "",
+          i.preavviso_ore !== null && i.preavviso_ore !== undefined ? `preavviso ${i.preavviso_ore}h` : "",
+          i.riferimento ? `rif. ${i.riferimento}` : "",
+        ].filter(Boolean).join(" · "),
+        avvisi: (i.avvisi || []).map((testo) => ({ testo })),
+        elimina: unaVolta(`eliminaInterruzione:${i.id}`, async () => {
+          try {
+            await this._json(`/api/trasporto/interruzioni/${i.id}`, { method: "DELETE" });
+            await this._caricaTrasporto();
+          } catch (error) {
+            this.setState({ trsElencoErrore: `Interruzione non rimossa: ${error.message}` });
+          }
+        }),
+      }));
+
+      const trsRiepilogo = (this.state.trsRiepilogoList || []).map((g) => ({
+        ...g,
+        // Le parziali si dicono a parte: possono ricadere nel T1max, e
+        // sommarle al Tmax senza distinguo sovrastima l'erosione del plafond.
+        testo: `${g.punto} · AT ${g.etichetta}: ${g.interruzioni} interruzioni, ${g.giorni_totali} giorni`
+          + (g.giorni_parziali ? ` (di cui ${g.giorni_parziali} parziali)` : "")
+          + ` · max ${g.giorni_massimi_consecutivi} consecutivi`,
+      }));
+
+      const trsNoteRows = (this.state.trsNote || []).map((n) => ({
+        ...n,
+        etichetta: `AT ${n.anno_termico}/${n.anno_termico + 1}`,
+        statoBg: n.fuori_termine ? NEG.bg : OK.bg,
+        statoFg: n.fuori_termine ? NEG.fg : OK.fg,
+        stato: n.fuori_termine ? "fuori termine" : `entro il ${n.scadenza}`,
+        scarica: () => window.open(`/api/trasporto/note/${n.id}/download`, "_blank"),
+      }));
+
+      const trsEsito = this.state.trsUtilizzo;
+      const trsUtilizzoEsito = trsEsito ? {
+        percentuale: `${trsEsito.percentuale}%`,
+        periodo: trsEsito.periodo,
+        // Sotto la soglia è un rischio, non un successo, e il colore deve
+        // dirlo — ma la condizione b) del Codice richiede l'80% violato in
+        // ENTRAMBI i semestri: un semestre solo non la verifica, e il badge
+        // non deve dire il contrario di ciò che la nota spiega sotto.
+        bg: trsEsito.sotto_soglia ? NEG.bg : OK.bg,
+        fg: trsEsito.sotto_soglia ? NEG.fg : OK.fg,
+        badge: trsEsito.sotto_soglia
+          ? "sotto l'80% in questo semestre · rischio solo se accade in entrambi"
+          : "sopra l'80% in questo semestre",
+        nota: trsEsito.nota,
+      } : null;
+
       // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
       const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
       const receiptField = (receipt, ...keys) => {
@@ -1543,7 +1715,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -1666,6 +1838,44 @@
         emrOpzEventi: opzioni("eventi"), emrOpzCarichi: opzioni("carichi"),
         emrOpzDettagli: opzioni(emrDettagli), emrOpzValutazioni: opzioni("valutazioni"),
         emrOpzLivelli: opzioni("livelli"),
+        trsPunto: this.state.trsPunto, trsTipo: this.state.trsTipo, trsInizio: this.state.trsInizio,
+        trsGiorni: this.state.trsGiorni, trsCapacita: this.state.trsCapacita,
+        trsPreavviso: this.state.trsPreavviso, trsRiferimento: this.state.trsRiferimento,
+        trsErrore: this.state.trsErrore, trsInfo: this.state.trsInfo, trsErrori: this.state.trsErroriCampo,
+        trsElencoErrore: this.state.trsElencoErrore,
+        trsSemestre: this.state.trsSemestre, trsImmessi: this.state.trsImmessi,
+        trsConferita: this.state.trsConferita, trsDisposizione: this.state.trsDisposizione,
+        trsIndisponibile: this.state.trsIndisponibile, trsAttestati: this.state.trsAttestati,
+        trsUtilizzoErrore: this.state.trsUtilizzoErrore, trsUtilizzoErrori: this.state.trsUtilizzoErrori,
+        trsNotaPunto: this.state.trsNotaPunto, trsNotaAnno: this.state.trsNotaAnno,
+        trsNotaCapacita: this.state.trsNotaCapacita, trsNotaDurata: this.state.trsNotaDurata,
+        trsNotaMotivazioni: this.state.trsNotaMotivazioni, trsNotaMittente: this.state.trsNotaMittente,
+        trsNotaErrore: this.state.trsNotaErrore, trsNotaInfo: this.state.trsNotaInfo, trsNotaErrori: this.state.trsNotaErrori,
+        trsRows, trsRiepilogo, trsNoteRows, trsUtilizzoEsito,
+        registraInterruzione, calcolaUtilizzo, preparaNota,
+        trsVuoto: !trsRows.length, trsNoteVuoto: !trsNoteRows.length,
+        trsAnnoRif: String(trsCat.anno_termico_riferimento || ""),
+        trsScadenza: trsCat.scadenza_nota_riferimento || "",
+        trsOpzPunti: (trsCat.punti_uioli || []).map((nome) => ({ id: nome, label: nome })),
+        setTrsPunto: (e) => this.setSilent({ trsPunto: e.target.value }),
+        setTrsTipo: (e) => this.setSilent({ trsTipo: e.target.value }),
+        setTrsInizio: (e) => this.setSilent({ trsInizio: e.target.value }),
+        setTrsGiorni: (e) => this.setSilent({ trsGiorni: e.target.value }),
+        setTrsCapacita: (e) => this.setSilent({ trsCapacita: e.target.value }),
+        setTrsPreavviso: (e) => this.setSilent({ trsPreavviso: e.target.value }),
+        setTrsRiferimento: (e) => this.setSilent({ trsRiferimento: e.target.value }),
+        setTrsSemestre: (e) => this.setSilent({ trsSemestre: e.target.value }),
+        setTrsImmessi: (e) => this.setSilent({ trsImmessi: e.target.value }),
+        setTrsConferita: (e) => this.setSilent({ trsConferita: e.target.value }),
+        setTrsDisposizione: (e) => this.setSilent({ trsDisposizione: e.target.value }),
+        setTrsIndisponibile: (e) => this.setSilent({ trsIndisponibile: e.target.value }),
+        setTrsAttestati: (e) => this.setSilent({ trsAttestati: e.target.value }),
+        setTrsNotaPunto: (e) => this.setSilent({ trsNotaPunto: e.target.value }),
+        setTrsNotaAnno: (e) => this.setSilent({ trsNotaAnno: e.target.value }),
+        setTrsNotaCapacita: (e) => this.setSilent({ trsNotaCapacita: e.target.value }),
+        setTrsNotaDurata: (e) => this.setSilent({ trsNotaDurata: e.target.value }),
+        setTrsNotaMotivazioni: (e) => this.setSilent({ trsNotaMotivazioni: e.target.value }),
+        setTrsNotaMittente: (e) => this.setSilent({ trsNotaMittente: e.target.value }),
         setEmrAzione: (e) => this.setSilent({ emrAzione: e.target.value }),
         setEmrLivello: (e) => this.setSilent({ emrLivello: e.target.value }),
         setEmrUti: (e) => this.setSilent({ emrUti: e.target.value }),

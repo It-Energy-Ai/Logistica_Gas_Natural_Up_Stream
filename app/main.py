@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import edigas, emir, uti, pdr, remit
+from . import edigas, emir, uti, pdr, remit, trasporto
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -796,6 +796,141 @@ async def post_emir_esito(request: Request):
     return JSONResponse(
         {**esito, "righe": righe, "esito_id": esito_id, "gia_importato": False},
         status_code=201,
+    )
+
+
+@app.get("/api/trasporto/catalogo")
+def get_trasporto_catalogo(request: Request):
+    """Regole e riferimenti del Codice di Rete: solo ciò che il Codice fissa."""
+
+    if not _sessione(request):
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    return trasporto.catalogo()
+
+
+@app.get("/api/trasporto/interruzioni")
+def get_trasporto_interruzioni(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        righe = db.elenca_interruzioni(conn, email)
+    return {"interruzioni": righe, "riepilogo": trasporto.riepilogo_interruzioni(righe)}
+
+
+@app.post("/api/trasporto/interruzioni")
+async def post_trasporto_interruzione(request: Request):
+    """Registra un'interruzione comunicata da Snam, con i controlli del Codice."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, trasporto.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        with db.connect() as conn:
+            # Integrale, non il LIMIT dell'elenco a schermo: i controlli del
+            # Codice devono vedere tutte le interruzioni, non le prime 500.
+            esistenti = db.tutte_interruzioni(conn, email)
+            record = trasporto.registra_interruzione(payload, esistenti)
+            interruzione_id = secrets.token_hex(8)
+            db.crea_interruzione(conn, interruzione_id=interruzione_id, email=email, record=record)
+    except trasporto.TrasportoError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except sqlite3.IntegrityError:
+        return JSONResponse(
+            {"errore": f"Esiste già un'interruzione su {record['punto']} con inizio {record['data_inizio']}."},
+            status_code=409,
+        )
+    return JSONResponse({**record, "id": interruzione_id}, status_code=201)
+
+
+@app.delete("/api/trasporto/interruzioni/{interruzione_id}")
+def delete_trasporto_interruzione(interruzione_id: str, request: Request):
+    """Le interruzioni sono trascrizioni manuali: un refuso deve poter uscire."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        rimossa = db.elimina_interruzione(conn, email, interruzione_id)
+    if not rimossa:
+        return JSONResponse({"errore": "interruzione non trovata"}, status_code=404)
+    return {"ok": True}
+
+
+@app.post("/api/trasporto/utilizzo")
+async def post_trasporto_utilizzo(request: Request):
+    """Calcolo dell'Utilizzo Medio di un semestre (§4.3.1). Non conserva nulla."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, trasporto.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        return trasporto.calcola_utilizzo_medio(payload)
+    except trasporto.TrasportoError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+
+
+@app.get("/api/trasporto/note")
+def get_trasporto_note(request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        return {"note": db.elenca_note_uioli(conn, email)}
+
+
+@app.post("/api/trasporto/note")
+async def post_trasporto_nota(request: Request):
+    """Prepara la nota giustificativa UIOLI e la conserva per il download."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, trasporto.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        record = trasporto.prepara_nota(payload)
+    except trasporto.TrasportoError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    nota_id = secrets.token_hex(8)
+    with db.connect() as conn:
+        db.crea_nota_uioli(conn, nota_id=nota_id, email=email, record=record)
+    return JSONResponse(
+        {**{k: v for k, v in record.items() if k != "testo"}, "id": nota_id},
+        status_code=201,
+    )
+
+
+@app.get("/api/trasporto/note/{nota_id}/download")
+def download_trasporto_nota(nota_id: str, request: Request):
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        record = db.leggi_nota_uioli(conn, email, nota_id)
+    if not record:
+        return JSONResponse({"errore": "nota non trovata"}, status_code=404)
+    nome = f"NOTA_UIOLI_{record['punto']}_{record['anno_termico']}.txt".replace("/", "-").replace(" ", "_")
+    return Response(
+        content=record["testo"],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nome)}"},
+        media_type="text/plain; charset=utf-8",
     )
 
 

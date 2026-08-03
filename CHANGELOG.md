@@ -2,6 +2,24 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.8.0] — 2026-08-03
+
+Una proposta esterna voleva coprire trasporto interrompibile, UIOLI, allocazione TISG, coefficienti di stoccaggio e sicurezza. Verificata contro i testi ufficiali (Codice di Rete rev. XCI, 648 pagine; Codice di Stoccaggio 2026 rev. I, 283 pagine), è stata respinta: capitoli citati sbagliati, parametri «normativi» inesistenti nei Codici, algoritmi EIC/LEI errati (Luhn spacciato per ISO 7064; validatore che rifiuta tutti i LEI GLEIF reali), formule della Delibera 147/19 con l'operazione invertita, e — di nuovo — una finta autenticazione. Ma due idee stavano dal lato giusto, e sono state costruite dalle fonti.
+
+### Aggiunto
+- **Modulo Trasporto · Interruzioni e UIOLI, dal lato dello shipper.** Nel Codice di Rete interruzioni e ritiri li esegue Snam: il portale li subisce, li controlla e vi risponde — non li simula.
+  - **Registro delle interruzioni comunicate da Snam** (Cap. 3, §2.2): trascrizione della comunicazione, conteggio dei giorni per punto e Anno Termico (sono i giorni che erodono il Tmax pubblicato), e il controllo dell'**unica regola quantitativa che il Codice fissa in proprio** — almeno 4 giorni fra il termine di un'interruzione e l'inizio della successiva. La violazione non blocca: produce un avviso, perché è un elemento **da contestare a Snam**. Sovrapposizioni respinte, cavallo del 30 settembre segnalato. I parametri Tmax/T1max/Dmax/Pmin non vengono ricopiati: sono pubblicati da Snam per punto e durata, e il Codice non ne fissa i valori.
+  - **Utilizzo Medio per semestre** (Cap. 7, §4.3.1): la condizione b) del ritiro richiede la soglia dell'80% violata in **ciascuno** dei due semestri (1/10–31/3 e 1/4–30/9), non su una media annuale, e il denominatore va diminuito delle tre detrazioni previste — capacità messa a disposizione, capacità non disponibile per riduzioni/interruzioni, quantitativi attestati. Ignorarle fa sembrare a rischio chi non lo è. Il risultato dichiara quali condizioni restano verificabili solo da Snam.
+  - **Nota giustificativa** (Cap. 7, §4.3): l'unico atto attivo dello shipper nel processo UIOLI. Contenuto prescritto dal Codice, termine dei sette giorni lavorativi dal 30 settembre calcolato (prudenzialmente: i festivi infrasettimanali potrebbero solo accorciarlo), note fuori termine marcate, file di testo scaricabile. **Nessun invio simulato**: le modalità di trasmissione le pubblica Snam.
+  - Nuove rotte `/api/trasporto/{catalogo, interruzioni, utilizzo, note}` con download della nota; tabelle `trasporto_interruzione` (correggibile: è una trascrizione manuale, non una prova) e `uioli_nota`.
+- Prima del rilascio il modulo è passato da una **revisione adversariale interna** (19 agenti, ogni rilievo riprodotto prima di essere accettato): 15 difetti confermati e corretti, fra cui un decimale con zero iniziale letto come migliaia («0.500» diventava 500), il confronto dei punti sensibile alle maiuscole che aggirava i controlli, i giorni consecutivi che non fondevano le interruzioni adiacenti, il riepilogo che sommava le parziali al plafond Tmax, un badge che dichiarava verificata la condizione b) con un semestre solo, e una citazione del Codice non più verbatim.
+- **47 verifiche nuove** fra Python e Node: regola dei 4 giorni in entrambe le direzioni, sovrapposizioni anche con maiuscole diverse, fusione dei periodi adiacenti, riparto totali/parziali, riparto per Anno Termico, detrazioni del §4.3.1, denominatore nullo spiegato, scadenza della nota sui giorni lavorativi, isolamento fra account, binding della schermata.
+
+### Respinto, con prova
+- **Coefficienti di stoccaggio «esemplificativi»**: il §2.5.2 del Codice di Stoccaggio dice che i coefficienti temporali sono determinati da Stogit e pubblicati sul suo sito; nessuno dei valori proposti compare nelle 283 pagine, e la «fonte» citata (stogit.it/coefficienti_temporali) reindirizza a una pagina commerciale generica. Numeri inventati non entrano nel portale nemmeno con l'etichetta «esemplificativi».
+- **Formule TISG/147-19**: la CTC proposta divideva dove la delibera moltiplica (CTC = PCM × z_cg), il PCM non corrisponde alla definizione del comma 3.1, e il comma 3.2 assegna il calcolo al SII — non allo shipper.
+- **Autenticazione JWT** (terza riproposizione): chiave con default nel codice, nessuna verifica di credenziali, token non revocabili. Vale la decisione già scritta nel guardrail di produzione: fingere un'autenticazione è peggio che non averla.
+
 ## [1.7.1] — 2026-08-02
 
 Da una revisione esterna del modulo EMIR: sei rilievi, verificati uno per uno contro il codice. Due accolti (in parte), quattro respinti con prova — fra questi «test assenti» (sono 63 e passano) e «manca il checksum del LEI» (c'è, MOD 97-10, su tutti e sette i campi LEI, con test).

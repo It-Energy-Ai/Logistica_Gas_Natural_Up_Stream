@@ -1196,6 +1196,107 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenTrasporto }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Trasporto" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Trasporto · Interruzioni e UIOLI</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Registro delle interruzioni comunicate da Snam · Utilizzo Medio per semestre · nota giustificativa</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Codice di Rete · Cap. 3 §2.2 e Cap. 7 §4</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="color:var(--primText)">Confine operativo</strong><span>Interruzioni e ritiri use-it-or-lose-it li esegue Snam Rete Gas: qui si registrano le comunicazioni ricevute, si controllano le regole che il Codice fissa nel proprio testo (almeno 4 giorni fra due interruzioni; per le parziali aggiuntive, il tetto del 20% della capacità conferita) e si prepara la nota giustificativa — l'unico atto attivo che spetta allo shipper. I parametri Tmax, T1max, Dmax e Pmin sono pubblicati da Snam per ciascun punto: il portale non li ricopia né li inventa.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Interruzione comunicata da Snam</h3><span style="font-size:12px;color:var(--ink3)">Trascrivi la comunicazione: il portale controlla intervalli e sovrapposizioni.</span></div>
+        <div style="display:grid;grid-template-columns:1.4fr .6fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Punto di entrata<input type="text" value="{{ trsPunto }}" onChange="{{ setTrsPunto }}" maxlength="160" placeholder="Tarvisio" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Tipo<select value="{{ trsTipo }}" onChange="{{ setTrsTipo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="totale">Totale</option><option value="parziale">Parziale</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr .5fr .7fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Inizio<input type="date" value="{{ trsInizio }}" onChange="{{ setTrsInizio }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Giorni<input type="text" value="{{ trsGiorni }}" onChange="{{ setTrsGiorni }}" maxlength="3" placeholder="3" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Preavviso (ore)<input type="text" value="{{ trsPreavviso }}" onChange="{{ setTrsPreavviso }}" maxlength="5" placeholder="48" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Capacità interrotta (kWh/g)<input type="text" value="{{ trsCapacita }}" onChange="{{ setTrsCapacita }}" maxlength="30" placeholder="obbligatoria se parziale" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Riferimento comunicazione<input type="text" value="{{ trsRiferimento }}" onChange="{{ setTrsRiferimento }}" maxlength="160" placeholder="prot. o email Snam" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+        <button onClick="{{ registraInterruzione }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Registra nel registro</button>
+        <sc-if value="{{ trsErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ trsErrore }}</span></sc-if>
+        <sc-for list="{{ trsErrori }}" as="tex" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ tex.message }}</span></sc-for>
+        <sc-if value="{{ trsInfo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--primText)">{{ trsInfo }}</span></sc-if>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Utilizzo Medio del semestre</h3><span style="font-size:12px;color:var(--ink3)">Definizione del §4.3.1, con le tre detrazioni al denominatore. Sotto l'80% scatta la condizione b) del ritiro.</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Semestre<select value="{{ trsSemestre }}" onChange="{{ setTrsSemestre }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="invernale">1 ott – 31 mar</option><option value="estivo">1 apr – 30 set</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Immessi/prelevati (kWh)<input type="text" value="{{ trsImmessi }}" onChange="{{ setTrsImmessi }}" maxlength="30" placeholder="dai bilanci definitivi" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Capacità conferita nel semestre (kWh)<input type="text" value="{{ trsConferita }}" onChange="{{ setTrsConferita }}" maxlength="30" placeholder="somma giornaliera" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Messa a disposizione<input type="text" value="{{ trsDisposizione }}" onChange="{{ setTrsDisposizione }}" maxlength="30" placeholder="0" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Non disponibile<input type="text" value="{{ trsIndisponibile }}" onChange="{{ setTrsIndisponibile }}" maxlength="30" placeholder="0" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Attestati<input type="text" value="{{ trsAttestati }}" onChange="{{ setTrsAttestati }}" maxlength="30" placeholder="0" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <button onClick="{{ calcolaUtilizzo }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Calcola l'Utilizzo Medio</button>
+        <sc-if value="{{ trsUtilizzoErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ trsUtilizzoErrore }}</span></sc-if>
+        <sc-for list="{{ trsUtilizzoErrori }}" as="ue" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ ue.message }}</span></sc-for>
+        <sc-if value="{{ trsUtilizzoEsito }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--bg)">
+            <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600">{{ trsUtilizzoEsito.percentuale }}</span><span style="font-size:12px;color:var(--ink3)">{{ trsUtilizzoEsito.periodo }}</span></div>
+            <span style="align-self:flex-start;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:{{ trsUtilizzoEsito.bg }};color:{{ trsUtilizzoEsito.fg }}">{{ trsUtilizzoEsito.badge }}</span>
+            <span style="font-size:11.5px;color:var(--ink3);line-height:1.5;text-wrap:pretty">{{ trsUtilizzoEsito.nota }}</span>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Registro interruzioni</h3><span style="font-size:12px;color:var(--ink3)">I giorni registrati erodono i plafond Tmax e T1max pubblicati da Snam: le interruzioni parziali possono ricadere nel T1max.</span></div>
+        <sc-if value="{{ trsElencoErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ trsElencoErrore }}</span></sc-if>
+        <sc-for list="{{ trsRiepilogo }}" as="ri" hint-placeholder-count="2"><span style="font-size:11.5px;font-weight:600;color:var(--ink2)">{{ ri.testo }}</span></sc-for>
+        <sc-if value="{{ trsVuoto }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessuna interruzione registrata. Quando Snam comunica un'interruzione della capacità interrompibile, trascrivila qui: il portale conteggia i giorni per Anno Termico e segnala ciò che non rispetta il Codice.</span></div></sc-if><sc-for list="{{ trsRows }}" as="ir" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:1.5fr .8fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)">
+            <span style="font-size:12.5px;font-weight:600">{{ ir.punto }} <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">{{ ir.periodo }}</span></span>
+            <span style="font-size:11.5px;color:var(--ink2)">{{ ir.giorni }} gg · {{ ir.etichettaTipo }}</span>
+            <button onClick="{{ ir.elimina }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--ink2);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Rimuovi</button>
+            <sc-if value="{{ ir.dettaglio }}" hint-placeholder-val="{{ false }}"><span style="grid-column:1 / -1;font-size:11px;color:var(--ink3)">{{ ir.dettaglio }}</span></sc-if>
+            <sc-for list="{{ ir.avvisi }}" as="ia" hint-placeholder-count="1"><span style="grid-column:1 / -1;font-size:11px;color:#B54708">{{ ia.testo }}</span></sc-for>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+        <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Nota giustificativa UIOLI</h3><span style="font-size:12px;color:var(--ink3)">Cap. 7 §4.3: l'unico atto attivo dello shipper. Anno Termico di riferimento {{ trsAnnoRif }} · termine {{ trsScadenza }}.</span></div>
+        <div style="display:grid;grid-template-columns:1fr .6fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Punto<select value="{{ trsNotaPunto }}" onChange="{{ setTrsNotaPunto }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option sc-repeat="{{ trsOpzPunti }}" sc-as="tp" hint-placeholder-count="3" value="{{ tp.id }}">{{ tp.label }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Anno Termico (avvio)<input type="text" value="{{ trsNotaAnno }}" onChange="{{ setTrsNotaAnno }}" maxlength="4" placeholder="2025" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Ragione sociale dell'Utente<input type="text" value="{{ trsNotaMittente }}" onChange="{{ setTrsNotaMittente }}" maxlength="160" placeholder="La tua società" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        <div style="display:grid;grid-template-columns:.7fr 1.3fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Capacità da detrarre (kWh/g)<input type="text" value="{{ trsNotaCapacita }}" onChange="{{ setTrsNotaCapacita }}" maxlength="30" placeholder="500.000" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Durata della capacità<input type="text" value="{{ trsNotaDurata }}" onChange="{{ setTrsNotaDurata }}" maxlength="160" placeholder="annuale, dal 1/10/2025" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"></label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Motivazioni documentate<textarea value="{{ trsNotaMotivazioni }}" onChange="{{ setTrsNotaMotivazioni }}" rows="3" placeholder="Descrivi l'evento e i riferimenti dei documenti allegati (almeno 40 caratteri)." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:12.5px;resize:vertical"></textarea></label>
+        <button onClick="{{ preparaNota }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Prepara la nota</button>
+        <sc-if value="{{ trsNotaErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ trsNotaErrore }}</span></sc-if>
+        <sc-for list="{{ trsNotaErrori }}" as="ne" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ ne.message }}</span></sc-for>
+        <sc-if value="{{ trsNotaInfo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--primText)">{{ trsNotaInfo }}</span></sc-if>
+        <sc-if value="{{ trsNoteVuoto }}" hint-placeholder-val="{{ false }}"><div style="padding:14px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12px;color:var(--ink3);text-wrap:pretty">Nessuna nota preparata. La trasmissione a Snam resta a tuo carico, secondo le modalità pubblicate sul sito del Trasportatore.</span></div></sc-if><sc-for list="{{ trsNoteRows }}" as="nr" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:1.6fr auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)">
+            <span style="font-size:12px;font-weight:600">{{ nr.punto }} · {{ nr.etichetta }}</span>
+            <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:{{ nr.statoBg }};color:{{ nr.statoFg }}">{{ nr.stato }}</span>
+            <button onClick="{{ nr.scarica }}" style="padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--primText);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Scarica</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 </div>
 </template>
 <script src="/static/runtime.js"></script>
