@@ -463,14 +463,20 @@
       const [locale, dominio] = email.includes("@") ? email.split("@") : ["", ""];
       const parti = locale.split(/[._-]+/).filter(Boolean);
       const maiuscola = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
-      const nome = parti.length ? parti.map(maiuscola).join(" ") : "Utente";
+      // Un'iniziale resta un'iniziale: "m.rossi" diventa "M. Rossi", col punto.
+      const nome = parti.length
+        ? parti.map((p) => (p.length === 1 ? p.toUpperCase() + "." : maiuscola(p))).join(" ")
+        : "Utente";
       const iniziali = (parti.length ? parti.map((p) => p[0]).join("") : "U").slice(0, 2).toUpperCase();
-      const estesa = parti.find((p) => p.length > 2);
       return {
         nome,
         iniziali,
-        nomeSaluto: estesa ? maiuscola(estesa) : nome,
-        azienda: dominio ? maiuscola(dominio.split(".")[0]) : "La tua azienda",
+        // Si saluta col nome di battesimo quando c'è (primo pezzo per esteso);
+        // se l'email dà solo l'iniziale, meglio il nome completo che il
+        // cognome secco — "Buonasera, Rossi" suona sgarbato.
+        nomeSaluto: parti.length && parti[0].length > 2 ? maiuscola(parti[0]) : nome,
+        // "azienda1" si mostra "Azienda 1": solo spaziatura, nessun dato inventato.
+        azienda: dominio ? maiuscola(dominio.split(".")[0]).replace(/([^\d])(\d+)$/, "$1 $2") : "La tua azienda",
         dominio: dominio || "azienda.it",
       };
     }
@@ -546,7 +552,7 @@
         const k = "px" + st.nextP;
         return { extraPunti: [...st.extraPunti, [name, "Riconsegna", k]], cfg: { ...st.cfg, [k]: true }, nextP: st.nextP + 1, newPunto: "", saved: false };
       });
-      const notifiche = [["Email a chiusura ciclo", "Riepilogo esiti a ogni ciclo di rinomina", "nEmail"], ["Alert sbilanciamento", "Avviso quando la posizione supera la tolleranza", "nAlert"], ["Report giornaliero PDF", "Sintesi del giorno gas alle 06:30", "nReport"]].map(([name, desc, k]) => ({ name, desc, go: tg(k), ...knob(cfg[k]) }));
+      const notifiche = [["Email a chiusura ciclo", "Riepilogo esiti a ogni ciclo di rinomina", "nEmail"], ["Alert sbilanciamento", "Avviso quando la posizione supera la tolleranza", "nAlert"], ["Bilancio giornaliero PDF", "Sintesi del giorno gas alle 06:30", "nReport"]].map(([name, desc, k]) => ({ name, desc, go: tg(k), ...knob(cfg[k]) }));
       const seg = (key, opts) => opts.map((o) => ({ label: o, go: setC(key, o), bg: cfg[key] === o ? "var(--surface)" : "transparent", fg: cfg[key] === o ? "var(--ink)" : "var(--ink2)", sh: cfg[key] === o ? "0 1px 2px rgba(16,34,45,.12)" : "none" }));
       const unitOpts = seg("unit", ["MWh", "Smc"]);
       const cicloOpts = seg("ciclo", ["D−1", "Intraday"]);
@@ -576,39 +582,46 @@
         emirRespinte: _emrEsiti.reduce((tot, e) => tot + (e.respinte || 0), 0),
       };
 
+      // Unità e badge possono dipendere dal numero: "1 documenti" è un errore
+      // di accordo, non una svista tollerabile su una tessera in dashboard.
+      const declina = (voce, n) => (typeof voce === "function" ? voce(n) : voce);
       const regTessera = (area, n, unita, pieno, vuoto, tono, dove) => ({
-        area, unita, go: go(dove),
+        area, unita: declina(unita, n), go: go(dove),
         value: regCaricamento ? "—" : String(n),
         // "—" significa "non ancora saputo", "0" significa "non hai nulla":
         // sono due cose diverse e vanno distinte a schermo.
-        hint: regCaricamento ? "caricamento…" : (n ? pieno : vuoto),
+        hint: regCaricamento ? "caricamento…" : (n ? declina(pieno, n) : vuoto),
         bg: (!regCaricamento && n) ? tono.bg : "var(--surface2)",
         fg: (!regCaricamento && n) ? tono.fg : "var(--ink3)",
       });
       const regKpis = [
-        regTessera("REMIT · BOZZE", nReg.bozze, "record", "da validare", "nessuna in lavorazione", WAIT, "remit"),
-        regTessera("REMIT · XML", nReg.xml, "file", "validati XSD", "nessun file generato", OK, "remit"),
-        regTessera("EDIG@S · GIORNO GAS", nReg.nomineOggi, "documenti", "NOMINT generati oggi", "nessuna nomina oggi", RUN, "nomine"),
-        regTessera("EDIG@S · AVVISI", nReg.avvisi, "avvisi", "da leggere", "nessun avviso", WARN, "nomine"),
-        regTessera("EMIR · SEGNALAZIONI", nReg.emirFile, "file", "validati XSD ESMA", "nessuna segnalazione", OK, "emir"),
-        regTessera("EMIR · RESPINTE", nReg.emirRespinte, "operazioni", "da correggere", "nessun rifiuto", NEG, "emir"),
+        regTessera("REMIT · BOZZE", nReg.bozze, (n) => (n === 1 ? "bozza" : "bozze"), "da validare", "nessuna in lavorazione", WAIT, "remit"),
+        regTessera("REMIT · XML", nReg.xml, "file", (n) => (n === 1 ? "validato XSD" : "validati XSD"), "nessun file generato", OK, "remit"),
+        regTessera("EDIG@S · GIORNO GAS", nReg.nomineOggi, (n) => (n === 1 ? "documento" : "documenti"), (n) => (n === 1 ? "NOMINT generato oggi" : "NOMINT generati oggi"), "nessuna nomina oggi", RUN, "nomine"),
+        regTessera("EDIG@S · AVVISI", nReg.avvisi, (n) => (n === 1 ? "avviso" : "avvisi"), "da leggere", "nessun avviso", WARN, "nomine"),
+        regTessera("EMIR · SEGNALAZIONI", nReg.emirFile, "file", (n) => (n === 1 ? "validato XSD ESMA" : "validati XSD ESMA"), "nessuna segnalazione", OK, "emir"),
+        regTessera("EMIR · RESPINTE", nReg.emirRespinte, (n) => (n === 1 ? "operazione" : "operazioni"), "da correggere", "nessuna operazione respinta", NEG, "emir"),
       ];
 
       const moduli = [
         { title: "Dashboard", desc: "Posizione del giorno gas, sbilanciamento e prezzi PSV a colpo d'occhio.", stat: "G+0", statLabel: "giorno gas corrente", primary: true, go: go("dash"), cursor: "pointer", border: "color-mix(in oklab, var(--prim) 40%, var(--line))" },
-        { title: "Nomine & Programmazione", desc: "Nomine EDIG@S 6.1: NOMINT validato, risposta NOMRES del trasportatore e cicli di rinomina.", stat: String(nReg.nomineOggi), statLabel: "documenti del giorno gas", reale: true, primary: true, go: go("nomine"), cursor: "pointer", border: "var(--line)" },
+        { title: "Nomine & Programmazione", desc: "Nomine EDIG@S 6.1: NOMINT validato, risposta NOMRES del trasportatore e cicli di rinomina.", stat: String(nReg.nomineOggi), statLabel: nReg.nomineOggi === 1 ? "documento del giorno gas" : "documenti del giorno gas", reale: true, primary: true, go: go("nomine"), cursor: "pointer", border: "var(--line)" },
         { title: "Bilanciamento", desc: "Posizione fisica e commerciale, esposizione e azioni correttive.", stat: "−312", statLabel: "MWh previsti", primary: true, go: go("bilancio"), cursor: "pointer", border: "var(--line)" },
         { title: "Capacità & Contratti", desc: "Capacità di trasporto conferite, contratti e scadenze.", stat: "8", statLabel: "contratti attivi", primary: true, go: go("capacita"), cursor: "pointer", border: "var(--line)" },
         { title: "Stoccaggio", desc: "Giacenza, iniezione ed erogazione sui servizi di stoccaggio.", stat: "61%", statLabel: "riempimento", primary: true, go: go("stoccaggio"), cursor: "pointer", border: "var(--line)" },
         { title: "Report & Analisi", desc: "Estrazioni, report regolatori e serie storiche esportabili.", stat: "12", statLabel: "report programmati", primary: true, go: go("report"), cursor: "pointer", border: "var(--line)" },
-        { title: "REMIT · XML ACER", desc: "Bozze auditabili, validazione XSD, generatore UTI ed export per PDR.", stat: String(nReg.bozze), statLabel: "bozze da validare", reale: true, primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
-        { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
-        { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
-        { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
+        { title: "REMIT · XML ACER", desc: "Bozze auditabili, validazione XSD, generatore UTI ed export per PDR.", stat: String(nReg.bozze), statLabel: nReg.bozze === 1 ? "bozza da validare" : "bozze da validare", reale: true, primary: true, go: go("remit"), cursor: "pointer", border: "var(--line)" },
+        { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: nReg.xml === 1 ? "file pronto al preflight" : "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
+        { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: nReg.emirFile === 1 ? "segnalazione generata" : "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
+        { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: (this.state.trsInterruzioni || []).length === 1 ? "interruzione registrata" : "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
       // veri dell'utente e restano visibili anche a portale pulito.
       if (!demoOn) for (const m of moduli) if (!m.reale) m.stat = "—";
+      // Con una card orfana nell'ultima riga (10 card su 3 colonne) l'ultima
+      // occupa la riga intera: una card larga chiude meglio di due terzi vuoti.
+      for (const m of moduli) m.span = "auto";
+      if (moduli.length % 3 === 1) moduli[moduli.length - 1].span = "1 / -1";
       const off = this.state.dashOff;
       const fmtN = (n) => n.toLocaleString("it-IT");
       const dNom = 12480 + off * 260;
@@ -664,7 +677,7 @@
         top: "none",
         shadow: "var(--shadow)",
       });
-      const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine EDIG@S · REMIT e PDR · Bilanciamento", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
+      const hubCards = [mkHub("lg", "LG", "Logistica Gas", "Nomine · REMIT · Bilanciamento", "moduli"), mkHub("cfg", "CF", "Configurazione", "Utenti · Parametri · Notifiche", "config")];
       const cfgCards = [
         { title: "Sistema", desc: "Stato dei servizi collegati, ambiente e attività recenti.", stat: demoOn ? "3" : "0", statLabel: "servizi collegati", go: go("cfgSis") },
         { title: "Impostazioni", desc: "Anagrafica shipper, parametri di nomina, punti e notifiche.", stat: String(nAbil), statLabel: "punti abilitati", go: go("cfgImp") },
@@ -864,9 +877,9 @@
       // incrociare a mano due elenchi per sapere quali documenti il
       // trasportatore ha preso in carico.
       const ESITI_ACK = {
-        "accettato": { testo: "presa in carico", bg: "#D1FADF", fg: "#05603A" },
-        "accettato con riserva": { testo: "con riserva", bg: "#FEF0C7", fg: "#B54708" },
-        "respinto": { testo: "respinta", bg: "#FEE4E2", fg: "#B42318" },
+        "accettato": { testo: "Presa in carico", bg: "#D1FADF", fg: "#05603A" },
+        "accettato con riserva": { testo: "Con riserva", bg: "#FEF0C7", fg: "#B54708" },
+        "respinto": { testo: "Respinta", bg: "#FEE4E2", fg: "#B42318" },
       };
 
       const importaAck = unaVolta("importaAck", async () => {
@@ -930,7 +943,7 @@
           impronta: `SHA-256 ${String(n.sha256 || "").slice(0, 16)}…`,
           avvisi: (n.avvisi || []).map((testo) => ({ testo })),
           scarica: () => window.open(`/api/edigas/nomine/${n.id}/download`, "_blank"),
-          ackEsito: stato ? stato.testo : "in attesa di riscontro",
+          ackEsito: stato ? stato.testo : "In attesa di riscontro",
           ackBg: stato ? stato.bg : "var(--surface2)",
           ackFg: stato ? stato.fg : "var(--ink3)",
           ackNota: ack ? (ack.motivazioni || []).join(" · ") : "",
@@ -954,7 +967,7 @@
       ];
       const azioni = !demoOn ? [] : [
         { txt: "Acquisto 250 MWh su MGP-GAS", sub: "Sessione AGS · entro 12:30", stato: "Suggerita", ...RUN },
-        { txt: "Rinomina R4 · +60 MWh su Gries", sub: "Apre alle 15:00", stato: "In valutazione", ...WAIT },
+        { txt: "Rinomina R4 · +60 MWh su Passo Gries", sub: "Apre alle 15:00", stato: "In valutazione", ...WAIT },
         { txt: "Erogazione stoccaggio +100 MWh", sub: "Confermata da Stogit", stato: "Eseguita", ...OK },
       ];
       const capRows = (!demoOn ? [] : [
@@ -967,7 +980,7 @@
       const capChip = capRows.length + " contratti";
       const scadenze = !demoOn ? [] : [
         { data: "05/08/2026", txt: "Asta PRISMA · capacità mensile settembre" },
-        { data: "15/09/2026", txt: "Rinnovo capacità annuale Gries e Mazara" },
+        { data: "15/09/2026", txt: "Rinnovo capacità annuale Passo Gries e Mazara del Vallo" },
         { data: "30/09/2026", txt: "Chiusura anno termico 2025/26" },
       ];
       const stocKpis = demoOn ? [
@@ -994,11 +1007,11 @@
       const repKpis = demoOn ? [
         { label: "Invii programmati", value: "3", unit: "attivi", delta: "Prossimo 06:30", dBg: RUN.bg, dFg: RUN.fg },
         { label: "Obblighi regolatori", value: "2", unit: "in scadenza", delta: "REMIT · ARERA", dBg: WARN.bg, dFg: WARN.fg },
-        { label: "Costo sbilancio · YTD", value: "84,2", unit: "k€", delta: "−18% vs 2025", dBg: OK.bg, dFg: OK.fg },
+        { label: "Costo sbilanciamento · YTD", value: "84,2", unit: "k€", delta: "−18% vs 2025", dBg: OK.bg, dFg: OK.fg },
       ] : [
         { label: "Invii programmati", value: "0", unit: "attivi", ...ATTESA },
         { label: "Obblighi regolatori", value: "—", unit: "in scadenza", ...ATTESA },
-        { label: "Costo sbilancio · YTD", value: "—", unit: "k€", ...ATTESA },
+        { label: "Costo sbilanciamento · YTD", value: "—", unit: "k€", ...ATTESA },
       ];
       const repCat = this.state.repCat;
       const repCats = [["tutti", "Tutti"], ["op", "Operativi"], ["reg", "Regolatori"], ["mkt", "Mercato"]].map(([k, label]) => ({
@@ -1349,6 +1362,17 @@
       // parziali aggiuntive, non verificabile dal solo registro) e si prepara la nota
       // giustificativa — l'unico atto attivo che spetta allo shipper.
       const trsCat = this.state.trsCatalogo || {};
+      // I dati restano in ISO; a schermo le date sono gg/mm/aaaa come nel
+      // resto del portale, e i numeri hanno il punto delle migliaia.
+      const dataIt = (iso) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso || "");
+      };
+      const dateItNelTesto = (testo) => String(testo || "").replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, "$3/$2/$1");
+      const numeroIt = (valore) => {
+        const n = Number(valore);
+        return Number.isFinite(n) ? n.toLocaleString("it-IT") : String(valore);
+      };
 
       const registraInterruzione = unaVolta("registraInterruzione", async () => {
         this.setState({ trsErrore: "", trsInfo: "", trsErroriCampo: [] });
@@ -1426,14 +1450,14 @@
 
       const trsRows = (this.state.trsInterruzioni || []).map((i) => ({
         ...i,
-        periodo: `${i.data_inizio} → ${i.data_fine}`,
+        periodo: `${dataIt(i.data_inizio)} → ${dataIt(i.data_fine)}`,
         etichettaTipo: i.tipo === "parziale" ? "parziale" : "totale",
         dettaglio: [
-          i.capacita ? `${i.capacita} kWh/g` : "",
+          i.capacita ? `${numeroIt(i.capacita)} kWh/g` : "",
           i.preavviso_ore !== null && i.preavviso_ore !== undefined ? `preavviso ${i.preavviso_ore}h` : "",
           i.riferimento ? `rif. ${i.riferimento}` : "",
         ].filter(Boolean).join(" · "),
-        avvisi: (i.avvisi || []).map((testo) => ({ testo })),
+        avvisi: (i.avvisi || []).map((testo) => ({ testo: dateItNelTesto(testo) })),
         elimina: unaVolta(`eliminaInterruzione:${i.id}`, async () => {
           try {
             await this._json(`/api/trasporto/interruzioni/${i.id}`, { method: "DELETE" });
@@ -1458,7 +1482,7 @@
         etichetta: `AT ${n.anno_termico}/${n.anno_termico + 1}`,
         statoBg: n.fuori_termine ? NEG.bg : OK.bg,
         statoFg: n.fuori_termine ? NEG.fg : OK.fg,
-        stato: n.fuori_termine ? "fuori termine" : `entro il ${n.scadenza}`,
+        stato: n.fuori_termine ? "fuori termine" : `entro il ${dataIt(n.scadenza)}`,
         scarica: () => window.open(`/api/trasporto/note/${n.id}/download`, "_blank"),
       }));
 
@@ -1854,8 +1878,10 @@
         trsRows, trsRiepilogo, trsNoteRows, trsUtilizzoEsito,
         registraInterruzione, calcolaUtilizzo, preparaNota,
         trsVuoto: !trsRows.length, trsNoteVuoto: !trsNoteRows.length,
-        trsAnnoRif: String(trsCat.anno_termico_riferimento || ""),
-        trsScadenza: trsCat.scadenza_nota_riferimento || "",
+        trsAnnoRif: trsCat.anno_termico_riferimento
+          ? `${trsCat.anno_termico_riferimento}/${Number(trsCat.anno_termico_riferimento) + 1}`
+          : "",
+        trsScadenza: dataIt(trsCat.scadenza_nota_riferimento || ""),
         trsOpzPunti: (trsCat.punti_uioli || []).map((nome) => ({ id: nome, label: nome })),
         setTrsPunto: (e) => this.setSilent({ trsPunto: e.target.value }),
         setTrsTipo: (e) => this.setSilent({ trsTipo: e.target.value }),
@@ -1933,11 +1959,14 @@
         pdrSetEnvironment: pdrSet("environment"), pdrSetChannel: pdrSet("channel"), pdrSetOperator: pdrSet("gme_operator_code"), pdrSetContract: pdrSet("pdr_contract_reference"), pdrSetRegisteredAcer: pdrSet("registered_acer_code"),
         pdrToggleTestAccess: pdrToggle("test_access_requested"), pdrToggleTwoFactor: pdrToggle("two_factor_ready"), salvaPdr,
         pdrEnvironment: pdrProfile.environment || "test", pdrChannel: pdrProfile.channel || "portal", pdrOperator: pdrProfile.gme_operator_code || "", pdrContract: pdrProfile.pdr_contract_reference || "", pdrRegisteredAcer: pdrProfile.registered_acer_code || "",
-        pdrTestAccess: !!pdrProfile.test_access_requested, pdrTwoFactor: !!pdrProfile.two_factor_ready,
+        pdrTestAccess: pdrProfile.test_access_requested ? "Sì" : "No", pdrTwoFactor: pdrProfile.two_factor_ready ? "Sì" : "No",
         pdrEndpoint: pdrProfile.environment === "production" ? "https://pdr.ipex.it" : "https://provepdr.ipex.it",
         pdrFeeAnnual: this.state.pdrFees ? `${this.state.pdrFees.external_upload_annual_eur} €/anno` : "—",
         pdrCheck: this.state.pdrCheck, pdrCheckOpen: !!this.state.pdrCheck, pdrCheckLoading: !!this.state.pdrCheck?.loading, pdrIssues: this.state.pdrCheck?.issues ?? [], pdrCheckReport: this.state.pdrCheck?.report_id ?? "",
-        pdrRows: remRows, pdrSchemas: this.state.pdrSchemas || [], goPdr: go("pdr"),
+        pdrRows: remRows,
+        pdrSchemas: (this.state.pdrSchemas || []).map((s) => ({ ...s, enabled_label: s.enabled ? "incluso" : "escluso" })),
+        goPdr: go("pdr"),
+        pdrReceiptNoSelection: !this.state.pdrReceiptReportId,
         pdrReceiptReportOptions, pdrReceiptReportId, pdrReceiptRows,
         pdrReceiptCaricamento: !!this.state.pdrReceiptCaricamento, pdrReceiptImporting: !!this.state.pdrReceiptImporting,
         pdrReceiptErrore: this.state.pdrReceiptErrore, pdrReceiptInfo: this.state.pdrReceiptInfo,

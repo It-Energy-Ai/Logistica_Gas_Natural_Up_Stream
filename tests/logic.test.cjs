@@ -455,7 +455,7 @@ test("PDR: schermata e profilo separano readiness da credenziali", () => {
   v = app.renderVals();
   assert.equal(v.pdrOperator, "M-GAS-123");
   assert.equal(v.pdrRegisteredAcer, "A0045821W.IT");
-  assert.equal(v.pdrTestAccess, true);
+  assert.equal(v.pdrTestAccess, "Sì");
   assert.equal("password" in app.state.pdr, false);
 });
 
@@ -845,10 +845,10 @@ test("ACKNOW: i tre esiti sono distinti a schermo", () => {
   });
   const [primo, secondo, terzo] = app.renderVals().edgRiscontri;
   assert.equal(primo.tipo, "Riscontro applicativo");
-  assert.equal(primo.esito, "presa in carico");
-  assert.equal(secondo.esito, "con riserva");
+  assert.equal(primo.esito, "Presa in carico");
+  assert.equal(secondo.esito, "Con riserva");
   assert.equal(terzo.tipo, "Riscontro tecnico");
-  assert.equal(terzo.esito, "respinta");
+  assert.equal(terzo.esito, "Respinta");
   assert.equal(terzo.dettaglio, "40G · Errore sintattico nel messaggio");
   assert.equal(app.renderVals().edgAckVuoto, false);
 });
@@ -869,10 +869,10 @@ test("ACKNOW: ogni nomina mostra se è stata riscontrata", () => {
     ],
   });
   const righe = app.renderVals().edgRows;
-  assert.equal(righe[0].ackEsito, "presa in carico");
+  assert.equal(righe[0].ackEsito, "Presa in carico");
   assert.equal(righe[0].ackNota, "01G · Elaborato e accettato");
-  assert.equal(righe[1].ackEsito, "con riserva");
-  assert.equal(righe[2].ackEsito, "in attesa di riscontro", "una nomina senza riscontro non è né accettata né respinta");
+  assert.equal(righe[1].ackEsito, "Con riserva");
+  assert.equal(righe[2].ackEsito, "In attesa di riscontro", "una nomina senza riscontro non è né accettata né respinta");
   assert.equal(righe[2].ackNota, "");
 });
 
@@ -887,7 +887,7 @@ test("ACKNOW: fra due riscontri sulla stessa nomina vale il più recente", () =>
       { nomina_id: "n1", esito: "accettato", accettato: true, motivazioni: ["01G"], tipo_documento: "294", riferimento: "NOM-1" },
     ],
   });
-  assert.equal(app.renderVals().edgRows[0].ackEsito, "respinta");
+  assert.equal(app.renderVals().edgRows[0].ackEsito, "Respinta");
 });
 
 test("ACKNOW: a portale pulito il pannello spiega a cosa serve", () => {
@@ -1208,8 +1208,9 @@ test("Trasporto: le righe del registro espongono avvisi, dettaglio e rimozione",
   });
   const v = app.renderVals();
   const riga = v.trsRows[0];
-  assert.equal(riga.periodo, "2026-01-10 → 2026-01-12");
-  assert.match(riga.dettaglio, /500000 kWh\/g · preavviso 48h · rif\. PROT-1/);
+  // a schermo le date sono in formato italiano; i dati restano ISO
+  assert.equal(riga.periodo, "10/01/2026 → 12/01/2026");
+  assert.match(riga.dettaglio, /500\.000 kWh\/g · preavviso 48h · rif\. PROT-1/);
   assert.deepEqual(riga.avvisi, [{ testo: "da contestare" }]);
   assert.equal(typeof riga.elimina, "function");
   assert.match(v.trsRiepilogo[0].testo, /Tarvisio · AT 2025\/2026: 2 interruzioni, 5 giorni \(di cui 2 parziali\) · max 5 consecutivi/);
@@ -1225,7 +1226,7 @@ test("Trasporto: la nota fuori termine è marcata in rosso e resta scaricabile",
     ],
   });
   const righe = app.renderVals().trsNoteRows;
-  assert.match(righe[0].stato, /entro il 2026-10-09/);
+  assert.match(righe[0].stato, /entro il 09\/10\/2026/);
   assert.equal(righe[1].stato, "fuori termine");
   assert.notEqual(righe[0].statoBg, righe[1].statoBg);
   assert.equal(typeof righe[0].scarica, "function");

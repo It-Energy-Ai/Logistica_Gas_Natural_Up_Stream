@@ -2,6 +2,24 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.8.1] — 2026-08-03
+
+Revisione grafica di tutte le pagine — scritte e posizionamenti — condotta sulle schermate reali con dati veri: 7 revisori indipendenti sui 19 scatti, ogni rilievo verificato guardando l'immagine e il markup prima di essere accettato. **48 correzioni applicate su 50 rilievi validi** (2 respinti dal verificatore).
+
+### Scritte
+- **Accordi singolare/plurale ovunque**: «1 documenti del giorno gas», «1 segnalazioni generate», «1 file validati XSD» e simili ora si declinano col numero, nelle card dei moduli e nelle tessere della dashboard.
+- **Il saluto non usa più il cognome secco**: da «Buonasera, Rossi» a «Buonasera, M. Rossi» — l'iniziale derivata dall'email prende il punto, l'azienda «azienda1» si mostra «Azienda 1» (solo spaziatura: nessun dato inventato).
+- Coerenza terminologica: «punti di consegna» (non «in consegna»), «Costo sbilanciamento» (non «sbilancio»), «Passo Gries» e «Mazara del Vallo» per esteso, «Bilancio giornaliero PDF» uniformato fra Notifiche e Report, badge ACKNOW con l'iniziale maiuscola, «Autenticazione a due livelli», «lo schema ESMA» al posto de «lo XSD».
+- **Niente più booleani grezzi**: i «true/false» della schermata PDR diventano «Sì/No» e «incluso/escluso»; il chip dell'endpoint ora dice cos'è («Endpoint PDR · …»).
+- **Date in formato italiano a schermo** nel modulo Trasporto (i dati restano ISO), numeri con il punto delle migliaia, Anno Termico sempre «2025/2026»; il bottone «Registra nel registro» diventa «Registra l'interruzione»; virgola che salva il «provvisorio, comunicato in G+1»; placeholder della password rimosso (dieci pallini finti sembravano una password precompilata).
+
+### Posizionamenti
+- **La card orfana dei moduli** (10 card su 3 colonne) ora chiude la griglia a piena riga; la didascalia dell'hub non è più coperta dalle carte decorative; «Confine operativo» non si spezza più su due righe in nessuno dei quattro banner.
+- **Tema scuro**: le barre «Nominato» del grafico erano quasi invisibili (contrasto 2:1) — nuova variabile `--primChart`; gli avvisi arancioni passano a `--warn` con variante scura leggibile; `color-scheme:dark` rende chiare le icone native di date picker e select.
+- Griglie allineate (registro interno delle nomine a 1fr/1.15fr come la riga sopra), card che non si stirano più (Sistema con `align-items:start`, «Utenti e privilegi» a piena riga, Configuratore a due colonne), fili separatori sopra le righe invece che sotto l'ultima, colonna destra di EMIR sticky accanto al form lungo, UTI lunghi troncati con ellissi e `title`, riquadri Table 1/Table 2 nell'ordine del select, stato vuoto per le ricevute PDR senza record selezionato.
+
+Non applicati, con motivazione: il suggerimento di mostrare «Marco Rossi» al posto di «M. Rossi» — il nome è derivato dall'email di login e «Marco» sarebbe un dato inventato, contro la regola dell'avvio pulito.
+
 ## [1.8.0] — 2026-08-03
 
 Una proposta esterna voleva coprire trasporto interrompibile, UIOLI, allocazione TISG, coefficienti di stoccaggio e sicurezza. Verificata contro i testi ufficiali (Codice di Rete rev. XCI, 648 pagine; Codice di Stoccaggio 2026 rev. I, 283 pagine), è stata respinta: capitoli citati sbagliati, parametri «normativi» inesistenti nei Codici, algoritmi EIC/LEI errati (Luhn spacciato per ISO 7064; validatore che rifiuta tutti i LEI GLEIF reali), formule della Delibera 147/19 con l'operazione invertita, e — di nuovo — una finta autenticazione. Ma due idee stavano dal lato giusto, e sono state costruite dalle fonti.

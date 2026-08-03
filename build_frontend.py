@@ -60,8 +60,8 @@ def main() -> None:
     login_bindings = [
         ('<input type="email" placeholder="nome@azienda.it"',
          '<input type="email" placeholder="nome@azienda.it" value="{{ loginEmail }}" onChange="{{ setLoginEmail }}" onKeyDown="{{ loginKey }}"'),
-        ('<input type="password" placeholder="••••••••••"',
-         '<input type="password" placeholder="••••••••••" value="{{ loginPass }}" onChange="{{ setLoginPass }}" onKeyDown="{{ loginKey }}"'),
+        ('<input type="password"',
+         '<input type="password" value="{{ loginPass }}" onChange="{{ setLoginPass }}" onKeyDown="{{ loginKey }}"'),
     ]
     for vecchio, nuovo in login_bindings:
         occorrenze = template.count(vecchio)
