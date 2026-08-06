@@ -1235,12 +1235,93 @@ test("Trasporto: la nota fuori termine è marcata in rosso e resta scaricabile",
 test("Trasporto: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf('data-screen-label="Trasporto"'), html.indexOf("</x-dc>"));
+  const blocco = html.slice(html.indexOf('data-screen-label="Trasporto"'), html.indexOf('data-screen-label="Previsione"'));
   assert.ok(blocco.length > 2000, "blocco Trasporto non trovato in index.html");
   const app = new App();
   app.setState({ screen: "trasporto" });
   const v = app.renderVals();
   const locali = new Set(["tex", "ue", "ri", "ir", "ia", "tp", "ne", "nr", "true", "false"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+
+// --- Previsione della domanda ----------------------------------------------
+
+test("Previsione: avvio pulito, nessun esito e stato vuoto", () => {
+  const app = new App();
+  app.setState({ screen: "previsione" });
+  const v = app.renderVals();
+  assert.equal(v.prvHa, false);
+  assert.equal(v.prvVuoto, true);
+  assert.deepEqual(v.prvBarre, []);
+  assert.deepEqual(v.prvRighe, []);
+  assert.equal(v.prvErrore, "");
+});
+
+test("Previsione: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title === "Previsione della domanda");
+  assert.ok(card, "manca la card Previsione");
+  card.go();
+  assert.equal(app.state.screen, "previsione");
+});
+
+test("Previsione: il payload legge lo stato al momento dell'invio", async () => {
+  const app = new App();
+  app.setState({ screen: "previsione" });
+  const azioni = app.renderVals();
+  azioni.setPrvCsv(ev("data;valore\n01/06/2026;100"));
+  azioni.setPrvOrizzonte(ev("14"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      metodo: "m", nota: "n", avvisi: [], dal: "2026-06-01", al: "2026-07-10", giorni_storico: 40,
+      backtest: { giorni: 14, mae: 1, rmse: 2, mape: 3 },
+      storico_recente: [{ data: "2026-07-10", valore: 100 }],
+      previsione: [{ data: "2026-07-11", valore: 110, minimo: 90, massimo: 130 }],
+    }), text: async () => "" };
+  };
+  await azioni.calcolaPrevisione();
+  assert.equal(inviato.url, "/api/previsione");
+  assert.equal(inviato.body.orizzonte, "14");
+  assert.match(inviato.body.csv, /01\/06\/2026/);
+  const v = app.renderVals();
+  assert.equal(v.prvHa, true);
+  // le barre della previsione sono in tinta primaria, lo storico neutro
+  assert.equal(v.prvBarre[0].colore, "var(--surface2)");
+  assert.equal(v.prvBarre[1].colore, "var(--primChart)");
+  assert.match(v.prvRighe[0].data, /11\/07\/2026/);
+  global.fetch = FETCH_OK;
+});
+
+test("Previsione: un errore del server arriva a schermo e azzera l'esito", async () => {
+  const app = new App();
+  app.setState({ screen: "previsione", prvEsito: { finto: true } });
+  global.fetch = async () => ({
+    ok: false, status: 422,
+    json: async () => ({ errore: "Servono almeno 35 giorni", errors: [{ field: "riga 3", message: "data non riconosciuta" }] }),
+    text: async () => "",
+  });
+  await app.renderVals().calcolaPrevisione();
+  assert.match(app.state.prvErrore, /35 giorni/);
+  assert.equal(app.state.prvEsito, null);
+  global.fetch = FETCH_OK;
+});
+
+test("Previsione: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Previsione"'), html.indexOf("</x-dc>"));
+  assert.ok(blocco.length > 2000, "blocco Previsione non trovato");
+  const app = new App();
+  app.setState({ screen: "previsione" });
+  const v = app.renderVals();
+  const locali = new Set(["pe", "pa", "pm", "pb", "pr2", "true", "false"]);
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);

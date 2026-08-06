@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import edigas, emir, uti, pdr, remit, trasporto
+from . import edigas, emir, previsione, uti, pdr, remit, trasporto
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -797,6 +797,32 @@ async def post_emir_esito(request: Request):
         {**esito, "righe": righe, "esito_id": esito_id, "gia_importato": False},
         status_code=201,
     )
+
+
+@app.post("/api/previsione")
+async def post_previsione(request: Request):
+    """Previsione della domanda dal CSV incollato. Non conserva nulla.
+
+    Il calcolo è deterministico e torna con il backtest incorporato: il
+    client non deve fidarsi del modello, deve guardare quanto ha sbagliato
+    sugli ultimi giorni noti.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, previsione.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        return previsione.prevedi(payload)
+    except previsione.PrevisioneError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, OverflowError, TypeError) as errore:
+        return JSONResponse({"errore": f"Dati della previsione non validi: {errore}"}, status_code=422)
 
 
 @app.get("/api/trasporto/catalogo")

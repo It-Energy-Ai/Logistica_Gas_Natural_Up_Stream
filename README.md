@@ -46,6 +46,7 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
 | <img src="docs/screenshots/remit.png" alt="REMIT · XML ACER"><br>**REMIT · XML ACER** · registro nei tre stati, validazione XSD, UTI, audit ed export | <img src="docs/screenshots/pdr.png" alt="PDR · GME"><br>**PDR · GME** · profilo, schemi fissati, preflight per artefatto e ricevute |
 | <img src="docs/screenshots/emir.png" alt="EMIR · Trade Repository"><br>**EMIR · Trade Repository** · segnalazione ISO 20022 auth.030 ed esito del registro | <img src="docs/screenshots/trasporto.png" alt="Trasporto · Interruzioni e UIOLI"><br>**Trasporto** · interruzioni ricevute da Snam, Utilizzo Medio e nota UIOLI |
+| <img src="docs/screenshots/previsione.png" alt="Previsione della domanda"><br>**Previsione della domanda** · backtest onesto e futuro vero, con banda dichiarata | |
 
 E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **EMIR · Trade Repository** (segnalazione ISO 20022 `auth.030` nelle otto azioni, validata contro gli schemi ESMA, esito `auth.092` abbinato agli UTI inviati), **Trasporto · Interruzioni e UIOLI** (registro delle interruzioni comunicate da Snam con i controlli del Codice di Rete, Utilizzo Medio per semestre, nota giustificativa scaricabile), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
 
@@ -149,6 +150,10 @@ Restano fuori, dichiarati: l'involucro che unisce intestazione e messaggio in un
 
 La schermata **Trasporto · Interruzioni e UIOLI** sta dal lato giusto del Codice di Rete: interruzioni della capacità interrompibile e ritiri use-it-or-lose-it li esegue Snam, e il portale non finge di essere il Trasportatore. Qui si **registrano le interruzioni ricevute** (con il controllo dell'unica regola quantitativa che il Codice fissa: almeno 4 giorni fra due interruzioni, e i conteggi per punto e Anno Termico), si calcola l'**Utilizzo Medio per semestre** con la definizione vera del §4.3.1 — le tre detrazioni al denominatore comprese — e si prepara la **nota giustificativa** del §4.3, l'unico atto attivo che spetta allo shipper, con il termine dei 7 giorni lavorativi calcolato e il file pronto da scaricare. I parametri Tmax/T1max/Dmax/Pmin non vengono ricopiati né inventati: sono pubblicati da Snam per ciascun punto. Dettagli in [docs/trasporto.md](docs/trasporto.md).
 
+## Previsione della domanda
+
+La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest incorporato** — il modello è addestrato senza vedere gli ultimi giorni noti e confrontato con la realtà — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui). Metodo trasparente e deterministico (Holt-Winters settimanale in puro Python, zero dipendenze scientifiche): stesso input, stessa previsione. Dettagli in [docs/previsione.md](docs/previsione.md).
+
 ## Test e qualità
 
 ```bash
@@ -158,7 +163,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Oltre quattrocento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Quasi cinquecento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

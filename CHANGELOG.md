@@ -2,6 +2,16 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.9.0] — 2026-08-03
+
+Una proposta esterna voleva aggiungere la previsione della domanda come app Streamlit che **sovrascriveva `app/main.py`** (le 1.203 righe del portale) e `requirements.txt`. Verificata eseguendola: `pd` mai importato nel main (NameError al primo clic), `fillna(method=…)` che crasha con le dipendenze non bloccate (pandas 3 lo ha rimosso), e il difetto di fondo — la "previsione" copriva **gli ultimi giorni già noti**, mai il futuro: la tabella presentava date passate come previsione. Respinta; l'idea, che per uno shipper è giusta (si prevede per nominare), è stata costruita nel modo del progetto.
+
+### Aggiunto
+- **Modulo Previsione della domanda**, con card e schermata proprie. Storico giornaliero incollato come CSV → **backtest sugli ultimi giorni noti** (MAE, RMSE, MAPE: la misura da guardare prima di fidarsi) → **previsione dei giorni futuri veri**, strettamente successivi all'ultimo osservato — con un test che lo presidia. Banda dichiarata per ciò che è: quantili 10°–90° dei residui, allargati con la radice dell'orizzonte.
+- **Metodo trasparente, zero dipendenze nuove**: Holt-Winters additivo con stagionalità settimanale in puro Python, coefficienti scelti su griglia deterministica. Stesso input, stessa previsione — verificato. Niente pandas/statsmodels/pmdarima nei requisiti: il portale viaggia anche come eseguibile.
+- **Parser CSV senza sorprese**: formati italiani e ISO, separatori `;`/`,`/tab, decimali con la virgola, intestazioni riconosciute in qualunque ordine, righe illeggibili indicate per numero. Giorni doppi aggregati e **contati**, buchi fino a 7 giorni interpolati e **contati**, buchi più larghi bloccano il calcolo invece di inventare una settimana.
+- Rotta `POST /api/previsione` (stateless: nulla viene conservato), 20 test Python e 5 Node dedicati — compresa la stagionalità imparata su un profilo settimanale puro e il rifiuto dei corpi oltre 1 MiB prima della lettura.
+
 ## [1.8.1] — 2026-08-03
 
 Revisione grafica di tutte le pagine — scritte e posizionamenti — condotta sulle schermate reali con dati veri: 7 revisori indipendenti sui 19 scatti, ogni rilievo verificato guardando l'immagine e il markup prima di essere accettato. **48 correzioni applicate su 50 rilievi validi** (2 respinti dal verificatore).

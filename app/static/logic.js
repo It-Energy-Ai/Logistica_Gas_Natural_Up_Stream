@@ -131,6 +131,8 @@
         trsUtilizzo: null, trsUtilizzoErrore: "", trsUtilizzoErrori: [],
         trsNotaPunto: "Tarvisio", trsNotaAnno: "", trsNotaCapacita: "", trsNotaDurata: "", trsNotaMotivazioni: "", trsNotaMittente: "",
         trsNote: [], trsNotaErrore: "", trsNotaInfo: "", trsNotaErrori: [], trsCatalogo: null,
+        prvCsv: "", prvOrizzonte: "7", prvAggregazione: "somma",
+        prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -506,6 +508,7 @@
         pdr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "PDR · GME" }],
         emir: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "EMIR · Trade Repository" }],
         trasporto: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Trasporto · Interruzioni e UIOLI" }],
+        previsione: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Previsione della domanda" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -614,6 +617,7 @@
         { title: "PDR · GME", desc: "Preflight, registro delle ricevute e requisiti di caricamento verso il GME.", stat: String(nReg.xml), statLabel: nReg.xml === 1 ? "file pronto al preflight" : "file pronti al preflight", reale: true, primary: true, go: go("pdr"), cursor: "pointer", border: "var(--line)" },
         { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: nReg.emirFile === 1 ? "segnalazione generata" : "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
         { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: (this.state.trsInterruzioni || []).length === 1 ? "interruzione registrata" : "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
+        { title: "Previsione della domanda", desc: "Storico giornaliero → backtest onesto e previsione dei prossimi giorni, con banda dichiarata: la base per preparare le nomine.", stat: "28", statLabel: "giorni di orizzonte massimo", reale: true, primary: true, go: go("previsione"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
       // veri dell'utente e restano visibili anche a portale pulito.
@@ -1031,7 +1035,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1502,6 +1506,62 @@
         nota: trsEsito.nota,
       } : null;
 
+      // --- Previsione della domanda: backtest prima, futuro poi -----------
+      const calcolaPrevisione = unaVolta("calcolaPrevisione", async () => {
+        this.setState({ prvErrore: "", prvErrori: [], prvCalcolo: true });
+        try {
+          const esito = await this._json("/api/previsione", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              csv: this.state.prvCsv,
+              orizzonte: this.state.prvOrizzonte,
+              aggregazione: this.state.prvAggregazione,
+            }),
+          });
+          this.setState({ prvEsito: esito, prvCalcolo: false });
+        } catch (error) {
+          this.setState({ prvErrore: `Previsione non calcolata: ${error.message}`, prvErrori: error.dettagli || [], prvCalcolo: false, prvEsito: null });
+        }
+      });
+
+      // Un esito malformato non deve far cadere il render di tutto il
+      // portale: se la forma non è quella attesa, si torna allo stato vuoto.
+      const prvGrezzo = this.state.prvEsito;
+      const prv = prvGrezzo && Array.isArray(prvGrezzo.previsione) && Array.isArray(prvGrezzo.storico_recente) && prvGrezzo.backtest
+        ? prvGrezzo : null;
+      // Grafico a barre nel linguaggio della dashboard: storico in tinta
+      // neutra, previsione in tinta primaria, altezze in percentuale del
+      // massimo comune (compresa la banda, così non esce mai dalla card).
+      let prvBarre = [];
+      if (prv) {
+        const massimo = Math.max(
+          ...prv.storico_recente.map((punto) => punto.valore),
+          ...prv.previsione.map((punto) => punto.massimo),
+          1
+        );
+        const altezza = (valore) => `${Math.max(2, Math.round((valore / massimo) * 100))}%`;
+        prvBarre = [
+          ...prv.storico_recente.map((punto) => ({
+            h: altezza(punto.valore), colore: "var(--surface2)", bordo: "var(--line)",
+            titolo: `${dataIt(punto.data)} · ${punto.valore}`,
+          })),
+          ...prv.previsione.map((punto) => ({
+            h: altezza(punto.valore), colore: "var(--primChart)", bordo: "transparent",
+            titolo: `${dataIt(punto.data)} · previsti ${punto.valore} (${punto.minimo}–${punto.massimo})`,
+          })),
+        ];
+      }
+      const prvRighe = prv ? prv.previsione.map((punto) => ({
+        data: dataIt(punto.data), valore: numeroIt(punto.valore),
+        minimo: numeroIt(punto.minimo), massimo: numeroIt(punto.massimo),
+      })) : [];
+      const prvMetriche = prv ? [
+        { nome: "MAE", valore: numeroIt(prv.backtest.mae), spiega: "errore medio assoluto" },
+        { nome: "RMSE", valore: numeroIt(prv.backtest.rmse), spiega: "errore quadratico medio" },
+        { nome: "MAPE", valore: prv.backtest.mape === null ? "—" : `${prv.backtest.mape}%`, spiega: `sui ${prv.backtest.giorni} giorni di backtest` },
+      ] : [];
+
       // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
       const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
       const receiptField = (receipt, ...keys) => {
@@ -1739,7 +1799,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -1862,6 +1922,17 @@
         emrOpzEventi: opzioni("eventi"), emrOpzCarichi: opzioni("carichi"),
         emrOpzDettagli: opzioni(emrDettagli), emrOpzValutazioni: opzioni("valutazioni"),
         emrOpzLivelli: opzioni("livelli"),
+        prvCsv: this.state.prvCsv, prvOrizzonte: this.state.prvOrizzonte,
+        prvAggregazione: this.state.prvAggregazione, prvErrore: this.state.prvErrore,
+        prvErroriCampo: this.state.prvErrori, prvCalcolo: this.state.prvCalcolo,
+        prvHa: !!prv, prvBarre, prvRighe, prvMetriche, calcolaPrevisione,
+        prvVuoto: !prv,
+        prvMetodo: prv ? prv.metodo : "", prvNota: prv ? prv.nota : "",
+        prvAvvisi: prv ? (prv.avvisi || []).map((testo) => ({ testo })) : [],
+        prvIntervallo: prv ? `${dataIt(prv.dal)} → ${dataIt(prv.al)} · ${prv.giorni_storico} giorni` : "",
+        setPrvCsv: (e) => this.setSilent({ prvCsv: e.target.value }),
+        setPrvOrizzonte: (e) => this.setSilent({ prvOrizzonte: e.target.value }),
+        setPrvAggregazione: (e) => this.setSilent({ prvAggregazione: e.target.value }),
         trsPunto: this.state.trsPunto, trsTipo: this.state.trsTipo, trsInizio: this.state.trsInizio,
         trsGiorni: this.state.trsGiorni, trsCapacita: this.state.trsCapacita,
         trsPreavviso: this.state.trsPreavviso, trsRiferimento: this.state.trsRiferimento,

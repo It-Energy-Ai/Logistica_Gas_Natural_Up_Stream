@@ -1298,6 +1298,66 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenPrevisione }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Previsione" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Previsione della domanda</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Storico giornaliero → backtest sugli ultimi giorni noti → previsione dei prossimi, con banda dichiarata</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Holt-Winters settimanale · deterministico</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>Il modello è dichiarato e il backtest è incorporato: prima di fidarti della previsione guarda quanto ha sbagliato sugli ultimi giorni noti. La banda è indicativa (quantili dei residui), non un intervallo di confidenza parametrico. Nulla viene conservato: lo storico resta tuo.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Storico della domanda</h3><span style="font-size:12px;color:var(--ink3)">Una riga per giorno: data e valore. Vanno bene gg/mm/aaaa o AAAA-MM-GG, separatore ; o virgola, decimali con la virgola.</span></div>
+      <textarea value="{{ prvCsv }}" onChange="{{ setPrvCsv }}" rows="10" placeholder="data;valore&#10;01/06/2026;125.000&#10;02/06/2026;131.500&#10;…" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px;resize:vertical"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Orizzonte<select value="{{ prvOrizzonte }}" onChange="{{ setPrvOrizzonte }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="7">7 giorni</option><option value="14">14 giorni</option><option value="28">28 giorni</option></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Giorni doppi<select value="{{ prvAggregazione }}" onChange="{{ setPrvAggregazione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="somma">Somma dei valori</option><option value="media">Media dei valori</option></select></label>
+      </div>
+      <button onClick="{{ calcolaPrevisione }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Calcola backtest e previsione</button>
+      <sc-if value="{{ prvCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Calcolo in corso…</span></sc-if>
+      <sc-if value="{{ prvErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ prvErrore }}</span></sc-if>
+      <sc-for list="{{ prvErroriCampo }}" as="pe" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ pe.field }}: {{ pe.message }}</span></sc-for>
+      <sc-for list="{{ prvAvvisi }}" as="pa" hint-placeholder-count="1"><span style="font-size:11.5px;color:var(--warn)">{{ pa.testo }}</span></sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ prvHa }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <sc-for list="{{ prvMetriche }}" as="pm" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--ink3)">{{ pm.nome }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ pm.valore }}</span>
+              <span style="font-size:11px;color:var(--ink3)">{{ pm.spiega }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Ultime quattro settimane e previsione</h3><span style="font-size:12px;color:var(--ink3)">Storico {{ prvIntervallo }} · barre piene: previsione</span></div>
+          <div style="display:flex;align-items:flex-end;gap:2px;height:150px;padding-top:6px">
+            <sc-for list="{{ prvBarre }}" as="pb" hint-placeholder-count="10"><span title="{{ pb.titolo }}" style="flex:1;height:{{ pb.h }};background:{{ pb.colore }};border:1px solid {{ pb.bordo }};border-radius:2px 2px 0 0"></span></sc-for>
+          </div>
+          <span style="font-size:11px;color:var(--ink3);line-height:1.5;text-wrap:pretty">{{ prvMetodo }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Valori previsti</h3><span style="font-size:12px;color:var(--ink3)">{{ prvNota }}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)"><span>GIORNO</span><span style="text-align:right">PREVISTO</span><span style="text-align:right">MINIMO</span><span style="text-align:right">MASSIMO</span></div>
+          <sc-for list="{{ prvRighe }}" as="pr2" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:7px 0;border-top:1px solid var(--line)">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px">{{ pr2.data }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;text-align:right">{{ pr2.valore }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ pr2.minimo }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ pr2.massimo }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ prvVuoto }}" hint-placeholder-val="{{ true }}"><div style="padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessuna previsione calcolata. Incolla almeno cinque settimane di storico giornaliero: il modello si valuta da solo sugli ultimi giorni noti prima di guardare avanti.</span></div></sc-if>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 </div>
 </template>
 <script src="/static/runtime.js"></script>
