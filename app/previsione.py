@@ -339,14 +339,29 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
     livello, trend, stagione, _ = _adatta_holt_winters(addestramento, alfa, beta, gamma)
     stimati = _previsione_da_stato(livello, trend, stagione, len(addestramento), orizzonte)
 
-    scarti = [reale - stimato for reale, stimato in zip(reali, stimati)]
-    mae = sum(abs(s) for s in scarti) / len(scarti)
-    rmse = math.sqrt(sum(s * s for s in scarti) / len(scarti))
-    non_nulli = [(reale, scarto) for reale, scarto in zip(reali, scarti) if abs(reale) > 1e-9]
-    mape = (
-        sum(abs(scarto / reale) for reale, scarto in non_nulli) / len(non_nulli) * 100
-        if non_nulli else None
-    )
+    def _metriche(previsti: list[float]) -> dict[str, float | None]:
+        scarti = [reale - stimato for reale, stimato in zip(reali, previsti)]
+        mae = sum(abs(s) for s in scarti) / len(scarti)
+        rmse = math.sqrt(sum(s * s for s in scarti) / len(scarti))
+        non_nulli = [(reale, scarto) for reale, scarto in zip(reali, scarti) if abs(reale) > 1e-9]
+        mape = (
+            sum(abs(scarto / reale) for reale, scarto in non_nulli) / len(non_nulli) * 100
+            if non_nulli else None
+        )
+        return {"mae": mae, "rmse": rmse, "mape": mape}
+
+    del_modello = _metriche(stimati)
+    # Il riferimento minimo di ogni previsione: l'ultima settimana osservata,
+    # ripetuta. Un modello che non batte «stesso giorno della settimana
+    # scorsa» non merita fiducia, e qui lo si dice invece di nasconderlo.
+    ultima_settimana = addestramento[-PERIODO:]
+    naive = [ultima_settimana[h % PERIODO] for h in range(orizzonte)]
+    del_naive = _metriche(naive)
+    if del_naive["mae"] > 1e-9:
+        vantaggio = round((1 - del_modello["mae"] / del_naive["mae"]) * 100, 1)
+    else:
+        vantaggio = 0.0
+    batte_il_naive = del_modello["mae"] <= del_naive["mae"] + 1e-9
 
     # ---- previsione vera: riaddestra su TUTTO e guarda oltre l'ultimo giorno
     alfa2, beta2, gamma2 = _migliori_coefficienti(valori)
@@ -383,9 +398,16 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
         "al": ultimo_giorno.isoformat(),
         "backtest": {
             "giorni": orizzonte,
-            "mae": round(mae, 2),
-            "rmse": round(rmse, 2),
-            "mape": round(mape, 1) if mape is not None else None,
+            "mae": round(del_modello["mae"], 2),
+            "rmse": round(del_modello["rmse"], 2),
+            "mape": round(del_modello["mape"], 1) if del_modello["mape"] is not None else None,
+            "naive": {
+                "mae": round(del_naive["mae"], 2),
+                "rmse": round(del_naive["rmse"], 2),
+                "mape": round(del_naive["mape"], 1) if del_naive["mape"] is not None else None,
+            },
+            "batte_il_naive": batte_il_naive,
+            "vantaggio_percentuale": vantaggio,
         },
         "storico_recente": storico_recente,
         "previsione": previsione,

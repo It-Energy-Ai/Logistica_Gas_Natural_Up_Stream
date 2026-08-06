@@ -46,6 +46,15 @@ fino a 7 giorni si colmano per interpolazione lineare e vengono contati; un
 buco più largo **ferma il calcolo** — l'interpolazione inventerebbe una
 settimana intera.
 
+## Il riferimento che non si può barare
+
+Ogni backtest confronta il modello con il **naive stagionale** — l'ultima
+settimana osservata, ripetuta. È il minimo sindacale della letteratura
+previsionale: un modello che non batte «stesso giorno della settimana
+scorsa» non merita fiducia, e la schermata lo dichiara nei due sensi. Su un
+profilo perfettamente periodico il naive è imbattibile, e il portale lo
+ammette invece di fingere un vantaggio.
+
 ## Cosa NON fa
 
 Non conserva nulla (lo storico resta dell'operatore), non pretende di essere

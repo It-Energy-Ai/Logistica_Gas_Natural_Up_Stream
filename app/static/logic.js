@@ -1556,6 +1556,13 @@
         data: dataIt(punto.data), valore: numeroIt(punto.valore),
         minimo: numeroIt(punto.minimo), massimo: numeroIt(punto.massimo),
       })) : [];
+      const prvNaive = prv && prv.backtest.naive ? (prv.backtest.batte_il_naive ? {
+        testo: `Batte il riferimento naive stagionale («stessa settimana precedente») del ${prv.backtest.vantaggio_percentuale}%: MAE ${numeroIt(prv.backtest.mae)} contro ${numeroIt(prv.backtest.naive.mae)}.`,
+        bg: OK.bg, fg: OK.fg, etichetta: "modello utile",
+      } : {
+        testo: `NON batte il riferimento naive stagionale (MAE ${numeroIt(prv.backtest.mae)} contro ${numeroIt(prv.backtest.naive.mae)}): su questo storico conviene ripetere l'ultima settimana osservata.`,
+        bg: NEG.bg, fg: NEG.fg, etichetta: "meglio il naive",
+      }) : null;
       const prvMetriche = prv ? [
         { nome: "MAE", valore: numeroIt(prv.backtest.mae), spiega: "errore medio assoluto" },
         { nome: "RMSE", valore: numeroIt(prv.backtest.rmse), spiega: "errore quadratico medio" },
@@ -1926,7 +1933,7 @@
         prvAggregazione: this.state.prvAggregazione, prvErrore: this.state.prvErrore,
         prvErroriCampo: this.state.prvErrori, prvCalcolo: this.state.prvCalcolo,
         prvHa: !!prv, prvBarre, prvRighe, prvMetriche, calcolaPrevisione,
-        prvVuoto: !prv,
+        prvVuoto: !prv, prvNaive, prvHaNaive: !!prvNaive,
         prvMetodo: prv ? prv.metodo : "", prvNota: prv ? prv.nota : "",
         prvAvvisi: prv ? (prv.avvisi || []).map((testo) => ({ testo })) : [],
         prvIntervallo: prv ? `${dataIt(prv.dal)} → ${dataIt(prv.al)} · ${prv.giorni_storico} giorni` : "",

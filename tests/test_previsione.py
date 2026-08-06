@@ -184,3 +184,29 @@ def test_un_corpo_enorme_viene_rifiutato_prima_di_leggerlo(client):
                  "Content-Length": str(previsione.MAX_CORPO_BYTES + 1)},
     )
     assert risposta.status_code == 413
+
+
+# --------------------------------------------- riferimento naive stagionale
+
+def test_il_backtest_confronta_sempre_col_naive_stagionale():
+    """Se il modello non batte «stessa settimana precedente», va detto."""
+
+    esito = previsione.prevedi({"csv": csv_sintetico(), "orizzonte": 7})
+    naive = esito["backtest"]["naive"]
+    assert naive["mae"] > 0 and naive["rmse"] >= naive["mae"] * 0.9
+    # con un trend nello storico il naive resta indietro: il modello vince
+    assert esito["backtest"]["batte_il_naive"] is True
+    assert esito["backtest"]["vantaggio_percentuale"] > 0
+
+
+def test_il_naive_e_davvero_lultima_settimana_ripetuta():
+    inizio = date(2026, 4, 6)
+    profilo = [100, 110, 120, 130, 120, 60, 40]
+    righe = ["data;valore"] + [
+        f"{(inizio + timedelta(days=i)).isoformat()};{profilo[i % 7]}" for i in range(70)
+    ]
+    esito = previsione.prevedi({"csv": "\n".join(righe), "orizzonte": 7})
+    # su un profilo perfettamente periodico il naive è perfetto: MAE 0 e
+    # nessun vantaggio dichiarabile del modello
+    assert esito["backtest"]["naive"]["mae"] == 0
+    assert esito["backtest"]["vantaggio_percentuale"] == 0

@@ -2,6 +2,13 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.9.1] — 2026-08-03
+
+Terza iterazione della proposta Streamlit, stavolta con una LSTM TensorFlow. Verificata eseguendola: oltre ai difetti già respinti (sovrascrittura di `app/main.py`, previsione che copre gli ultimi giorni già noti, `fillna` che crasha con pandas 3), la riscrittura ha perso l'import di `ARIMA` (NameError su ogni percorso ARIMA), la banda di confidenza della LSTM **moltiplica** per `scaler.scale_` dove dovrebbe **dividere** — su una domanda da 120.000 kWh la banda esce ±0,000002 kWh, un fattore ~1,6 miliardi — e nessun seme è fissato: stesso input, previsione diversa a ogni esecuzione. Respinta.
+
+### Aggiunto
+- **Confronto col riferimento naive stagionale nel backtest.** L'unica idea buona della proposta (confrontare modelli), nella forma che la letteratura considera il minimo: se il modello non batte «stessa settimana precedente, ripetuta», va detto. Ora ogni backtest calcola anche il naive e la schermata dichiara l'esito — «Batte il riferimento del X%» oppure, in rosso, «NON batte il riferimento: su questo storico conviene ripetere l'ultima settimana». Su un profilo perfettamente periodico il naive è imbattibile e il portale lo ammette invece di fingere un vantaggio.
+
 ## [1.9.0] — 2026-08-03
 
 Una proposta esterna voleva aggiungere la previsione della domanda come app Streamlit che **sovrascriveva `app/main.py`** (le 1.203 righe del portale) e `requirements.txt`. Verificata eseguendola: `pd` mai importato nel main (NameError al primo clic), `fillna(method=…)` che crasha con le dipendenze non bloccate (pandas 3 lo ha rimosso), e il difetto di fondo — la "previsione" copriva **gli ultimi giorni già noti**, mai il futuro: la tabella presentava date passate come previsione. Respinta; l'idea, che per uno shipper è giusta (si prevede per nominare), è stata costruita nel modo del progetto.
