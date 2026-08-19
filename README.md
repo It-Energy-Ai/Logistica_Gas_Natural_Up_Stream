@@ -11,6 +11,7 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 
 [![CI](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml/badge.svg)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream?label=release&color=0E5A75)](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest)
+[![Sito vetrina](https://img.shields.io/badge/sito-vetrina-4C93C9)](https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/)
 [![Autore](https://img.shields.io/badge/autore-Davide%20Bellini-2FA37C)](https://github.com/It-Energy-Ai)
 [![Licenza MIT](https://img.shields.io/badge/licenza-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](requirements.txt)
@@ -24,6 +25,8 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 
 Un file solo, doppio click, il browser si apre da solo. **Niente Docker, niente Python, niente terminale.**
 Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest) · [SHA256SUMS](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/SHA256SUMS.txt)
+
+Una panoramica di cosa fa il portale: [**sito vetrina**](https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/) con tutte le schermate, i moduli e le FAQ.
 
 > Il pulsante verde **Code ▾ → Download ZIP** qui sopra scarica invece il **codice sorgente** (`…-main.zip`), che serve a chi vuole leggere o modificare il progetto. Per usare l'applicazione servono i file qui sopra.
 

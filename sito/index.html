@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vettore — Portale Logistica Gas</title>
+<meta name="description" content="Il portale operativo per shipper e trader di gas naturale sul mercato italiano: nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio e agenda regolatoria. Un file solo, senza installazioni.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A75'/><text x='16' y='22' font-size='17' font-weight='700' text-anchor='middle' fill='white' font-family='sans-serif'>V</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <nav class="nav">
+    <a class="brand" href="#"><span class="brand-mark">V</span>Vettore<small>· logistica gas</small></a>
+    <div class="nav-links">
+      <a href="#funzioni">Funzionalità</a>
+      <a href="#download"><span>Scarica</span></a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+
+  <!-- --------------------------------------------------------------- hero -->
+  <div class="hero">
+    <div class="hero-inner">
+      <h1>Il portale operativo per <em>shipper e trader</em> di gas naturale.</h1>
+      <p class="sub">Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, previsione della domanda e agenda regolatoria — in un'unica piattaforma che gira sul tuo computer.</p>
+      <p class="sub2">Progettato per il mercato italiano: giorno gas reale, calendario italiano, documenti validati contro gli schemi ufficiali.</p>
+      <div class="badges">
+        <span class="badge"><b>17 moduli</b> · 18 schermate</span>
+        <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest">release <b>v1.11.0</b></a>
+        <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml">CI <b>verde</b></a>
+        <span class="badge">MIT</span>
+        <span class="badge">Python 3.11+ · FastAPI</span>
+      </div>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-windows.exe">⬇ Scarica per Windows</a>
+        <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-macos-apple-silicon">⬇ Scarica per macOS</a>
+        <a class="btn btn-ghost" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-linux">⬇ Linux</a>
+      </div>
+      <img class="hero-shot" src="screenshots/dashboard.png" alt="Dashboard di Vettore: posizione shipper del giorno gas" width="960">
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------ perché -->
+  <section id="perche">
+    <div class="section-inner">
+      <h2>Perché Vettore</h2>
+      <p class="lead">Il lavoro regolatorio del gas italiano è fatto di documenti con schemi ufficiali, scadenze certe e riscontri da conservare. Vettore li porta tutti in un posto solo, senza semplificazioni.</p>
+      <div class="promises">
+        <div class="promise">
+          <h3>Un file solo, zero installazioni</h3>
+          <p>Niente Docker, niente Python, niente terminale: scarichi l'eseguibile per il tuo sistema, doppio click, il browser si apre da solo. I dati restano locali in <span class="em">~/.vettore/vettore.db</span>.</p>
+        </div>
+        <div class="promise">
+          <h3>Dati veri, niente scenografia</h3>
+          <p>Le date operative vengono dalle fonti (Codice di Rete Snam, Codice Stogit, ARERA); il giorno gas è quello reale italiano (06:00 → 06:00, al PSV sempre 24 ore) e anche i festivi contano.</p>
+        </div>
+        <div class="promise">
+          <h3>Nessun finto invio</h3>
+          <p>Il portale prepara, valida e registra — non trasmette nulla ai gestori. I documenti EDIG@S e gli XML REMIT/EMIR sono controllati contro gli schemi ufficiali prima che tu li porti dove serve.</p>
+        </div>
+        <div class="promise">
+          <h3>Ogni operazione è una prova</h3>
+          <p>Registro interno con audit (utente, istante, operazione), riscontri archiviati (NOMRES, ACKNOW, esiti EMIR) e bozze ricostruibili. Tutto quello che serve a rispondere a una richiesta di chiarimento.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------- funzionalità -->
+  <section id="funzioni">
+    <div class="section-inner">
+      <h2>I moduli</h2>
+      <p class="lead">Diciassette aree di lavoro, dall'accesso ai registri regolatori. Clicca su una schermata per vederla da vicino.</p>
+      <div class="grid">
+
+        <div class="card" data-cap="Login — email/password o SSO aziendale con scelta account">
+          <img loading="lazy" src="screenshots/login.png" alt="Login con SSO aziendale">
+          <div class="body"><h3>Login</h3><p>Email/password o SSO aziendale con scelta account.</p></div>
+        </div>
+
+        <div class="card" data-cap="Hub — i moduli come carte da gioco, con effetto mazzo all'hover">
+          <img loading="lazy" src="screenshots/hub.png" alt="Hub moduli">
+          <div class="body"><h3>Hub</h3><p>I moduli come carte da gioco, con effetto mazzo all'hover.</p></div>
+        </div>
+
+        <div class="card" data-cap="Nomine — documento EDIG@S 6.1 validato e registro interno dei cicli">
+          <img loading="lazy" src="screenshots/nomine.png" alt="Nomine e programmazione">
+          <div class="body"><h3>Nomine</h3><p>Documento EDIG@S 6.1 validato e registro interno dei cicli.</p></div>
+        </div>
+
+        <div class="card" data-cap="Bilanciamento — disequilibrio DS e azioni correttive, tema scuro">
+          <img loading="lazy" src="screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro">
+          <div class="body"><h3>Bilanciamento</h3><p>Disequilibrio DS, azioni correttive — tema scuro incluso.</p></div>
+        </div>
+
+        <div class="card" data-cap="Logistica Gas — le aree di lavoro operative">
+          <img loading="lazy" src="screenshots/moduli.png" alt="Aree di lavoro Logistica Gas">
+          <div class="body"><h3>Logistica Gas</h3><p>Le aree di lavoro operative del portale.</p></div>
+        </div>
+
+        <div class="card" data-cap="Configuratore — utenti con wizard a 3 passi e impostazioni locali">
+          <img loading="lazy" src="screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente">
+          <div class="body"><h3>Configuratore</h3><p>Utenti con wizard a 3 passi e impostazioni locali.</p></div>
+        </div>
+
+        <div class="card" data-cap="REMIT — registro nei tre stati, validazione XSD, UTI, audit ed export">
+          <img loading="lazy" src="screenshots/remit.png" alt="REMIT · XML ACER">
+          <div class="body"><h3>REMIT · XML ACER</h3><p>Registro nei tre stati, validazione XSD, UTI, audit ed export.</p><span class="tag">ACER</span></div>
+        </div>
+
+        <div class="card" data-cap="PDR · GME — profilo, schemi fissati, preflight e ricevute">
+          <img loading="lazy" src="screenshots/pdr.png" alt="PDR · GME">
+          <div class="body"><h3>PDR · GME</h3><p>Profilo, schemi fissati, preflight per artefatto e ricevute.</p><span class="tag">GME</span></div>
+        </div>
+
+        <div class="card" data-cap="EMIR — segnalazione ISO 20022 auth.030 ed esito del registro">
+          <img loading="lazy" src="screenshots/emir.png" alt="EMIR · Trade Repository">
+          <div class="body"><h3>EMIR · Trade Repository</h3><p>Segnalazione ISO 20022 auth.030 ed esito del registro.</p><span class="tag">ESMA</span></div>
+        </div>
+
+        <div class="card" data-cap="Trasporto — interruzioni Snam, Utilizzo Medio e nota UIOLI">
+          <img loading="lazy" src="screenshots/trasporto.png" alt="Trasporto · Interruzioni e UIOLI">
+          <div class="body"><h3>Trasporto</h3><p>Interruzioni ricevute da Snam, Utilizzo Medio e nota UIOLI.</p><span class="tag">Snam</span></div>
+        </div>
+
+        <div class="card" data-cap="Capacità & Contratti — capacità conferite, contratti attivi, scadenze d'asta">
+          <img loading="lazy" src="screenshots/capacita.png" alt="Capacità e Contratti">
+          <div class="body"><h3>Capacità &amp; Contratti</h3><p>Capacità conferite, contratti attivi, scadenze d'asta.</p></div>
+        </div>
+
+        <div class="card" data-cap="Stoccaggio — giacenza, iniezione ed erogazione, servizi Stogit">
+          <img loading="lazy" src="screenshots/stoccaggio.png" alt="Stoccaggio">
+          <div class="body"><h3>Stoccaggio</h3><p>Giacenza, iniezione ed erogazione, servizi Stogit.</p><span class="tag">Stogit</span></div>
+        </div>
+
+        <div class="card" data-cap="Previsione della domanda — backtest onesto e futuro vero, con banda dichiarata">
+          <img loading="lazy" src="screenshots/previsione.png" alt="Previsione della domanda">
+          <div class="body"><h3>Previsione della domanda</h3><p>Backtest onesto e futuro vero, con banda dichiarata.</p></div>
+        </div>
+
+        <div class="card" data-cap="Report & Analisi — estrazioni e invii programmati per categoria">
+          <img loading="lazy" src="screenshots/report.png" alt="Report e Analisi">
+          <div class="body"><h3>Report &amp; Analisi</h3><p>Estrazioni e invii programmati per categoria.</p></div>
+        </div>
+
+        <div class="card" data-cap="Agenda regolatoria — scadenze con data certa dalle fonti e voci personalizzate">
+          <img loading="lazy" src="screenshots/agenda.png" alt="Agenda regolatoria">
+          <div class="body"><h3>Agenda regolatoria</h3><p>Scadenze con data certa dalle fonti e voci personalizzate.</p></div>
+        </div>
+
+        <div class="card" data-cap="Impostazioni impresa — anagrafica shipper, punti e notifiche">
+          <img loading="lazy" src="screenshots/impostazioni.png" alt="Impostazioni impresa">
+          <div class="body"><h3>Impostazioni impresa</h3><p>Anagrafica shipper, punti di consegna e notifiche.</p></div>
+        </div>
+
+        <div class="card" data-cap="Sistema — stato dei servizi collegati e interruttore demo">
+          <img loading="lazy" src="screenshots/sistema.png" alt="Sistema">
+          <div class="body"><h3>Sistema</h3><p>Stato dei servizi collegati e interruttore demo.</p></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------- dettagli -->
+  <section id="dettagli">
+    <div class="section-inner">
+      <h2>Sotto la superficie</h2>
+      <p class="lead">Quello che gli screenshot non mostrano — i controlli che rendono i documenti presentabili, e i registri che li rendono difendibili.</p>
+      <ul class="details">
+        <li><b>Nomine EDIG@S</b> — <span>NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina. Giorno gas reale: 06:00 → 06:00 locale, 24 ore anche al PSV.</span></li>
+        <li><b>REMIT · XML ACER</b> — <span>bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR.</span></li>
+        <li><b>EMIR · Trade Repository</b> — <span>segnalazione ISO 20022 <code>auth.030</code> nelle otto azioni, validata contro gli schemi ESMA, esito <code>auth.092</code> abbinato agli UTI inviati.</span></li>
+        <li><b>Trasporto · Interruzioni e UIOLI</b> — <span>registro delle interruzioni comunicate da Snam con i controlli del Codice di Rete, Utilizzo Medio per semestre, nota giustificativa scaricabile.</span></li>
+        <li><b>PDR · GME</b> — <span>readiness e controlli preliminari, senza credenziali locali né falso invio.</span></li>
+        <li><b>Agenda regolatoria</b> — <span>scadenze con data certa dalle fonti (modello Stogit/Snam, 14 voci per Anno Termico) e voci personalizzate, con stati adempiuta/saltata e occorrenze ricorrenti.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ download -->
+  <section id="download">
+    <div class="section-inner">
+      <h2>Scarica e prova</h2>
+      <p class="lead">Un file solo, doppio click, il browser si apre da solo. I collegamenti puntano sempre all'ultima versione.</p>
+      <div class="dl-cards">
+        <div class="dl-card">
+          <div class="os">Windows</div>
+          <p>Eseguibile unico, 64 bit. Niente installazione: lo avvii e sei dentro.</p>
+          <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-windows.exe">⬇ Vettore-windows.exe</a>
+        </div>
+        <div class="dl-card">
+          <div class="os">macOS</div>
+          <p>Apple Silicon (M1 o successivi). Al primo avvio: tasto destro → <em>Apri</em>.</p>
+          <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-macos-apple-silicon">⬇ Vettore-macos</a>
+        </div>
+        <div class="dl-card">
+          <div class="os">Linux</div>
+          <p>Eseguibile unico, poi <code>chmod +x Vettore-linux</code> e via.</p>
+          <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-linux">⬇ Vettore-linux</a>
+        </div>
+      </div>
+      <p class="note">Verifica dell'integrità (consigliata, i binari non sono firmati): scarica anche <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> e confronta con <code>shasum -a 256 &lt;file&gt;</code> (macOS/Linux) o <code>Get-FileHash &lt;file&gt;</code> (Windows).<br>
+      <b>Mac Intel</b>: usa <code>avvio.sh</code> dal repository (serve solo Python 3.11+).<br>
+      Preferisci il codice? <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/archive/refs/heads/main.zip">Download ZIP del sorgente</a> dal pulsante verde <b>Code ▾</b>.</p>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------------- FAQ -->
+  <section id="faq">
+    <div class="section-inner">
+      <h2>Domande frequenti</h2>
+      <p class="lead">Le risposte oneste, comprese quelle che di solito si nascondono.</p>
+      <div class="faq">
+        <details>
+          <summary>Devo installare Docker, Python o altro?</summary>
+          <p>No. L'applicazione è un eseguibile per il tuo sistema: Windows, macOS (Apple Silicon) o Linux. Doppio click e il browser si apre da solo su <code>localhost</code>. Docker e Python servono solo a chi vuole compilare il codice sorgente.</p>
+        </details>
+        <details>
+          <summary>Windows SmartScreen avvisa: cosa faccio?</summary>
+          <p>I binari non sono firmati, quindi SmartScreen mostra un avviso. Clicca <em>Ulteriori informazioni → Esegui comunque</em>. Verifica l'integrità con SHA256SUMS come indicato sopra.</p>
+        </details>
+        <details>
+          <summary>macOS non vuole aprire il file.</summary>
+          <p>Fai tasto destro sul file → <em>Apri</em>. Se l'hai scaricato dal browser può servire <code>xattr -d com.apple.quarantine &lt;file&gt;</code> nel terminale, poi riprova.</p>
+        </details>
+        <details>
+          <summary>Dove stanno i miei dati?</summary>
+          <p>Sul tuo computer, in <code>~/.vettore/vettore.db</code>. Niente account esterni, niente telemetria: il portale funziona anche offline. Fai un backup di quella cartella e hai tutto.</p>
+        </details>
+        <details>
+          <summary>Il portale invia davvero le nomine ai gestori?</summary>
+          <p>No, e non finge di farlo. Vettore prepara i documenti (NOMINT, XML ACER, segnalazioni EMIR), li valida contro gli schemi ufficiali e li registra con il loro esito. La trasmissione resta alla piattaforma del gestore, con le credenziali del gestore stesso. Niente credenziali salvate, niente invii simulati spacciati per veri.</p>
+        </details>
+        <details>
+          <summary>C'è una modalità demo per provarla?</summary>
+          <p>Sì: dal Configuratore → Sistema. I dati di mercato delle aree operative diventano dimostrativi, mentre i registri reali (bozze, documenti, riscontri, scadenze) restano quelli veri. Al primo avvio tutto parte pulito.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>Vettore — Portale Logistica Gas · un progetto di <a href="https://github.com/It-Energy-Ai" target="_blank" rel="noopener">It-Energy-Ai</a></span>
+    <span class="right">
+      <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream" target="_blank" rel="noopener">Repository</a> ·
+      <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Note di rilascio</a> ·
+      <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/LICENSE" target="_blank" rel="noopener">Licenza MIT</a>
+    </span>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Schermata ingrandita">
+  <img id="lightbox-img" alt="" src="">
+  <div class="cap" id="lightbox-cap"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var lb = document.getElementById("lightbox");
+  var img = document.getElementById("lightbox-img");
+  var cap = document.getElementById("lightbox-cap");
+  document.querySelectorAll(".card").forEach(function (card) {
+    card.addEventListener("click", function () {
+      var shot = card.querySelector("img");
+      img.src = shot.src;
+      img.alt = shot.alt;
+      cap.textContent = card.dataset.cap || shot.alt;
+      lb.classList.add("open");
+    });
+  });
+  function chiudi() { lb.classList.remove("open"); }
+  lb.addEventListener("click", chiudi);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") chiudi(); });
+})();
+</script>
+
+</body>
+</html>

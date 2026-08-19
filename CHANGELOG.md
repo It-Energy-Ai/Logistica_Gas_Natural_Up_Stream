@@ -2,6 +2,15 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.12.0] — 2026-08-19
+
+**Sito vetrina** pubblicato su GitHub Pages: la landing page del progetto per far conoscere Vettore a chi non frequenta il repository.
+
+### Aggiunto
+- **Landing page** in `sito/` (HTML e CSS puri, nessuna dipendenza): hero con la value proposition e i download per i tre sistemi, le 17 promesse del portale (dati veri, nessun finto invio, registri con audit), griglia dei 17 moduli con le schermate reali in lightbox, sezione «Sotto la superficie» con i controlli regolatori, sezione download con SHA256SUMS e FAQ oneste (SmartScreen, quarantine macOS, dove stanno i dati, perché non invia nulla).
+- **Workflow `pages.yml`**: compone l'artefatto copiando le schermate da `docs/screenshots/` e lo pubblica su GitHub Pages a ogni push che tocca il sito o le schermate; la landing page si aggiorna da sola, senza build manuali.
+- **README**: badge «Sito vetrina» e link alla landing page accanto ai download.
+
 ## [1.11.0] — 2026-08-19
 
 Nuovo modulo **Agenda regolatoria** (18° schermata): scadenze operative e regolatorie dello shipper, con un modello precompilato solo dalle date fissate dalle fonti e voci personalizzate per il resto.

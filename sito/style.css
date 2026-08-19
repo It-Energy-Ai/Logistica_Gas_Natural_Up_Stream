@@ -1,0 +1,396 @@
+/* Vettore — sito vetrina. Stessi colori e font dell'app (design/design.html). */
+
+:root {
+  --prim: #0E5A75;
+  --prim-dark: #0A4559;
+  --accent: #4C93C9;
+  --ink: #10222D;
+  --ink2: #46606C;
+  --ink3: #6B828E;
+  --line: #DCE4E8;
+  --bg: #F6F8F9;
+  --surface: #FFFFFF;
+  --ok: #2FA37C;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.55;
+}
+
+a { color: var(--prim); }
+
+/* ------------------------------------------------------------ intestazione */
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--prim), var(--accent));
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+}
+
+.brand small { color: var(--ink3); font-weight: 500; font-size: 12px; }
+
+.nav-links {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nav-links a { color: var(--ink2); text-decoration: none; }
+.nav-links a:hover { color: var(--prim); }
+
+/* ------------------------------------------------------------------- hero */
+
+.hero {
+  background:
+    radial-gradient(900px 420px at 85% -10%, rgba(76, 147, 201, .18), transparent 60%),
+    linear-gradient(180deg, #FBFCFD, var(--bg));
+  border-bottom: 1px solid var(--line);
+  padding: 64px 24px 0;
+}
+
+.hero-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(30px, 5vw, 44px);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.hero h1 em { font-style: normal; color: var(--prim); }
+
+.hero .sub {
+  max-width: 640px;
+  margin: 0 auto 8px;
+  font-size: 17px;
+  color: var(--ink2);
+}
+
+.hero .sub2 {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 14px;
+  color: var(--ink3);
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 18px 0 26px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  text-decoration: none;
+}
+
+.badge b { color: var(--prim); }
+
+.hero-shot {
+  display: block;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -6px 30px rgba(16, 34, 45, .08);
+}
+
+/* ----------------------------------------------------------------- CTA */
+
+.cta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 22px 0 30px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.btn-primary { background: var(--prim); color: #fff; }
+.btn-primary:hover { background: var(--prim-dark); }
+
+.btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--prim); }
+
+.btn small { font-weight: 500; opacity: .85; }
+
+/* ------------------------------------------------------------- sezioni */
+
+section { padding: 64px 24px; }
+
+.section-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  letter-spacing: -.015em;
+}
+
+.lead {
+  margin: 0 0 36px;
+  max-width: 720px;
+  color: var(--ink2);
+  font-size: 16px;
+}
+
+/* ---------------------------------------------------- perché / promesse */
+
+.promises {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.promise {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+
+.promise h3 { margin: 0 0 6px; font-size: 16px; }
+.promise p { margin: 0; font-size: 13.5px; color: var(--ink2); }
+.promise .em { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--prim); }
+
+/* ------------------------------------------------------- griglia moduli */
+
+#funzioni { background: var(--surface); border-block: 1px solid var(--line); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+
+.card:hover { box-shadow: 0 8px 24px rgba(16, 34, 45, .1); transform: translateY(-2px); }
+
+.card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+
+.card .body { padding: 14px 16px 16px; }
+
+.card h3 { margin: 0 0 4px; font-size: 15.5px; }
+.card p { margin: 0; font-size: 13px; color: var(--ink2); }
+
+.card .tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--prim);
+  border: 1px solid rgba(14, 90, 117, .35);
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: rgba(14, 90, 117, .06);
+}
+
+/* ---------------------------------------------------------- lightbox */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 30, .82);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  z-index: 50;
+  cursor: zoom-out;
+}
+
+.lightbox.open { display: flex; }
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 86vh;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .4);
+}
+
+.lightbox .cap {
+  position: fixed;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, .85);
+  font-size: 14px;
+}
+
+/* ----------------------------------------------------------- dettagli */
+
+.details { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+
+.details li {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.details b { color: var(--prim); font-size: 15px; }
+
+.details span { color: var(--ink2); font-size: 14px; }
+
+/* ------------------------------------------------------------- download */
+
+#download { background: var(--surface); border-block: 1px solid var(--line); }
+
+.dl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dl-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  background: var(--bg);
+}
+
+.dl-card .os { font-weight: 700; font-size: 17px; }
+.dl-card p { font-size: 13px; color: var(--ink2); margin: 6px 0 14px; min-height: 40px; }
+.dl-card .btn { width: 100%; justify-content: center; }
+
+.note { font-size: 13px; color: var(--ink3); max-width: 720px; }
+
+/* ----------------------------------------------------------------- FAQ */
+
+.faq details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 12px;
+}
+
+.faq summary {
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.faq details p { margin: 10px 0 0; font-size: 14px; color: var(--ink2); }
+.faq code { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+
+/* --------------------------------------------------------------- footer */
+
+footer {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 28px 24px;
+  font-size: 13px;
+  color: var(--ink3);
+}
+
+.footer-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.footer-inner a { color: var(--ink2); text-decoration: none; }
+.footer-inner a:hover { color: var(--prim); }
+.footer-inner .right { margin-left: auto; }
+
+/* ---------------------------------------------------------- responsive */
+
+@media (max-width: 640px) {
+  .nav-links span { display: none; }
+  section { padding: 44px 16px; }
+  .hero { padding: 44px 16px 0; }
+  .lightbox { padding: 16px; }
+}
