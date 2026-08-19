@@ -661,9 +661,24 @@ def _testo(
 
 
 def _booleano(dati: dict[str, Any], chiave: str) -> str:
+    """Sì/no del documento: booleani JSON o le forme italiane/inglesi note.
+
+    Un valore che non è un sì/no riconoscibile non deve diventare in
+    silenzio «false»: su una segnalazione regolatoria una forzatura del
+    genere cambierebbe il contenuto del file senza che nessuno lo segnali.
+    """
+
     valore = dati.get(chiave)
     if isinstance(valore, str):
-        return "true" if valore.strip().lower() in {"true", "1", "si", "sì", "vero"} else "false"
+        testo = valore.strip().lower()
+        if testo in {"true", "1", "si", "sì", "vero"}:
+            return "true"
+        if testo in {"", "false", "0", "no"}:
+            return "false"
+        raise EmirError(
+            f"Il campo «{chiave}» deve essere un valore sì/no: "
+            f"«{valore[:40]}» non è riconosciuto."
+        )
     return "true" if bool(valore) else "false"
 
 

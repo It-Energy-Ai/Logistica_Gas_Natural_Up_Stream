@@ -36,6 +36,7 @@ import hashlib
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 # Cap. 3, §2.2.1, lettera b): «Il Trasportatore potrà esercitare nuovamente la
 # propria facoltà di interruzione non prima che siano trascorsi almeno 4
@@ -94,6 +95,18 @@ class TrasportoError(ValueError):
 
 def ora_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def oggi_roma() -> date:
+    """La data corrente sul calendario italiano.
+
+    Scadenze e termini del Codice di Rete valgono sul giorno italiano, non su
+    quello UTC: nelle ore 22–24 UTC (00–02 di notte a Roma) i due calendari
+    divergono e un confronto in UTC sbaglierebbe il «fuori termine» di un
+    giorno.
+    """
+
+    return datetime.now(ZoneInfo("Europe/Rome")).date()
 
 
 # ------------------------------------------------------------ anno termico
@@ -510,7 +523,7 @@ def prepara_nota(dati: dict[str, Any]) -> dict[str, Any]:
         raise TrasportoError("La nota non è stata preparata: correggi i campi segnalati.", errors)
 
     termine = scadenza_nota(avvio)
-    oggi = datetime.now(timezone.utc).date()
+    oggi = oggi_roma()
     fuori_termine = oggi > termine
     if fuori_termine:
         avvisi.append(
@@ -559,7 +572,7 @@ def prepara_nota(dati: dict[str, Any]) -> dict[str, Any]:
 def catalogo() -> dict[str, Any]:
     """Regole e riferimenti per l'interfaccia: solo ciò che sta nel Codice."""
 
-    oggi = datetime.now(timezone.utc).date()
+    oggi = oggi_roma()
     corrente = anno_termico(oggi)
     # Finché il termine della nota dell'anno precedente non è passato, è
     # quello l'Anno Termico di Riferimento su cui l'operatore sta lavorando.

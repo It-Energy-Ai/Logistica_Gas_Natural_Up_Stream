@@ -1440,7 +1440,10 @@ def confronta_con_nomina(nomina_xml: bytes | str, risposta: dict[str, Any]) -> l
     ns = {"e": SCHEMI["nomina"]["namespace"]}
     # Stessa convenzione di leggi_risposta/leggi_riscontro: parser esplicito
     # senza DTD, entità o rete, anche se l'XML viene dal nostro database.
-    documento = etree.fromstring(grezzo, _parser_sicuro())
+    try:
+        documento = etree.fromstring(grezzo, _parser_sicuro())
+    except etree.XMLSyntaxError as exc:
+        raise EdigasError(f"La nomina archiviata non è leggibile: {exc}") from exc
 
     # I Period pendono da External_Account quando c'è una controparte e dal
     # punto di connessione nelle nomine non-matching: vanno letti entrambi,

@@ -61,6 +61,18 @@ def test_i_valori_negativi_sono_rifiutati():
         previsione.prevedi({"csv": "\n".join(righe), "orizzonte": 7})
 
 
+def test_nan_inf_e_notazione_scientifica_sono_rifiutati():
+    # "nan"/"inf" superano float() ma non sono domande: senza il controllo il
+    # calcolo sarebbe avvelenato e l'output conterrebbe JSON non valido.
+    for valore in ("nan", "inf", "-inf", "1e5", "1E5"):
+        righe = csv_sintetico().splitlines()
+        righe[3] = f"03/04/2026;{valore}"
+        with pytest.raises(previsione.PrevisioneError) as errore:
+            previsione.prevedi({"csv": "\n".join(righe), "orizzonte": 7})
+        campi = {e["field"] for e in errore.value.errors}
+        assert campi == {"riga 4"}, valore
+
+
 def test_csv_vuoto_o_senza_separatore():
     with pytest.raises(previsione.PrevisioneError):
         previsione.prevedi({"csv": "   ", "orizzonte": 7})

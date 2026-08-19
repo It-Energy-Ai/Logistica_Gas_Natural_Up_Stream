@@ -589,7 +589,12 @@ async def post_edigas_risposta(request: Request):
         nomina = db.trova_nomina_edigas(conn, email, riferita["identificativo"], riferita["versione"])
     if nomina is None and not risposta["valido_xsd"]:
         risposta = {**risposta, "nota": "Il file non è conforme allo schema EDIG@S: controlla gli errori riportati."}
-    scostamenti = edigas.confronta_con_nomina(nomina["xml"], risposta) if nomina else []
+    try:
+        scostamenti = edigas.confronta_con_nomina(nomina["xml"], risposta) if nomina else []
+    except edigas.EdigasError as errore:
+        # Una nomina archiviata corrotta o illeggibile non può diventare un
+        # 500: si segnala il problema, restando nel registro.
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     return {
         **risposta,
         "nomina_trovata": bool(nomina),

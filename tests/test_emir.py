@@ -83,6 +83,19 @@ def test_ogni_azione_produce_un_documento_valido(azione):
     assert [e.tag for e in involucro] == [q(emir.AZIONI[azione]["elemento"])]
 
 
+def test_il_si_no_rifiuta_una_stringa_non_riconosciuta():
+    """«forse» non è un sì: forzarlo a false cambierebbe il file in silenzio."""
+
+    for testo in ("forse", "maybe", "vero!"):
+        with pytest.raises(emir.EmirError) as exc:
+            emir._booleano({"campo": testo}, "campo")
+        assert "non è riconosciuto" in str(exc.value)
+    assert emir._booleano({"campo": True}, "campo") == "true"
+    assert emir._booleano({"campo": "si"}, "campo") == "true"
+    assert emir._booleano({"campo": "no"}, "campo") == "false"
+    assert emir._booleano({"campo": ""}, "campo") == "false"
+
+
 def test_il_tipo_di_evento_segue_lo_schema_non_i_dati():
     """Lo XSD usa una variante di DerivativeEvent diversa per ogni azione.
 

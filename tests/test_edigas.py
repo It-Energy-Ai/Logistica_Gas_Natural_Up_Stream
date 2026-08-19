@@ -584,6 +584,14 @@ def test_confronto_tace_quando_tutto_combacia():
     assert edigas.confronta_con_nomina(doc.xml, risposta) == []
 
 
+def test_confronto_con_una_nomina_archiviata_corrotta_non_esplode():
+    """L'XML nel database può degradare: va segnalato come errore, non come 500."""
+
+    with pytest.raises(edigas.EdigasError) as exc:
+        edigas.confronta_con_nomina("<non-chiuso>", {"righe": []})
+    assert "non è leggibile" in str(exc.value)
+
+
 def test_gli_istanti_senza_fuso_sono_letti_come_ora_italiana():
     """Il giorno gas è definito in locale: un istante nudo segue quella regola."""
 

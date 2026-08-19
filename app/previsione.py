@@ -92,11 +92,12 @@ def _numero_da_testo(testo: str) -> float | None:
         testo = testo.replace(",", ".")
     elif re.fullmatch(r"-?[1-9][0-9]{0,2}(\.[0-9]{3})+", testo):
         testo = testo.replace(".", "")
-    if not NUMERO_RE.fullmatch(testo.replace(".", ".", 1)):
-        try:
-            return float(testo)
-        except ValueError:
-            return None
+    # Un valore che non rispetta il formato numerico atteso non deve entrare:
+    # il fallback float() accetterebbe "nan", "inf" e la notazione esponenziale
+    # ("1e5"), che non sono domande valide e produrrebbero un output JSON non
+    # valido (NaN/Infinity non sono JSON). Meglio segnalare la riga.
+    if not NUMERO_RE.fullmatch(testo):
+        return None
     try:
         return float(testo)
     except ValueError:

@@ -137,6 +137,44 @@ def schema_per_tipo(kind: str) -> dict[str, str] | None:
 
 
 @lru_cache(maxsize=None)
+def _byte_schema(kind: str) -> bytes:
+    """Legge lo XSD e ne verifica l'impronta prima di qualunque parse.
+
+    Vale per entrambe le strade che leggono lo schema: la compilazione che
+    valida i documenti e l'indice dei tipi che alimenta le tendine.  Senza il
+    controllo anche qui, uno schema sostituito su disco bloccherebbe la
+    generazione ma continuerebbe a riempire il catalogo: due verità diverse
+    sullo stesso file.  I byte verificati sono anche ciò che viene parsato,
+    così non c'è finestra fra il controllo e l'uso.
+    """
+
+    meta = SCHEMAS.get(kind)
+    if not meta:
+        raise AcerXmlError("Tracciato ACER non supportato.")
+    percorso = SCHEMA_DIR / meta["filename"]
+    try:
+        contenuto = percorso.read_bytes()
+    except OSError as exc:
+        raise AcerXmlError(f"Schema ACER non leggibile ({meta['schema_name']}): {exc}") from exc
+    if hashlib.sha256(contenuto).hexdigest() != meta["sha256"]:
+        raise AcerXmlError(
+            f"Integrità dello schema ACER non verificata ({meta['schema_name']}): "
+            "l'impronta del file non corrisponde a quella dichiarata."
+        )
+    return contenuto
+
+
+def _parser_sicuro():
+    """Parser esplicito e difensivo anche per i nostri XSD.
+
+    I default di libxml2 oggi bloccano già XXE ed espansione di entità, ma la
+    garanzia non deve dipendere dalla versione installata.
+    """
+
+    return etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
+
+
+@lru_cache(maxsize=None)
 def _facet(kind: str, tipo: str) -> dict[str, Any]:
     """Legge i vincoli di un simpleType direttamente dall'XSD del tracciato.
 
@@ -150,7 +188,9 @@ def _facet(kind: str, tipo: str) -> dict[str, Any]:
     if not meta:
         return {}
     ns = "{http://www.w3.org/2001/XMLSchema}"
-    radice = ElementTree.parse(SCHEMA_DIR / meta["filename"]).getroot()
+    # Si parsano i byte già verificati per impronta (stessa fonte della
+    # compilazione): un file sostituito su disco non può dare due verità.
+    radice = ElementTree.fromstring(_byte_schema(kind))
     for st in radice.iter(f"{ns}simpleType"):
         if st.get("name") != tipo:
             continue
@@ -491,17 +531,14 @@ def _compiled_schema(kind: str):
     meta = schema_per_tipo(kind)
     if not meta:
         raise AcerXmlError("Tracciato ACER non supportato.")
-    path = SCHEMA_DIR / meta["filename"]
     try:
-        raw = path.read_bytes()
-    except OSError as exc:
-        raise AcerXmlError(f"Schema ACER non disponibile: {path.name}.") from exc
-    digest = hashlib.sha256(raw).hexdigest()
-    if digest != meta["sha256"]:
-        raise AcerXmlError("Integrità dello schema ACER non verificata: export bloccato.")
-    try:
-        return etree.XMLSchema(etree.parse(str(path)))
-    except (OSError, etree.XMLSchemaParseError) as exc:
+        # Si compila dai byte appena verificati, non rileggendo il percorso:
+        # rileggere aprirebbe una finestra fra il controllo dell'impronta e
+        # l'uso del file. Gli XSD ACER sono autonomi, senza xs:import né
+        # xs:include da risolvere.
+        radice = etree.fromstring(_byte_schema(kind), _parser_sicuro())
+        return etree.XMLSchema(radice)
+    except (etree.XMLSyntaxError, etree.XMLSchemaParseError) as exc:
         raise AcerXmlError("Schema ACER non caricabile: export bloccato.") from exc
 
 
@@ -569,10 +606,7 @@ def verifica_xml_archiviato(kind: str, xml: str, expected_sha256: str) -> None:
             [{"field": "sha256", "message": "Il contenuto XML non coincide con l'impronta registrata."}],
         )
     try:
-        root = etree.fromstring(
-            raw,
-            parser=etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False),
-        )
+        root = etree.fromstring(raw, _parser_sicuro())
     except etree.XMLSyntaxError as exc:
         raise AcerXmlError(
             "Artefatto XML non leggibile.",

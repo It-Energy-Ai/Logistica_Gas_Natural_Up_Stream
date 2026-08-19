@@ -1,6 +1,6 @@
 """Trasporto lato shipper: registro interruzioni, Utilizzo Medio, nota UIOLI."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -343,6 +343,23 @@ def test_i_giorni_consecutivi_fondono_le_interruzioni_adiacenti():
     seconda = interruzione(dati={"data_inizio": "2026-01-08", "giorni": 3}, esistenti=[prima])
     riepilogo = trasporto.riepilogo_interruzioni([prima, seconda])
     assert riepilogo[0]["giorni_massimi_consecutivi"] == 6
+
+
+def test_il_fuori_termine_usa_il_giorno_italiano(monkeypatch):
+    """Scadenze e termini valgono sul calendario italiano, non su quello UTC.
+
+    Nelle ore 22–24 UTC i due calendari divergono: forzare oggi_roma a una
+    data precisa deve cambiare l'esito, indipendentemente da dov'è il server.
+    """
+
+    termine = trasporto.scadenza_nota(NOTA["anno_termico"])
+    monkeypatch.setattr(trasporto, "oggi_roma", lambda: termine)
+    dentro = trasporto.prepara_nota({**NOTA})
+    assert dentro["fuori_termine"] is False
+    monkeypatch.setattr(trasporto, "oggi_roma", lambda: termine + timedelta(days=1))
+    fuori = trasporto.prepara_nota({**NOTA})
+    assert fuori["fuori_termine"] is True
+    assert any("già passato" in a for a in fuori["avvisi"])
 
 
 def test_il_riepilogo_distingue_le_parziali():
