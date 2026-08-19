@@ -2,6 +2,20 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.10.0] — 2026-08-19
+
+Revisione esterna del codice con cinque correzioni fondate, ognuna riprodotta (con un test che falliva) prima di essere applicata.
+
+### Corretto
+- **Previsione della domanda**: la guardia che doveva rifiutare i valori non numerici era inerte (un `replace(".", ".", 1)` che non sostituiva nulla) e `float()` accettava `nan`, `inf` e la notazione scientifica `1e5`. Ora ogni riga non numerica è segnalata per numero di riga e l'elaborazione si ferma.
+- **Schemi ACER (REMIT, PDR)**: l'XSD veniva compilato passando il percorso del file a `etree.parse`, con una finestra di lettura separata dalla verifica dell'impronta SHA-256 (un file scambiato fra le due letture passava i controlli). Ora gli schemi sono caricati e verificati in byte e da lì compilati; anche `_facet` e la verifica degli archivi usano la stessa fonte. Un test manomette lo schema sul disco e verifica che né l'export né le tendine accettino la versione contraffatta.
+- **Scadenze italiane (Trasporto, Nomine)**: la nota UIOLI e il catalogo delle nomine usavano `datetime.now(timezone.utc).date()` per decidere la scadenza dei 7 giorni lavorativi: dopo le 00:30 italiane (le 23:30 UTC della sera prima) il termine risultava già scaduto. Introdotto `oggi_roma()` su `Europe/Rome`, con test sul cambio d'ora.
+- **Nomine EDIG@S**: un XML corrotto nella risposta del trasportatore produceva un errore interno 500; ora `confronta_con_nomina` intercetta l'errore di parsing e risponde 422 con un messaggio controllato (un test lo presidia).
+- **EMIR**: `_booleano` accettava qualunque stringa e ripiegava silenziosamente su `false` (un valore digitato male veniva salvato come negato); ora accetta booleani e le forme note (`true/1/sì/vero`, `false/0/no`) e rifiuta il resto con un errore esplicito.
+
+### Modificato
+- **README**: tabella delle schermate completa (17 moduli, con le 5 schermate finora prive di immagine — Capacità, Stoccaggio, Report, Sistema, Impostazioni), conteggio delle verifiche esatto (476: 384 pytest + 82 logica + 10 runtime) e l'elenco dei moduli trasformato in un elenco puntato leggibile.
+
 ## [1.9.1] — 2026-08-03
 
 Terza iterazione della proposta Streamlit, stavolta con una LSTM TensorFlow. Verificata eseguendola: oltre ai difetti già respinti (sovrascrittura di `app/main.py`, previsione che copre gli ultimi giorni già noti, `fillna` che crasha con pandas 3), la riscrittura ha perso l'import di `ARIMA` (NameError su ogni percorso ARIMA), la banda di confidenza della LSTM **moltiplica** per `scaler.scale_` dove dovrebbe **dividere** — su una domanda da 120.000 kWh la banda esce ±0,000002 kWh, un fattore ~1,6 miliardi — e nessun seme è fissato: stesso input, previsione diversa a ogni esecuzione. Respinta.
