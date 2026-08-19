@@ -46,9 +46,21 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | <img src="docs/screenshots/moduli.png" alt="Aree di lavoro Logistica Gas"><br>**Logistica Gas** · aree di lavoro operative | <img src="docs/screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente"><br>**Configuratore** · utenti con wizard a 3 passi e impostazioni locali |
 | <img src="docs/screenshots/remit.png" alt="REMIT · XML ACER"><br>**REMIT · XML ACER** · registro nei tre stati, validazione XSD, UTI, audit ed export | <img src="docs/screenshots/pdr.png" alt="PDR · GME"><br>**PDR · GME** · profilo, schemi fissati, preflight per artefatto e ricevute |
 | <img src="docs/screenshots/emir.png" alt="EMIR · Trade Repository"><br>**EMIR · Trade Repository** · segnalazione ISO 20022 auth.030 ed esito del registro | <img src="docs/screenshots/trasporto.png" alt="Trasporto · Interruzioni e UIOLI"><br>**Trasporto** · interruzioni ricevute da Snam, Utilizzo Medio e nota UIOLI |
-| <img src="docs/screenshots/previsione.png" alt="Previsione della domanda"><br>**Previsione della domanda** · backtest onesto e futuro vero, con banda dichiarata | |
+| <img src="docs/screenshots/capacita.png" alt="Capacità e Contratti"><br>**Capacità & Contratti** · capacità conferite, contratti attivi, scadenze d'asta | <img src="docs/screenshots/stoccaggio.png" alt="Stoccaggio"><br>**Stoccaggio** · giacenza, iniezione ed erogazione, servizi Stogit |
+| <img src="docs/screenshots/previsione.png" alt="Previsione della domanda"><br>**Previsione della domanda** · backtest onesto e futuro vero, con banda dichiarata | <img src="docs/screenshots/report.png" alt="Report e Analisi"><br>**Report & Analisi** · estrazioni e invii programmati per categoria |
+| <img src="docs/screenshots/sistema.png" alt="Sistema"><br>**Sistema** · stato dei servizi collegati e interruttore demo | <img src="docs/screenshots/impostazioni.png" alt="Impostazioni impresa"><br>**Impostazioni impresa** · anagrafica shipper, punti e notifiche |
 
-E inoltre: **Capacità & Contratti** (anno termico, utilizzo, scadenze d'asta), **Stoccaggio** (giacenza, fattori di adeguamento Stogit, movimenti), **Report & Analisi** (filtri per categoria, invii programmati), **Nomine EDIG@S** (NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina), **REMIT · XML ACER** (bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR), **EMIR · Trade Repository** (segnalazione ISO 20022 `auth.030` nelle otto azioni, validata contro gli schemi ESMA, esito `auth.092` abbinato agli UTI inviati), **Trasporto · Interruzioni e UIOLI** (registro delle interruzioni comunicate da Snam con i controlli del Codice di Rete, Utilizzo Medio per semestre, nota giustificativa scaricabile), **PDR · GME** (readiness e controlli preliminari, senza credenziali locali né falso invio), **Impostazioni impresa** (anagrafica shipper, parametri di nomina, punti di consegna, notifiche).
+E inoltre, i dettagli che gli screenshot non mostrano:
+
+- **Nomine EDIG@S** — NOMINT validato contro gli schemi EASEE-gas, risposta NOMRES confrontata riga per riga, riscontro ACKNOW archiviato come prova con esito su ogni nomina.
+- **REMIT · XML ACER** — bozze auditabili, Table 1 V3 / Table 2 V1, validazione XSD, generatore di UTI e Contract ID con l'algoritmo ufficiale ACER, preflight PDR.
+- **EMIR · Trade Repository** — segnalazione ISO 20022 `auth.030` nelle otto azioni, validata contro gli schemi ESMA, esito `auth.092` abbinato agli UTI inviati.
+- **Trasporto · Interruzioni e UIOLI** — registro delle interruzioni comunicate da Snam con i controlli del Codice di Rete, Utilizzo Medio per semestre, nota giustificativa scaricabile.
+- **PDR · GME** — readiness e controlli preliminari, senza credenziali locali né falso invio.
+- **Capacità & Contratti** — anno termico, utilizzo, scadenze d'asta.
+- **Stoccaggio** — giacenza, fattori di adeguamento Stogit, movimenti.
+- **Report & Analisi** — filtri per categoria, invii programmati.
+- **Impostazioni impresa** — anagrafica shipper, parametri di nomina, punti di consegna, notifiche.
 
 > Screenshot e tour mostrano la **modalità demo** attiva per i dati di mercato; bozze REMIT, documenti EDIG@S con i riscontri e tessere regolatorie sono invece **dati reali** creati nel portale. Al primo avvio tutto parte pulito (vedi sotto).
 
@@ -61,7 +73,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["14 schermate"]
+    R --> UI["17 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```
@@ -163,7 +175,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Quasi cinquecento verifiche fra Python e Node: sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Quattrocentosettantasei verifiche fra Python e Node (384 pytest + 82 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 
