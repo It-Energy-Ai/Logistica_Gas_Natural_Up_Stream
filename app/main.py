@@ -912,7 +912,8 @@ async def patch_agenda_scadenza(scadenza_id: str, request: Request):
     """Aggiorna una scadenza: campi, stato o adempimento con prossima occorrenza.
 
     Adempiendo una voce ricorrente nasce la prossima occorrenza aperta: la
-    scadenza adempiuta resta in cronologia con la sua data.
+    scadenza adempiuta resta in cronologia con la sua data.  Un adempimento
+    ripetuto (retry di rete, secondo client) non crea una seconda occorrenza.
     """
 
     email = _sessione(request)
@@ -939,7 +940,8 @@ async def patch_agenda_scadenza(scadenza_id: str, request: Request):
                 record = agenda.prepara_scadenza(fuso)
             except agenda.AgendaError as errore:
                 return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
-            if record["stato"] == "adempiuta" and esistente["ricorrenza"] != "una_tantum":
+            if (record["stato"] == "adempiuta" and esistente["ricorrenza"] != "una_tantum"
+                    and esistente["stato"] != "adempiuta"):
                 prossima = agenda.prossima_occorrenza(
                     date.fromisoformat(record["data_scadenza"]), esistente["ricorrenza"]
                 )

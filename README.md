@@ -181,7 +181,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Cinquecentosei verifiche fra Python e Node (407 pytest + 89 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Cinquecentosette verifiche fra Python e Node (408 pytest + 89 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

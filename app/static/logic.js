@@ -1650,7 +1650,7 @@
         };
       });
       const agnKpis = [
-        { nome: "OGGI", valore: String(agnCont.oggi), spiega: "scadenze in giornata" },
+        { nome: "OGGI", valore: String(agnCont.oggi), spiega: "oggi o già scadute" },
         { nome: "7 GIORNI", valore: String(agnCont.sette), spiega: "entro una settimana" },
         { nome: "30 GIORNI", valore: String(agnCont.trenta), spiega: "entro il mese" },
         { nome: "SCADUTE", valore: String(agnCont.scadute), spiega: "aperte oltre la data" },

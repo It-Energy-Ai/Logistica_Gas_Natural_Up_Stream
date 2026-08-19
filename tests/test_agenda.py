@@ -212,6 +212,25 @@ def test_agenda_adempimento_ricorrente_genera_occorrenza(client):
     assert prossima["data_scadenza"] == "2026-10-01"
 
 
+def test_agenda_doppio_adempimento_non_duplica_le_occorrenze(client):
+    client.post("/api/login", json={"email": "m.rossi@azienda1.it"})
+    r = client.post("/api/agenda/scadenze", json={
+        "titolo": "Controllo registro REMIT",
+        "categoria": "remit",
+        "data_scadenza": "2026-09-01",
+        "ricorrenza": "mensile",
+    })
+    scadenza = r.json()
+    # Un retry di rete (o un secondo client) ripete la stessa richiesta.
+    assert client.patch(f"/api/agenda/scadenze/{scadenza['id']}", json={"stato": "adempiuta"}).status_code == 200
+    assert client.patch(f"/api/agenda/scadenze/{scadenza['id']}", json={"stato": "adempiuta"}).status_code == 200
+    elenco = client.get("/api/agenda").json()["scadenze"]
+    # Originale adempiuta + una sola occorrenza successiva: nessun duplicato.
+    assert len(elenco) == 2
+    aperte = [s for s in elenco if s["stato_effettivo"] == "aperta"]
+    assert len(aperte) == 1
+
+
 def test_agenda_validazione_422(client):
     client.post("/api/login", json={"email": "m.rossi@azienda1.it"})
     r = client.post("/api/agenda/scadenze", json={"titolo": "X"})
