@@ -1316,7 +1316,7 @@ test("Previsione: un errore del server arriva a schermo e azzera l'esito", async
 test("Previsione: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf('data-screen-label="Previsione"'), html.indexOf("</x-dc>"));
+  const blocco = html.slice(html.indexOf('data-screen-label="Previsione"'), html.indexOf('data-screen-label="Agenda"'));
   assert.ok(blocco.length > 2000, "blocco Previsione non trovato");
   const app = new App();
   app.setState({ screen: "previsione" });
@@ -1325,4 +1325,128 @@ test("Previsione: ogni binding del pannello ha un valore dal render", () => {
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);
+});
+
+test("Agenda: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Agenda"'), html.indexOf("</x-dc>"));
+  assert.ok(blocco.length > 2000, "blocco Agenda non trovato");
+  const app = new App();
+  app.setState({ screen: "agenda" });
+  const v = app.renderVals();
+  const locali = new Set(["ak", "ar", "am", "amr", "ac", "aric", "ae", "true", "false", "null", ""]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+test("Agenda: avvio pulito, vuoto, zero contatori e modello dal catalogo", () => {
+  const app = new App();
+  app.setState({
+    screen: "agenda",
+    agnCatalogo: {
+      anno_termico_corrente: 2026, etichetta_corrente: "2026/2027",
+      anno_termico_successivo: 2027, etichetta_successiva: "2027/2028",
+      categorie: { operativo: "Operativo · giorno gas", stoccaggio: "Stoccaggio · Stogit" },
+      ricorrenze: { una_tantum: "Una tantum", annuale: "Annuale" },
+      modello_corrente: [{ chiave: "stoccaggio.fase_iniezione_inizio", titolo: "Inizio Fase di Iniezione", data: "2026-04-01", riferimento: "Codice di Stoccaggio", anno_termico: "2026/2027" }],
+      modello_successivo: [],
+    },
+    agnModelloAnno: "2026",
+  });
+  const v = app.renderVals();
+  assert.deepEqual(v.agnRows, []);
+  assert.equal(v.agnVuoto, true);
+  assert.equal(v.agnKpis[0].valore, "0");
+  assert.equal(v.agnModelloRows[0].data, "01/04/2026");
+  assert.equal(v.agnOpzModelloAnni.length, 2);
+});
+
+test("Agenda: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title.startsWith("Agenda"));
+  assert.ok(card, "manca la card Agenda");
+  assert.equal(card.reale, true);
+  card.go();
+  assert.equal(app.state.screen, "agenda");
+});
+
+test("Agenda: il payload della nuova scadenza legge lo stato al momento dell'invio", async () => {
+  const app = new App();
+  app.setState({ screen: "agenda" });
+  const azioni = app.renderVals();
+  azioni.setAgnTitolo(ev("Chiusura consultazione ARERA"));
+  azioni.setAgnData(ev("2026-09-25"));
+  azioni.setAgnCategoria(ev("regolatorio"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 201, json: async () => ({ id: "x1" }), text: async () => "" };
+  };
+  await azioni.creaScadenza();
+  assert.equal(inviato.url, "/api/agenda/scadenze");
+  assert.equal(inviato.body.titolo, "Chiusura consultazione ARERA");
+  assert.equal(inviato.body.data_scadenza, "2026-09-25");
+  assert.equal(inviato.body.ricorrenza, "una_tantum");
+  assert.match(app.state.agnInfo, /aggiunta/);
+  assert.equal(app.state.agnTitolo, "");
+  global.fetch = FETCH_OK;
+});
+
+test("Agenda: una voce scaduta espone Adempi e Salta, una chiusa espone Riapri", () => {
+  const app = new App();
+  app.setState({
+    screen: "agenda",
+    agnScadenze: [
+      { id: "a", titolo: "Programma di erogazione", data_scadenza: "2026-08-01", stato_effettivo: "scaduta", categoria: "stoccaggio", etichetta_categoria: "Stoccaggio · Stogit", ricorrenza: "annuale", etichetta_ricorrenza: "Annuale", riferimento: "§6.3.2", nota: "", modello_chiave: "stoccaggio.programma_erogazione", modello_anno: 2026 },
+      { id: "b", titolo: "Fattura Stogit", data_scadenza: "2026-08-05", stato_effettivo: "adempiuta", categoria: "stoccaggio", etichetta_categoria: "Stoccaggio · Stogit", ricorrenza: "annuale", etichetta_ricorrenza: "Annuale", riferimento: "", nota: "", modello_chiave: null, modello_anno: null },
+    ],
+  });
+  const v = app.renderVals();
+  const [scaduta, chiusa] = v.agnRows;
+  assert.equal(scaduta.badge.testo, "scaduta");
+  assert.equal(typeof scaduta.adempi, "function");
+  assert.equal(typeof scaduta.salta, "function");
+  assert.equal(scaduta.riapri, null);
+  assert.equal(typeof chiusa.riapri, "function");
+  assert.equal(chiusa.adempi, null);
+  assert.match(scaduta.modelloLabel, /Modello AT 2026\/2027/);
+  assert.match(scaduta.dettaglioRif, /§6\.3\.2/);
+});
+
+test("Agenda: adempiendo una voce ricorrente si chiede la prossima occorrenza al server", async () => {
+  const app = new App();
+  app.setState({
+    screen: "agenda",
+    agnScadenze: [{ id: "m1", titolo: "Controllo registro", data_scadenza: "2026-09-01", stato_effettivo: "aperta", categoria: "remit", etichetta_categoria: "REMIT · ACER", ricorrenza: "mensile", etichetta_ricorrenza: "Mensile", riferimento: "", nota: "", modello_chiave: null, modello_anno: null }],
+  });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    if (opts && opts.method === "PATCH") {
+      inviato = { url, body: JSON.parse(opts.body || "{}") };
+    }
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "" };
+  };
+  await app.renderVals().agnRows[0].adempi();
+  assert.equal(inviato.url, "/api/agenda/scadenze/m1");
+  assert.equal(inviato.body.stato, "adempiuta");
+  global.fetch = FETCH_OK;
+});
+
+test("Agenda: l'istanziazione del modello invia l'anno scelto e ne dice l'esito", async () => {
+  const app = new App();
+  app.setState({ screen: "agenda", agnModelloAnno: "2027" });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({ create: 14, gia_presenti: [] }), text: async () => "" };
+  };
+  await app.renderVals().istanziaModello();
+  assert.equal(inviato.url, "/api/agenda/modello/istanzia");
+  assert.equal(inviato.body.anno, 2027);
+  assert.match(app.state.agnModelloInfo, /14 voci/);
+  global.fetch = FETCH_OK;
 });

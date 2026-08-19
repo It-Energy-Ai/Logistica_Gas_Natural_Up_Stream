@@ -11,7 +11,7 @@ def test_index_contiene_template_e_schermate(client):
     for label in [
         "Login", "Hub moduli", "Logistica Gas", "Dashboard", "Nomine e Programmazione",
         "Bilanciamento", "Capacita e Contratti", "Stoccaggio", "Report e Analisi",
-        "Impostazioni", "Configuratore", "Sistema", "Remit", "PDR · GME",
+        "Impostazioni", "Configuratore", "Sistema", "Remit", "PDR · GME", "Agenda",
     ]:
         assert f'data-screen-label="{label}"' in r.text, label
     assert 'id="app-template"' in r.text

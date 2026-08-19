@@ -48,7 +48,8 @@ Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](htt
 | <img src="docs/screenshots/emir.png" alt="EMIR · Trade Repository"><br>**EMIR · Trade Repository** · segnalazione ISO 20022 auth.030 ed esito del registro | <img src="docs/screenshots/trasporto.png" alt="Trasporto · Interruzioni e UIOLI"><br>**Trasporto** · interruzioni ricevute da Snam, Utilizzo Medio e nota UIOLI |
 | <img src="docs/screenshots/capacita.png" alt="Capacità e Contratti"><br>**Capacità & Contratti** · capacità conferite, contratti attivi, scadenze d'asta | <img src="docs/screenshots/stoccaggio.png" alt="Stoccaggio"><br>**Stoccaggio** · giacenza, iniezione ed erogazione, servizi Stogit |
 | <img src="docs/screenshots/previsione.png" alt="Previsione della domanda"><br>**Previsione della domanda** · backtest onesto e futuro vero, con banda dichiarata | <img src="docs/screenshots/report.png" alt="Report e Analisi"><br>**Report & Analisi** · estrazioni e invii programmati per categoria |
-| <img src="docs/screenshots/sistema.png" alt="Sistema"><br>**Sistema** · stato dei servizi collegati e interruttore demo | <img src="docs/screenshots/impostazioni.png" alt="Impostazioni impresa"><br>**Impostazioni impresa** · anagrafica shipper, punti e notifiche |
+| <img src="docs/screenshots/agenda.png" alt="Agenda regolatoria"><br>**Agenda regolatoria** · scadenze con data certa dalle fonti e voci personalizzate | <img src="docs/screenshots/impostazioni.png" alt="Impostazioni impresa"><br>**Impostazioni impresa** · anagrafica shipper, punti e notifiche |
+| <img src="docs/screenshots/sistema.png" alt="Sistema"><br>**Sistema** · stato dei servizi collegati e interruttore demo | |
 
 E inoltre, i dettagli che gli screenshot non mostrano:
 
@@ -61,6 +62,7 @@ E inoltre, i dettagli che gli screenshot non mostrano:
 - **Stoccaggio** — giacenza, fattori di adeguamento Stogit, movimenti.
 - **Report & Analisi** — filtri per categoria, invii programmati.
 - **Impostazioni impresa** — anagrafica shipper, parametri di nomina, punti di consegna, notifiche.
+- **Agenda regolatoria** — scadenze con data certa dalle fonti (modello Stogit/Snam) e voci personalizzate, con stati adempiuta/saltata e occorrenze ricorrenti.
 
 > Screenshot e tour mostrano la **modalità demo** attiva per i dati di mercato; bozze REMIT, documenti EDIG@S con i riscontri e tessere regolatorie sono invece **dati reali** creati nel portale. Al primo avvio tutto parte pulito (vedi sotto).
 
@@ -73,7 +75,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["17 schermate"]
+    R --> UI["18 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```
@@ -166,6 +168,10 @@ La schermata **Trasporto · Interruzioni e UIOLI** sta dal lato giusto del Codic
 
 La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest incorporato** — il modello è addestrato senza vedere gli ultimi giorni noti e confrontato con la realtà — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui). Metodo trasparente e deterministico (Holt-Winters settimanale in puro Python, zero dipendenze scientifiche): stesso input, stessa previsione. Dettagli in [docs/previsione.md](docs/previsione.md).
 
+## Agenda regolatoria
+
+La schermata **Agenda regolatoria** tiene le scadenze vere dello shipper senza inventarne una. Il **modello regolatorio** precompila le 14 voci la cui data è fissata dalle fonti — fasi e programmi stagionali dello stoccaggio (Codice di Stoccaggio Stogit, §6.3.1, §6.3.2, Cap. 7 Allegato 1), calendario di conferimento, fatture di riaddebito, Anno Termico di trasporto e termine della nota UIOLI (Codice di Rete Snam) — e istanzia tutto per l'Anno Termico scelto con un clic, in modo idempotente. Consultazioni ARERA, aste Snam su Jarvis e obblighi REMIT legati a una transazione non hanno date fisse: si creano a mano con la stessa schermata. «Scaduta» è uno stato **derivato dalla data**, mai scritto: ogni voce si adempie (generando la prossima occorrenza se ricorrente) o si dichiara saltata. Dettagli in [docs/agenda.md](docs/agenda.md).
+
 ## Test e qualità
 
 ```bash
@@ -175,7 +181,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Quattrocentosettantasei verifiche fra Python e Node (384 pytest + 82 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Cinquecentosei verifiche fra Python e Node (407 pytest + 89 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora, progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

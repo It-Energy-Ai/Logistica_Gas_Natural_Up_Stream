@@ -133,6 +133,11 @@
         trsNote: [], trsNotaErrore: "", trsNotaInfo: "", trsNotaErrori: [], trsCatalogo: null,
         prvCsv: "", prvOrizzonte: "7", prvAggregazione: "somma",
         prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
+        agnScadenze: [], agnCatalogo: null, agnContatori: null, agnOggi: "",
+        agnErrore: "", agnInfo: "", agnErrori: [], agnElencoErrore: "",
+        agnTitolo: "", agnCategoria: "operativo", agnData: "", agnRicorrenza: "una_tantum",
+        agnRiferimento: "", agnNota: "",
+        agnModelloAnno: "", agnModelloErrore: "", agnModelloInfo: "",
         remReports: [], remCaricamento: false, remErrore: "", remInfo: "", remAudit: null,
         remTipo: "gas_standard", remAzione: "new", remRif: "", remData: "", remPunto: "", remControparte: "", remControparteTipo: "ace", remLato: "buy", remQta: "", remUnita: "MWh", remPrezzo: "", remValuta: "EUR", remCapacita: "P",
         remContractId: "", remContractDate: "", remContractType: "SP", remCommodity: "NG", remDeliveryStart: "", remDeliveryEnd: "", remSettlement: "P", remMarketplaceTipo: "mic", remMarketplaceId: "", remTransactionAt: "", remTransactionId: "",
@@ -392,6 +397,30 @@
       }
     }
 
+    async _caricaAgenda() {
+      if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
+      try {
+        const [agenda, catalogo] = await Promise.all([
+          this._json("/api/agenda"),
+          this.state.agnCatalogo ? Promise.resolve(this.state.agnCatalogo) : this._json("/api/agenda/catalogo"),
+        ]);
+        if (!miaSessione()) return;
+        this.setState({
+          agnScadenze: Array.isArray(agenda.scadenze) ? agenda.scadenze : [],
+          agnContatori: agenda.contatori || null,
+          agnOggi: agenda.oggi || "",
+          agnCatalogo: catalogo || null,
+          agnModelloAnno: this.state.agnModelloAnno || String((catalogo || {}).anno_termico_corrente || ""),
+          agnElencoErrore: "",
+        });
+      } catch (error) {
+        if (!miaSessione()) return;
+        this.setState({ agnElencoErrore: `Agenda non disponibile: ${error.message}` });
+      }
+    }
+
     async _caricaPdr() {
       if (!this._sessionEmail) return;
       const epoca = this._sessionEpoch;
@@ -413,7 +442,7 @@
     }
 
     async _caricaWorkspaceRegolatorio() {
-      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir(), this._caricaTrasporto()]);
+      await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir(), this._caricaTrasporto(), this._caricaAgenda()]);
     }
 
     async _apriSessione(email) {
@@ -509,6 +538,7 @@
         emir: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "EMIR · Trade Repository" }],
         trasporto: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Trasporto · Interruzioni e UIOLI" }],
         previsione: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Previsione della domanda" }],
+        agenda: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Agenda regolatoria" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
         label: c.label, pre: i ? "›" : "",
@@ -584,6 +614,8 @@
         // parte dagli accolti, che non richiedono nulla.
         emirRespinte: _emrEsiti.reduce((tot, e) => tot + (e.respinte || 0), 0),
       };
+      // Le scadenze dell'Agenda si contano solo su ciò che chiede attenzione.
+      const agnCont = this.state.agnContatori || { oggi: 0, sette: 0, trenta: 0, scadute: 0, adempiute_mese: 0 };
 
       // Unità e badge possono dipendere dal numero: "1 documenti" è un errore
       // di accordo, non una svista tollerabile su una tessera in dashboard.
@@ -618,6 +650,7 @@
         { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: nReg.emirFile === 1 ? "segnalazione generata" : "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
         { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: (this.state.trsInterruzioni || []).length === 1 ? "interruzione registrata" : "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
         { title: "Previsione della domanda", desc: "Storico giornaliero → backtest onesto e previsione dei prossimi giorni, con banda dichiarata: la base per preparare le nomine.", stat: "28", statLabel: "giorni di orizzonte massimo", reale: true, primary: true, go: go("previsione"), cursor: "pointer", border: "var(--line)" },
+        { title: "Agenda regolatoria", desc: "Scadenze di stoccaggio, trasporto e regolatorio: modello precompilato dalle fonti e voci personalizzate, con promemoria di adempimento.", stat: String(agnCont.scadute), statLabel: agnCont.scadute === 1 ? "scadenza aperta oltre la data" : "scadenze aperte oltre la data", reale: true, primary: true, go: go("agenda"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
       // veri dell'utente e restano visibili anche a portale pulito.
@@ -1035,7 +1068,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", agenda: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1569,6 +1602,115 @@
         { nome: "MAPE", valore: prv.backtest.mape === null ? "—" : `${prv.backtest.mape}%`, spiega: `sui ${prv.backtest.giorni} giorni di backtest` },
       ] : [];
 
+      // --- Agenda regolatoria: dominio server-side, stati derivati ----------
+      const agnStatoC = {
+        aperta: { testo: "aperta", ...RUN },
+        scaduta: { testo: "scaduta", ...NEG },
+        adempiuta: { testo: "adempiuta", ...OK },
+        saltata: { testo: "saltata", ...WAIT },
+      };
+      const agnCat = this.state.agnCatalogo;
+      const setAgnStato = (id, stato) => unaVolta(`agnStato:${id}:${stato}`, async () => {
+        this.setState({ agnElencoErrore: "" });
+        try {
+          await this._json(`/api/agenda/scadenze/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stato }),
+          });
+          await this._caricaAgenda();
+        } catch (error) {
+          this.setState({ agnElencoErrore: `Scadenza non aggiornata: ${error.message}` });
+        }
+      });
+      const eliminaScadenza = (id) => unaVolta(`agnElimina:${id}`, async () => {
+        this.setState({ agnElencoErrore: "" });
+        try {
+          await this._json(`/api/agenda/scadenze/${encodeURIComponent(id)}`, { method: "DELETE" });
+          await this._caricaAgenda();
+        } catch (error) {
+          this.setState({ agnElencoErrore: `Scadenza non rimossa: ${error.message}` });
+        }
+      });
+      const agnRows = (this.state.agnScadenze || []).map((s) => {
+        const chiusa = s.stato_effettivo === "adempiuta" || s.stato_effettivo === "saltata";
+        return {
+          ...s,
+          data: dataIt(s.data_scadenza),
+          badge: agnStatoC[s.stato_effettivo] || agnStatoC.saltata,
+          categoriaLabel: s.etichetta_categoria || s.categoria,
+          ricorrenzaLabel: s.etichetta_ricorrenza || s.ricorrenza,
+          dettaglioRif: s.riferimento ? ` · ${s.riferimento}` : "",
+          modelloLabel: s.modello_chiave && s.modello_anno
+            ? ` · Modello AT ${s.modello_anno}/${Number(s.modello_anno) + 1}` : "",
+          adempi: chiusa ? null : setAgnStato(s.id, "adempiuta"),
+          salta: chiusa ? null : setAgnStato(s.id, "saltata"),
+          riapri: chiusa ? setAgnStato(s.id, "aperta") : null,
+          elimina: eliminaScadenza(s.id),
+        };
+      });
+      const agnKpis = [
+        { nome: "OGGI", valore: String(agnCont.oggi), spiega: "scadenze in giornata" },
+        { nome: "7 GIORNI", valore: String(agnCont.sette), spiega: "entro una settimana" },
+        { nome: "30 GIORNI", valore: String(agnCont.trenta), spiega: "entro il mese" },
+        { nome: "SCADUTE", valore: String(agnCont.scadute), spiega: "aperte oltre la data" },
+      ];
+      const creaScadenza = unaVolta("creaScadenza", async () => {
+        this.setState({ agnErrore: "", agnInfo: "", agnErrori: [] });
+        try {
+          await this._json("/api/agenda/scadenze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              titolo: cap(this.state.agnTitolo, 160),
+              categoria: this.state.agnCategoria,
+              data_scadenza: cap(this.state.agnData, 10),
+              ricorrenza: this.state.agnRicorrenza,
+              riferimento: cap(this.state.agnRiferimento, 160),
+              nota: cap(this.state.agnNota, 500),
+            }),
+          });
+          this.setState({
+            agnInfo: "Scadenza aggiunta all'agenda.",
+            agnTitolo: "", agnData: "", agnRiferimento: "", agnNota: "",
+          });
+          await this._caricaAgenda();
+        } catch (error) {
+          this.setState({ agnErrore: `Scadenza non salvata: ${error.message}`, agnErrori: error.dettagli || [] });
+        }
+      });
+      const istanziaModello = unaVolta("istanziaModello", async () => {
+        this.setState({ agnModelloErrore: "", agnModelloInfo: "" });
+        try {
+          const esito = await this._json("/api/agenda/modello/istanzia", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ anno: Number(this.state.agnModelloAnno) }),
+          });
+          const gia = esito.gia_presenti ? esito.gia_presenti.length : 0;
+          this.setState({
+            agnModelloInfo: `Create ${esito.create} voci del modello${gia ? ` · ${gia} già presenti` : ""}.`,
+          });
+          await this._caricaAgenda();
+        } catch (error) {
+          this.setState({ agnModelloErrore: `Modello non istanziato: ${error.message}` });
+        }
+      });
+      const agnModelloAnno = this.state.agnModelloAnno;
+      const agnModello = agnCat && agnModelloAnno
+        ? (Number(agnModelloAnno) === Number(agnCat.anno_termico_corrente) ? agnCat.modello_corrente : agnCat.modello_successivo)
+        : [];
+      const agnModelloRows = (agnModello || []).map((v) => ({
+        ...v,
+        data: dataIt(v.data),
+      }));
+      const agnOpzModelloAnni = agnCat ? [
+        { id: String(agnCat.anno_termico_corrente), label: `AT ${agnCat.etichetta_corrente} · stoccaggio dal 1/4` },
+        { id: String(agnCat.anno_termico_successivo), label: `AT ${agnCat.etichetta_successiva} · stoccaggio dal 1/4` },
+      ] : [];
+      const agnOpzCategorie = agnCat ? Object.entries(agnCat.categorie || {}).map(([id, label]) => ({ id, label })) : [];
+      const agnOpzRicorrenze = agnCat ? Object.entries(agnCat.ricorrenze || {}).map(([id, label]) => ({ id, label })) : [];
+
       // --- Ricevute PDR: conservazione locale, senza fingere una verifica ---
       const receiptId = (receipt) => receipt?.id ?? receipt?.receipt_id ?? receipt?.receipt?.id ?? "";
       const receiptField = (receipt, ...keys) => {
@@ -1806,7 +1948,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenAgenda: s === "agenda",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -1940,6 +2082,26 @@
         setPrvCsv: (e) => this.setSilent({ prvCsv: e.target.value }),
         setPrvOrizzonte: (e) => this.setSilent({ prvOrizzonte: e.target.value }),
         setPrvAggregazione: (e) => this.setSilent({ prvAggregazione: e.target.value }),
+        agnRows, agnKpis, agnVuoto: !agnRows.length,
+        agnOggi: dataIt(this.state.agnOggi || ""),
+        agnAdempiute: String(agnCont.adempiute_mese),
+        agnElencoErrore: this.state.agnElencoErrore,
+        agnTitolo: this.state.agnTitolo, agnCategoria: this.state.agnCategoria,
+        agnData: this.state.agnData, agnRicorrenza: this.state.agnRicorrenza,
+        agnRiferimento: this.state.agnRiferimento, agnNota: this.state.agnNota,
+        agnErrore: this.state.agnErrore, agnInfo: this.state.agnInfo,
+        agnErrori: this.state.agnErrori,
+        setAgnTitolo: (e) => this.setSilent({ agnTitolo: e.target.value }),
+        setAgnCategoria: (e) => this.setSilent({ agnCategoria: e.target.value }),
+        setAgnData: (e) => this.setSilent({ agnData: e.target.value }),
+        setAgnRicorrenza: (e) => this.setSilent({ agnRicorrenza: e.target.value }),
+        setAgnRiferimento: (e) => this.setSilent({ agnRiferimento: e.target.value }),
+        setAgnNota: (e) => this.setSilent({ agnNota: e.target.value }),
+        creaScadenza, istanziaModello,
+        agnModelloAnno: this.state.agnModelloAnno,
+        setAgnModelloAnno: (e) => this.setSilent({ agnModelloAnno: e.target.value }),
+        agnModelloRows, agnOpzModelloAnni, agnOpzCategorie, agnOpzRicorrenze,
+        agnModelloErrore: this.state.agnModelloErrore, agnModelloInfo: this.state.agnModelloInfo,
         trsPunto: this.state.trsPunto, trsTipo: this.state.trsTipo, trsInizio: this.state.trsInizio,
         trsGiorni: this.state.trsGiorni, trsCapacita: this.state.trsCapacita,
         trsPreavviso: this.state.trsPreavviso, trsRiferimento: this.state.trsRiferimento,

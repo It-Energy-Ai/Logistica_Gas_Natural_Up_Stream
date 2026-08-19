@@ -2,6 +2,17 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.11.0] — 2026-08-19
+
+Nuovo modulo **Agenda regolatoria** (18° schermata): scadenze operative e regolatorie dello shipper, con un modello precompilato solo dalle date fissate dalle fonti e voci personalizzate per il resto.
+
+### Aggiunto
+- **Modello regolatorio a 14 voci** con la data della fonte e il riferimento al paragrafo: fasi di iniezione/erogazione, programmi stagionali in SAMPEI e relative accettazioni (§6.3.1 e §6.3.2 del Codice di Stoccaggio Stogit), calendario di conferimento dei Servizi Base (Cap. 5), fatture di riaddebito dei costi (Cap. 7 Allegato 1), Anno Termico di trasporto e termine della nota UIOLI (Codice di Rete Snam, Cap. 7 §4.3 — stessa regola e stessa funzione `scadenza_nota` del modulo Trasporto). Nessuna voce con data non fissata: consultazioni ARERA, aste Jarvis e REMIT restano voci personalizzate, dichiaratamente.
+- **Istanziazione idempotente** del modello per l'Anno Termico di stoccaggio scelto (avvio 1 aprile): ogni voce nasce come scadenza annuale; il vincolo `UNIQUE(email, modello_chiave, modello_anno)` impedisce i duplicati e l'operazione già completa risponde 409.
+- **Stati e occorrenze**: aperta / adempiuta / saltata; «scaduta» è derivata dalla data, mai scritta, così una voce superata resta una decisione da prendere. Adempiendo una voce ricorrente (annuale, mensile, trimestrale, settimanale, giorno gas) nasce la prossima occorrenza aperta, con il giorno del mese chiuso al mese di arrivo (31/1 → 28/2).
+- **Rotte `/api/agenda*`** (elenco con stato effettivo e contatori, catalogo con fonti e modello, creazione, aggiornamento parziale, eliminazione, istanziazione), tabella `agenda_scadenza` in SQLite e 24 test Python dedicati che fissano le date attese del modello per un Anno Termico noto — un refuso nella tabella delle date fa cadere la suite.
+- **Schermata Agenda** in `design/design.html` e `logic.js`: contatori (oggi / 7 / 30 giorni / scadute, adempiute nel mese), elenco con badge di stato e azioni Adempi/Salta/Riapri/Elimina, card del modello con scelta dell'AT e anteprima delle 14 voci, form per le scadenze personalizzate; 6 test Node per i binding e i flussi.
+
 ## [1.10.0] — 2026-08-19
 
 Revisione esterna del codice con cinque correzioni fondate, ognuna riprodotta (con un test che falliva) prima di essere applicata.

@@ -11,6 +11,7 @@ import re
 import sqlite3
 import secrets
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
@@ -19,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import edigas, emir, previsione, uti, pdr, remit, trasporto
+from . import agenda, edigas, emir, previsione, uti, pdr, remit, trasporto
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -828,6 +829,197 @@ async def post_previsione(request: Request):
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
         return JSONResponse({"errore": f"Dati della previsione non validi: {errore}"}, status_code=422)
+
+
+@app.get("/api/agenda")
+def get_agenda(request: Request):
+    """Scadenze dell'utente con stato effettivo (scaduta è derivato) e contatori."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    oggi = agenda.oggi_roma()
+    with db.connect() as conn:
+        righe = db.elenca_scadenze(conn, email)
+    arricchite = []
+    for riga in righe:
+        arricchite.append({
+            **riga,
+            "stato_effettivo": agenda.stato_effettivo(riga, oggi),
+            "etichetta_categoria": agenda.CATEGORIE[riga["categoria"]],
+            "etichetta_ricorrenza": agenda.RICORRENZE[riga["ricorrenza"]],
+        })
+    return {
+        "scadenze": arricchite,
+        "contatori": agenda.contatori(righe, oggi),
+        "oggi": oggi.isoformat(),
+    }
+
+
+@app.get("/api/agenda/catalogo")
+def get_agenda_catalogo(request: Request):
+    """Fonti, categorie e modello calcolato per gli Anni Termici correnti."""
+
+    if not _sessione(request):
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    return agenda.catalogo()
+
+
+@app.post("/api/agenda/scadenze")
+async def post_agenda_scadenza(request: Request):
+    """Crea una scadenza personalizzata (o di modello, se viene passata la chiave)."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, agenda.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        record = agenda.prepara_scadenza(payload)
+        modello_chiave = str(payload.get("modello_chiave") or "").strip() or None
+        modello_anno = payload.get("modello_anno")
+        if modello_chiave:
+            modello_anno = int(modello_anno) if str(modello_anno or "").strip() else None
+    except agenda.AgendaError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, TypeError):
+        return JSONResponse({"errore": "Chiave o anno del modello non validi."}, status_code=422)
+    scadenza_id = secrets.token_hex(8)
+    try:
+        with db.connect() as conn:
+            if modello_chiave and modello_anno is not None:
+                gia = conn.execute(
+                    "SELECT 1 FROM agenda_scadenza WHERE email = ? AND modello_chiave = ? AND modello_anno = ?",
+                    (email, modello_chiave, modello_anno),
+                ).fetchone()
+                if gia:
+                    return JSONResponse({"errore": "Questa voce del modello è già istanziata."}, status_code=409)
+            db.crea_scadenza(
+                conn, scadenza_id=scadenza_id, email=email,
+                record={**record, "modello_chiave": modello_chiave, "modello_anno": modello_anno},
+            )
+    except sqlite3.IntegrityError:
+        return JSONResponse({"errore": "Questa voce del modello è già istanziata."}, status_code=409)
+    return JSONResponse({**record, "id": scadenza_id}, status_code=201)
+
+
+@app.patch("/api/agenda/scadenze/{scadenza_id}")
+async def patch_agenda_scadenza(scadenza_id: str, request: Request):
+    """Aggiorna una scadenza: campi, stato o adempimento con prossima occorrenza.
+
+    Adempiendo una voce ricorrente nasce la prossima occorrenza aperta: la
+    scadenza adempiuta resta in cronologia con la sua data.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, agenda.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        with db.connect() as conn:
+            esistente = conn.execute(
+                "SELECT titolo, categoria, data_scadenza, ricorrenza, stato, riferimento, nota "
+                "FROM agenda_scadenza WHERE email = ? AND id = ?",
+                (email, scadenza_id),
+            ).fetchone()
+            if not esistente:
+                return JSONResponse({"errore": "scadenza non trovata"}, status_code=404)
+            # PATCH parziale: i campi non inviati restano quelli salvati.
+            fuso = {**dict(esistente), **payload}
+            try:
+                record = agenda.prepara_scadenza(fuso)
+            except agenda.AgendaError as errore:
+                return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+            if record["stato"] == "adempiuta" and esistente["ricorrenza"] != "una_tantum":
+                prossima = agenda.prossima_occorrenza(
+                    date.fromisoformat(record["data_scadenza"]), esistente["ricorrenza"]
+                )
+                nuova_id = secrets.token_hex(8)
+                db.crea_scadenza(conn, scadenza_id=nuova_id, email=email, record={
+                    **record,
+                    "data_scadenza": prossima.isoformat(),
+                    "stato": "aperta",
+                    "modello_chiave": None,
+                    "modello_anno": None,
+                })
+            aggiornata = db.aggiorna_scadenza(conn, email=email, scadenza_id=scadenza_id, record=record)
+            if not aggiornata:
+                return JSONResponse({"errore": "scadenza non trovata"}, status_code=404)
+    except ValueError:
+        return JSONResponse({"errore": "Scadenza non aggiornata: data non valida."}, status_code=422)
+    return {"ok": True, "id": scadenza_id}
+
+
+@app.delete("/api/agenda/scadenze/{scadenza_id}")
+def delete_agenda_scadenza(scadenza_id: str, request: Request):
+    """Le scadenze sono promemoria locali: una voce sbagliata deve poter uscire."""
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    with db.connect() as conn:
+        rimossa = db.elimina_scadenza(conn, email, scadenza_id)
+    if not rimossa:
+        return JSONResponse({"errore": "scadenza non trovata"}, status_code=404)
+    return {"ok": True}
+
+
+@app.post("/api/agenda/modello/istanzia")
+async def post_agenda_modello_istanzia(request: Request):
+    """Istanzia il modello regolatorio per un Anno Termico di stoccaggio.
+
+    Idempotente per voce: quelle già presenti non vengono duplicate.  Se
+    tutte le voci esistono già la richiesta è respinta (409).
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, agenda.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        anno = int(payload.get("anno"))
+    except (TypeError, ValueError):
+        return JSONResponse({"errore": "Anno Termico non valido."}, status_code=422)
+    try:
+        with db.connect() as conn:
+            esistenti = db.elenca_scadenze(conn, email)
+            esito = agenda.istanzia_modello(anno, esistenti)
+            for voce in esito["da_creare"]:
+                db.crea_scadenza(
+                    conn, scadenza_id=secrets.token_hex(8), email=email,
+                    record={
+                        "titolo": voce["titolo"],
+                        "categoria": voce["categoria"],
+                        "data_scadenza": voce["data"],
+                        "ricorrenza": voce["ricorrenza"],
+                        "stato": voce["stato"],
+                        "riferimento": voce["riferimento"],
+                        "nota": "",
+                        "modello_chiave": voce["chiave"],
+                        "modello_anno": anno,
+                    },
+                )
+    except agenda.AgendaError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=409)
+    return {
+        "ok": True,
+        "create": len(esito["da_creare"]),
+        "gia_presenti": [v["chiave"] for v in esito["gia_presenti"]],
+    }
 
 
 @app.get("/api/trasporto/catalogo")

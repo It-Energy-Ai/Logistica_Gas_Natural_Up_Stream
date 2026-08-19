@@ -270,6 +270,34 @@ BEFORE DELETE ON pdr_ricevuta
 BEGIN
     SELECT RAISE(ABORT, 'Le ricevute PDR sono immutabili');
 END;
+
+-- Scadenze dell'Agenda regolatoria: promemoria locali dello shipper. Le voci
+-- istanziate dal modello (modello_chiave NOT NULL) portano il riferimento
+-- alla fonte che fissa la data; quelle personalizzate (modello_chiave NULL)
+-- sono libere e correggibili. Nessuna di esse è una prova: si possono
+-- modificare ed eliminare, a differenza di ricevute ed esiti.
+CREATE TABLE IF NOT EXISTS agenda_scadenza (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    titolo TEXT NOT NULL,
+    categoria TEXT NOT NULL CHECK (categoria IN (
+        'trasporto', 'stoccaggio', 'regolatorio', 'remit', 'operativo', 'personale'
+    )),
+    data_scadenza TEXT NOT NULL,
+    ricorrenza TEXT NOT NULL CHECK (ricorrenza IN (
+        'una_tantum', 'annuale', 'mensile', 'trimestrale', 'settimanale', 'giorno_gas'
+    )),
+    stato TEXT NOT NULL CHECK (stato IN ('aperta', 'adempiuta', 'saltata')),
+    riferimento TEXT NOT NULL DEFAULT '',
+    nota TEXT NOT NULL DEFAULT '',
+    modello_chiave TEXT,
+    modello_anno INTEGER,
+    creato_il TEXT NOT NULL,
+    aggiornata_il TEXT NOT NULL,
+    UNIQUE (email, modello_chiave, modello_anno)
+);
+CREATE INDEX IF NOT EXISTS idx_agenda_scadenza_email_data
+    ON agenda_scadenza(email, data_scadenza);
 """
 
 
@@ -1228,3 +1256,70 @@ def lista_ricevute_pdr(
             (email,),
         )
     return [_deserializza_ricevuta(row) for row in rows]
+
+
+CAMPI_SCADENZA = (
+    "id, titolo, categoria, data_scadenza, ricorrenza, stato, riferimento, nota, "
+    "modello_chiave, modello_anno, creato_il, aggiornata_il"
+)
+
+
+def _riga_scadenza(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "titolo": row["titolo"],
+        "categoria": row["categoria"],
+        "data_scadenza": row["data_scadenza"],
+        "ricorrenza": row["ricorrenza"],
+        "stato": row["stato"],
+        "riferimento": row["riferimento"],
+        "nota": row["nota"],
+        "modello_chiave": row["modello_chiave"],
+        "modello_anno": row["modello_anno"],
+        "creato_il": row["creato_il"],
+        "aggiornata_il": row["aggiornata_il"],
+    }
+
+
+def elenca_scadenze(conn: sqlite3.Connection, email: str) -> list[dict]:
+    righe = conn.execute(
+        f"SELECT {CAMPI_SCADENZA} FROM agenda_scadenza WHERE email = ? "
+        "ORDER BY data_scadenza, creato_il DESC",
+        (email,),
+    ).fetchall()
+    return [_riga_scadenza(r) for r in righe]
+
+
+def crea_scadenza(conn: sqlite3.Connection, *, scadenza_id: str, email: str, record: dict) -> None:
+    conn.execute(
+        "INSERT INTO agenda_scadenza (id, email, titolo, categoria, data_scadenza, ricorrenza, "
+        "stato, riferimento, nota, modello_chiave, modello_anno, creato_il, aggiornata_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+        (
+            scadenza_id, email, record["titolo"], record["categoria"], record["data_scadenza"],
+            record["ricorrenza"], record["stato"], record["riferimento"], record["nota"],
+            record.get("modello_chiave"), record.get("modello_anno"),
+        ),
+    )
+
+
+def aggiorna_scadenza(conn: sqlite3.Connection, *, email: str, scadenza_id: str, record: dict) -> bool:
+    cursore = conn.execute(
+        "UPDATE agenda_scadenza SET titolo = ?, categoria = ?, data_scadenza = ?, ricorrenza = ?, "
+        "stato = ?, riferimento = ?, nota = ?, aggiornata_il = datetime('now') "
+        "WHERE email = ? AND id = ?",
+        (
+            record["titolo"], record["categoria"], record["data_scadenza"],
+            record["ricorrenza"], record["stato"], record["riferimento"], record["nota"],
+            email, scadenza_id,
+        ),
+    )
+    return cursore.rowcount > 0
+
+
+def elimina_scadenza(conn: sqlite3.Connection, email: str, scadenza_id: str) -> bool:
+    cursore = conn.execute(
+        "DELETE FROM agenda_scadenza WHERE email = ? AND id = ?",
+        (email, scadenza_id),
+    )
+    return cursore.rowcount > 0
