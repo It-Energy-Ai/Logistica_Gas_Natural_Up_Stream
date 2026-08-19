@@ -156,6 +156,16 @@ jobs:
             gh issue create --title "Diagnostica smoke macOS" --body-file diagnosi.md || true
           fi
 
+      - name: Firma ad-hoc (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Su Apple Silicon tutto il codice nativo deve essere firmato
+          # (anche solo ad-hoc). Non rimuove l'avviso Gatekeeper — serve un
+          # Developer ID Apple a pagamento — ma rende stabile l'apertura con
+          # «tasto destro → Apri» dopo il primo consenso.
+          codesign --force --sign - dist/Vettore
+          codesign --verify --strict dist/Vettore
+
       - name: Rinomina il prodotto
         shell: bash
         run: mv "${{ matrix.prodotto }}" "${{ matrix.nome }}"
@@ -191,10 +201,10 @@ jobs:
             **Vettore senza installare nulla**: scarica il file per il tuo sistema, doppio click, e il browser si apre su http://localhost:8080.
 
             - **Windows** → `Vettore-windows.exe` (se SmartScreen avvisa: *Ulteriori informazioni → Esegui comunque*)
-            - **macOS** (Apple Silicon, M1 o successivi) → `Vettore-macos-apple-silicon` — al primo avvio: tasto destro → *Apri* (binario non firmato); se scaricato dal browser può servire `xattr -d com.apple.quarantine <file>`
+            - **macOS** (Apple Silicon, M1 o successivi) → `Vettore-macos-apple-silicon` — il binario è firmato ad-hoc, ma senza Developer ID Apple l'avviso «Apple non è in grado di verificare che Vettore-macos-apple-silicon non contenga malware...» è previsto. Aprire con **tasto destro sul file → Apri → Apri**, oppure togliere il segno di quarantena e poi doppio click: `xattr -d com.apple.quarantine ~/Downloads/Vettore-macos-apple-silicon`
             - **Linux** → `Vettore-linux` (poi `chmod +x Vettore-linux`)
             - **Mac Intel**: usa `avvio.sh` dal repository (serve solo Python)
 
-            **Verifica dell'integrità** (consigliata, i binari non sono firmati): scarica anche `SHA256SUMS.txt` e confronta con `shasum -a 256 <file>` (macOS/Linux) o `Get-FileHash <file>` (Windows).
+            **Verifica dell'integrità** (consigliata, i binari non sono firmati con Developer ID): scarica anche `SHA256SUMS.txt` e confronta con `shasum -a 256 <file>` (macOS/Linux) o `Get-FileHash <file>` (Windows). Il codice è aperto: puoi anche compilare da sorgente con `pyinstaller Vettore.spec`.
 
             I dati restano in `~/.vettore/vettore.db`. Le novità di questa versione sono nel [CHANGELOG](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/CHANGELOG.md).

@@ -7,6 +7,7 @@ Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://k
 **Sito vetrina** pubblicato su GitHub Pages: la landing page del progetto per far conoscere Vettore a chi non frequenta il repository.
 
 ### Aggiunto
+- **Firma ad-hoc del binario macOS** nel workflow di release (su Apple Silicon tutto il codice nativo dev'essere firmato) e istruzioni precise per l'avviso Gatekeeper: «tasto destro → Apri» oppure `xattr -d com.apple.quarantine ~/Downloads/Vettore-macos-apple-silicon`. L'avviso di Apple non è eliminabile senza un Developer ID a pagamento, ma ora è spiegato in release notes, README e FAQ del sito.
 - **Landing page** in `sito/` (HTML e CSS puri, nessuna dipendenza): hero con la value proposition e i download per i tre sistemi, le 17 promesse del portale (dati veri, nessun finto invio, registri con audit), griglia dei 17 moduli con le schermate reali in lightbox, sezione «Sotto la superficie» con i controlli regolatori, sezione download con SHA256SUMS e FAQ oneste (SmartScreen, quarantine macOS, dove stanno i dati, perché non invia nulla).
 - **Workflow `pages.yml`**: compone l'artefatto copiando le schermate da `docs/screenshots/` e lo pubblica su GitHub Pages a ogni push che tocca il sito o le schermate; la landing page si aggiorna da sola, senza build manuali.
 - **README**: badge «Sito vetrina» e link alla landing page accanto ai download.

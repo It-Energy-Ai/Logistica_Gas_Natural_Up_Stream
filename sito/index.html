@@ -230,8 +230,11 @@
           <p>I binari non sono firmati, quindi SmartScreen mostra un avviso. Clicca <em>Ulteriori informazioni → Esegui comunque</em>. Verifica l'integrità con SHA256SUMS come indicato sopra.</p>
         </details>
         <details>
-          <summary>macOS non vuole aprire il file.</summary>
-          <p>Fai tasto destro sul file → <em>Apri</em>. Se l'hai scaricato dal browser può servire <code>xattr -d com.apple.quarantine &lt;file&gt;</code> nel terminale, poi riprova.</p>
+          <summary>macOS: «Apple non è in grado di verificare che Vettore-macos-apple-silicon non contenga malware...»</summary>
+          <p>È il controllo Gatekeeper su un binario firmato solo ad-hoc: senza un account Apple Developer a pagamento l'avviso non si può eliminare, ma è previsto e innocuo — il codice è aperto e verificabile. Due vie:</p>
+          <p><b>Tasto destro</b> sul file → <em>Apri</em> → <em>Apri</em> nel dialogo (il consenso viene ricordato per il futuro).</p>
+          <p>Oppure, per tornare al doppio click, togli il segno di quarantena dal terminale:<br>
+          <code>xattr -d com.apple.quarantine ~/Downloads/Vettore-macos-apple-silicon</code></p>
         </details>
         <details>
           <summary>Dove stanno i miei dati?</summary>

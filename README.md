@@ -26,6 +26,8 @@ Un progetto di **[Davide Bellini](https://github.com/It-Energy-Ai)** · It-Energ
 Un file solo, doppio click, il browser si apre da solo. **Niente Docker, niente Python, niente terminale.**
 Questi collegamenti puntano sempre all'ultima versione · [note di rilascio](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest) · [SHA256SUMS](https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/SHA256SUMS.txt)
 
+> **macOS**: al primo avvio Apple mostra «non è in grado di verificare che Vettore-macos-apple-silicon non contenga malware…». È il controllo Gatekeeper su un binario firmato ad-hoc (niente Developer ID Apple): previsto e innocuo. Apri con **tasto destro → Apri**, o rimuovi il segno di quarantena e riprova il doppio click: `xattr -d com.apple.quarantine ~/Downloads/Vettore-macos-apple-silicon`.
+
 Una panoramica di cosa fa il portale: [**sito vetrina**](https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/) con tutte le schermate, i moduli e le FAQ.
 
 > Il pulsante verde **Code ▾ → Download ZIP** qui sopra scarica invece il **codice sorgente** (`…-main.zip`), che serve a chi vuole leggere o modificare il progetto. Per usare l'applicazione servono i file qui sopra.
