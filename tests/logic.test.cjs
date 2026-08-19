@@ -3,7 +3,7 @@ const { test } = require("node:test");
 const assert = require("node:assert");
 const path = require("node:path");
 
-const { App } = require(path.join(__dirname, "..", "app", "static", "logic.js"));
+const { App, giornoGasIso } = require(path.join(__dirname, "..", "app", "static", "logic.js"));
 
 const ev = (value) => ({ target: { value } });
 
@@ -1449,4 +1449,24 @@ test("Agenda: l'istanziazione del modello invia l'anno scelto e ne dice l'esito"
   assert.equal(inviato.body.anno, 2027);
   assert.match(app.state.agnModelloInfo, /14 voci/);
   global.fetch = FETCH_OK;
+});
+
+test("Giorno gas: il confine sta alle 06:00 locali di Roma, non a uno shift fisso", () => {
+  // estate (UTC+2): le 03:30Z sono le 05:30 di Roma, il giorno gas è ancora il precedente
+  assert.equal(giornoGasIso(new Date("2026-08-19T03:30:00Z")), "2026-08-18");
+  assert.equal(giornoGasIso(new Date("2026-08-19T04:00:00Z")), "2026-08-19");
+  // inverno (UTC+1): le 05:00Z sono le 06:00 di Roma
+  assert.equal(giornoGasIso(new Date("2026-12-01T04:59:00Z")), "2026-11-30");
+  assert.equal(giornoGasIso(new Date("2026-12-01T05:00:00Z")), "2026-12-01");
+});
+
+test("Giorno gas: ai cambi dell'ora il confine segue l'ora locale vera", () => {
+  // passaggio all'ora legale (2026-03-29, alle 01:00Z): il giorno 28 è da 23 ore
+  // e finisce alle 06:00 CEST = 04:00Z
+  assert.equal(giornoGasIso(new Date("2026-03-29T03:59:00Z")), "2026-03-28");
+  assert.equal(giornoGasIso(new Date("2026-03-29T04:00:00Z")), "2026-03-29");
+  // ritorno all'ora solare (2026-10-25, alle 01:00Z): il giorno 24 è da 25 ore
+  // e finisce alle 06:00 CET = 05:00Z
+  assert.equal(giornoGasIso(new Date("2026-10-25T04:59:00Z")), "2026-10-24");
+  assert.equal(giornoGasIso(new Date("2026-10-25T05:00:00Z")), "2026-10-25");
 });

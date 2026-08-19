@@ -78,5 +78,9 @@ respinta (409) — l'operatore ha già davanti l'elenco.
   per la nota UIOLI (termine già implementato nel modulo Trasporto).
 
 La scadenza «oggi» e il mese corrente si calcolano sul calendario italiano
-(Europe/Rome): il giorno gas inizia alle 6:00, ma una scadenza regolatoria
-è una data civile, non un ciclo di nomina.
+(Europe/Rome). Il termine di una voce dipende dalla categoria: le voci
+**operative** valgono sul giorno gas (06:00 → 06:00 locali), quindi una
+scadenza «entro il giorno gas X» resta aperta fino alle 06:00 di X+1, non a
+mezzanotte — alle 02:00 di X+1 è ancora «oggi» e non scaduta. Le altre
+categorie (trasporto, stoccaggio, regolatorio, REMIT, personale) sono date
+civili e scadono alla mezzanotte del giorno dopo.

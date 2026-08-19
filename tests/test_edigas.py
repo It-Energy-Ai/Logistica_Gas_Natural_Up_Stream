@@ -77,6 +77,24 @@ def test_giorno_gas_segue_il_fuso_italiano(giorno, ore, intervallo):
     assert edigas._intervallo(inizio, fine) == intervallo
 
 
+def test_ore_giorno_gas_al_psv_e_sempre_di_24_ore():
+    """Al PSV il giorno gas è di 24 ore nominali anche ai cambi d'ora
+    (Condizioni di accesso al PSV, ARERA 436/2015/R/gas).  L'ora di
+    differenza non entra nel profilo: in autunno le due occorrenze dell'ora
+    ripetuta confluiscono in un unico slot di 2 ore, in primavera l'ora
+    saltata ha durata zero al cambio dell'ora."""
+
+    for giorno in ("2026-08-03", "2026-12-01", "2026-03-28", "2026-10-24"):
+        slot = edigas.ore_giorno_gas(date.fromisoformat(giorno), psv=True)
+        assert len(slot) == 24
+        assert all(slot[i][1] == slot[i + 1][0] for i in range(23))
+    durate = sorted((b - a).total_seconds() / 3600 for a, b in edigas.ore_giorno_gas(date(2026, 10, 24), psv=True))
+    assert durate == [1.0] * 23 + [2.0]
+    primavera = edigas.ore_giorno_gas(date(2026, 3, 28), psv=True)
+    zeri = [(a, b) for a, b in primavera if a == b]
+    assert len(zeri) == 1 and zeri[0][0].strftime("%H:%MZ") == "01:00Z"
+
+
 def test_il_giorno_gas_non_dipende_dal_fuso_della_macchina():
     """Un server in UTC o a Tokyo deve produrre gli stessi intervalli."""
 
@@ -117,6 +135,47 @@ def test_profilo_orario_rifiutato_se_non_combacia_col_giorno_gas():
             controparti=[{"conto": "CTP", "direzione": "Z02", "profilo_orario": [10] * 24}],
         )
     assert "25 ore" in exc.value.errors[0]["message"]
+
+
+def test_nomina_psv_accetta_24_valori_nei_giorni_di_cambio_dora():
+    """Una nomina sul PSV (02G) con profilo di 24 ore è valida anche nei
+    giorni di 23 e 25 ore, dove un punto fisico chiederebbe 23 o 25 valori."""
+
+    for giorno in ("2026-03-28", "2026-10-24"):
+        doc = nomina(
+            tipo_documento="02G",
+            giorno_gas=giorno,
+            destinatario_ruolo="ZUK",
+            controparti=[{"conto": "CTP", "direzione": "Z02", "profilo_orario": [10] * 24}],
+        )
+        assert len(elementi(doc.xml, "timeInterval")) == 24
+
+
+def test_nomina_psv_23_valori_rifiutata_il_giorno_della_transizione():
+    """Al PSV servono sempre 24 valori: un profilo da 23 è incompleto anche
+    il giorno in cui la rete ha 23 ore reali."""
+
+    with pytest.raises(edigas.EdigasError) as exc:
+        nomina(
+            tipo_documento="02G",
+            giorno_gas="2026-03-28",
+            destinatario_ruolo="ZUK",
+            controparti=[{"conto": "CTP", "direzione": "Z02", "profilo_orario": [10] * 23}],
+        )
+    assert "di 24 ore" in exc.value.errors[0]["message"]
+
+
+def test_nomina_punto_fisico_24_valori_rifiutata_ai_cambi_di_ora():
+    """Un punto fisico (01G) resta sulla durata reale del giorno: 23 o 25
+    valori ai cambi d'ora, mai 24."""
+
+    for giorno, ore in (("2026-03-28", "23 ore"), ("2026-10-24", "25 ore")):
+        with pytest.raises(edigas.EdigasError) as exc:
+            nomina(
+                giorno_gas=giorno,
+                controparti=[{"conto": "CTP", "direzione": "Z02", "profilo_orario": [10] * 24}],
+            )
+        assert ore in exc.value.errors[0]["message"]
 
 
 # -------------------------------------------------------------- generazione

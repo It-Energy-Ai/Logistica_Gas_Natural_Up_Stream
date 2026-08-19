@@ -18,8 +18,12 @@ tracciati distinti.
 
 Il giorno gas segue la convenzione italiana (06:00 → 06:00 ora locale) ed è
 calcolato su ``Europe/Rome``, quindi i giorni di cambio ora hanno 23 o 25 ore
-invece di 24: un profilo orario viene accettato solo se rispetta la durata
-reale di quel giorno.
+invece di 24 per i punti fisici della rete: un profilo orario viene accettato
+solo se rispetta la durata reale di quel giorno.  Al Punto di Scambio
+Virtuale (02G e 03G) il giorno gas è invece convenzionalmente sempre di 24
+ore (Condizioni di accesso al PSV, ARERA 436/2015/R/gas): l'ora di differenza
+— quella ripetuta in autunno, quella saltata in primavera — è del sistema di
+allocazione del trasportatore e non entra nel profilo.
 """
 
 from __future__ import annotations
@@ -312,14 +316,33 @@ def confini_giorno_gas(giorno: date) -> tuple[datetime, datetime]:
     return inizio.astimezone(timezone.utc), fine.astimezone(timezone.utc)
 
 
-def ore_giorno_gas(giorno: date) -> list[tuple[datetime, datetime]]:
-    """Slot orari del giorno gas: 24 di norma, 23 o 25 al cambio dell'ora."""
+def ore_giorno_gas(giorno: date, *, psv: bool = False) -> list[tuple[datetime, datetime]]:
+    """Slot orari del giorno gas: 24 di norma, 23 o 25 al cambio dell'ora.
+
+    Per i punti fisici la griglia segue la durata reale del giorno.  Al PSV
+    il giorno gas è sempre di 24 ore nominali, anche ai cambi d'ora: la
+    griglia segue il calendario locale (06:00 → 06:00) e l'ora di
+    differenza non entra nel profilo — in autunno (giorno di 25 ore) le due
+    occorrenze dell'ora ripetuta confluiscono in un unico slot di 2 ore, in
+    primavera (giorno di 23 ore) l'ora saltata ha durata zero al cambio.
+    """
 
     inizio, fine = confini_giorno_gas(giorno)
-    slot, cursore = [], inizio
-    while cursore < fine:
-        successivo = min(cursore + timedelta(hours=1), fine)
-        slot.append((cursore, successivo))
+    if not psv:
+        slot, cursore = [], inizio
+        while cursore < fine:
+            successivo = min(cursore + timedelta(hours=1), fine)
+            slot.append((cursore, successivo))
+            cursore = successivo
+        return slot
+    slot = []
+    cursore = datetime.combine(giorno, time(ORA_AVVIO_GIORNO_GAS))
+    for _ in range(24):
+        successivo = cursore + timedelta(hours=1)
+        slot.append((
+            cursore.replace(tzinfo=FUSO_GAS, fold=0).astimezone(timezone.utc),
+            successivo.replace(tzinfo=FUSO_GAS, fold=0).astimezone(timezone.utc),
+        ))
         cursore = successivo
     return slot
 
@@ -558,6 +581,8 @@ def _periodi_controparte(
     nome: str,
     giorno: date,
     errors: list[dict[str, str]],
+    *,
+    psv: bool = False,
 ) -> list[tuple[str, str, str]]:
     """Espande una partita in periodi (intervallo, direzione, quantità).
 
@@ -565,11 +590,12 @@ def _periodi_controparte(
     quantità costante sull'intero giorno gas, un profilo orario, oppure i
     periodi già scritti dall'operatore.  ``prefisso`` e ``nome`` servono a
     scrivere errori comprensibili anche per la nomina senza controparte,
-    dove le quantità pendono dal punto di connessione.
+    dove le quantità pendono dal punto di connessione.  Al PSV il profilo
+    orario è sempre di 24 ore anche ai cambi dell'ora (``psv=True``).
     """
 
     direzione_base = str(controparte.get("direzione") or "").strip()
-    slot = ore_giorno_gas(giorno)
+    slot = ore_giorno_gas(giorno, psv=psv)
     fuori: list[tuple[str, str, str]] = []
 
     espliciti = controparte.get("periodi")
@@ -854,6 +880,7 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
     conti_visti: set[str] = set()
     senza_controparte: list[tuple[str, str, str]] = []
     totale_periodi = 0
+    psv = tipo_documento in ("02G", "03G")
     if giorno is not None and non_matching:
         senza_controparte = _periodi_controparte(dati, "punto", "Punto di connessione", giorno, errors)
         for conflitto in _sovrapposizioni(senza_controparte):
@@ -886,7 +913,7 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
                 )
                 continue
             periodi = _periodi_controparte(
-                controparte, f"controparti[{indice}]", f"Controparte {indice + 1}", giorno, errors
+                controparte, f"controparti[{indice}]", f"Controparte {indice + 1}", giorno, errors, psv=psv
             )
             for conflitto in _sovrapposizioni(periodi):
                 _errore(errors, f"controparti[{indice}]", f"Controparte {indice + 1}: periodi sovrapposti — {conflitto}.")

@@ -11,7 +11,7 @@ import re
 import sqlite3
 import secrets
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -839,19 +839,20 @@ def get_agenda(request: Request):
     if not email:
         return JSONResponse({"errore": "sessione assente"}, status_code=401)
     oggi = agenda.oggi_roma()
+    adesso = datetime.now(agenda.FUSO_AGENDA)
     with db.connect() as conn:
         righe = db.elenca_scadenze(conn, email)
     arricchite = []
     for riga in righe:
         arricchite.append({
             **riga,
-            "stato_effettivo": agenda.stato_effettivo(riga, oggi),
+            "stato_effettivo": agenda.stato_effettivo(riga, adesso),
             "etichetta_categoria": agenda.CATEGORIE[riga["categoria"]],
             "etichetta_ricorrenza": agenda.RICORRENZE[riga["ricorrenza"]],
         })
     return {
         "scadenze": arricchite,
-        "contatori": agenda.contatori(righe, oggi),
+        "contatori": agenda.contatori(righe, adesso),
         "oggi": oggi.isoformat(),
     }
 

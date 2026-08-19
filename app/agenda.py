@@ -18,7 +18,7 @@ di ogni adempimento.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -136,10 +136,13 @@ def ora_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+FUSO_AGENDA = ZoneInfo("Europe/Rome")
+
+
 def oggi_roma() -> date:
     """La data corrente sul calendario italiano (le scadenze valgono sul giorno italiano)."""
 
-    return datetime.now(ZoneInfo("Europe/Rome")).date()
+    return datetime.now(FUSO_AGENDA).date()
 
 
 def etichetta_at_stoccaggio(avvio: int) -> str:
@@ -222,49 +225,82 @@ def _giorni_mese(anno: int, mese: int) -> int:
     return 30 if mese in (4, 6, 9, 11) else 31
 
 
-def stato_effettivo(riga: dict[str, Any], oggi: date) -> str:
-    """Lo stato mostrato: una voce aperta oltre la data è scaduta.
+def _termine_scadenza(data: date, categoria: str) -> datetime:
+    """Il momento in cui la scadenza è davvero passata, sul calendario italiano.
+
+    Una voce operativa vale sul giorno gas (06:00 → 06:00 locali): «entro il
+    giorno gas X» resta aperta fino alle 06:00 di X+1, non a mezzanotte.
+    Le altre voci hanno scadenze di calendario e valgono fino alla
+    mezzanotte del giorno.
+    """
+
+    domani = data + timedelta(days=1)
+    ora = time(6) if categoria == "operativo" else time(0)
+    return datetime.combine(domani, ora, tzinfo=FUSO_AGENDA)
+
+
+def _adesso(adesso: datetime | None) -> datetime:
+    """L'istante di riferimento, sempre sul calendario italiano.
+
+    Gli istanti senza fuso sono interpretati come ora italiana: è la stessa
+    regola degli istanti del giorno gas, dove un valore nudo segue il fuso
+    locale.
+    """
+
+    if adesso is None:
+        return datetime.now(FUSO_AGENDA)
+    return adesso if adesso.tzinfo is not None else adesso.replace(tzinfo=FUSO_AGENDA)
+
+
+def stato_effettivo(riga: dict[str, Any], adesso: datetime | None = None) -> str:
+    """Lo stato mostrato: una voce aperta oltre la sua scadenza è scaduta.
 
     La scaduta è uno stato derivato, non scritto: lasciare la riga «aperta»
     permette all'operatore di decidere dopo — adempierla (generando la
-    prossima occorrenza se ricorrente) o dichiararla saltata.
+    prossima occorrenza se ricorrente) o dichiararla saltata.  Il termine
+    dipende dalla categoria: le voci operative valgono sul giorno gas e
+    scadono alle 06:00 del giorno dopo (vedi ``_termine_scadenza``).
     """
 
     if riga.get("stato") != "aperta":
         return str(riga.get("stato") or "aperta")
-    if date.fromisoformat(riga["data_scadenza"]) < oggi:
+    termine = _termine_scadenza(date.fromisoformat(riga["data_scadenza"]), str(riga.get("categoria") or ""))
+    if _adesso(adesso) >= termine:
         return "scaduta"
     return "aperta"
 
 
-def contatori(scadenze: list[dict[str, Any]], oggi: date) -> dict[str, int]:
+def contatori(scadenze: list[dict[str, Any]], adesso: datetime | None = None) -> dict[str, int]:
     """Quante cose chiedono attenzione oggi, nei prossimi 7 e 30 giorni.
 
     Conta solo le voci aperte (incluse quelle già scadute, che restano il
-    problema più urgente): adempiute e saltate non chiedono nulla.
+    problema più urgente): adempiute e saltate non chiedono nulla.  Le
+    finestre misurano il tempo che manca al termine della voce (l'ora del
+    giorno gas per le voci operative), quindi una voce operativa resta
+    «oggi» fino alle 06:00 del giorno dopo, non a mezzanotte.
     """
 
+    adesso = _adesso(adesso)
     oggi_n, sette_n, trenta_n, scadute_n = 0, 0, 0, 0
     adempiute_mese = 0
     for riga in scadenze:
-        effettivo = stato_effettivo(riga, oggi)
+        effettivo = stato_effettivo(riga, adesso)
         if effettivo not in ("aperta", "scaduta"):
-            if effettivo == "adempiuta" and _stesso_mese(date.fromisoformat(riga["data_scadenza"]), oggi):
+            if effettivo == "adempiuta" and _stesso_mese(date.fromisoformat(riga["data_scadenza"]), adesso.date()):
                 adempiute_mese += 1
             continue
-        data = date.fromisoformat(riga["data_scadenza"])
-        if data < oggi:
+        restante = _termine_scadenza(date.fromisoformat(riga["data_scadenza"]), str(riga.get("categoria") or "")) - adesso
+        if restante <= timedelta(0):
             scadute_n += 1
             oggi_n += 1
             sette_n += 1
             trenta_n += 1
         else:
-            giorni = (data - oggi).days
-            if giorni == 0:
+            if restante <= timedelta(days=1):
                 oggi_n += 1
-            if giorni <= 7:
+            if restante <= timedelta(days=7):
                 sette_n += 1
-            if giorni <= 30:
+            if restante <= timedelta(days=30):
                 trenta_n += 1
     return {
         "oggi": oggi_n,

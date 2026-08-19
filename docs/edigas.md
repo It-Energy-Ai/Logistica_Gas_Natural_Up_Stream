@@ -53,6 +53,14 @@ iniziato il pomeriggio precedente**: sono il 28 marzo e il 24 ottobre a durare
 23 e 25 ore, non il 29 e il 25. Un profilo orario che non rispetta la durata
 reale di quel giorno viene rifiutato con il conteggio corretto nel messaggio.
 
+**Al Punto di Scambio Virtuale (02G e 03G) il giorno gas è invece sempre di
+24 ore** (Condizioni di accesso al PSV, ARERA 436/2015/R/gas): un profilo di
+24 valori è accettato anche il 28 marzo e il 24 ottobre. L'ora di differenza
+non entra nel profilo — in autunno le due occorrenze dell'ora ripetuta
+confluiscono in un unico slot di 2 ore (quello del cambio), in primavera
+l'ora saltata ha durata zero al cambio. Solo le nomine su punti fisici
+(01G, 04G) seguono la durata reale del giorno.
+
 ### Come si indicano le quantità
 
 Tre forme, dalla più sintetica alla più esplicita, una sola per controparte:

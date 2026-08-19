@@ -26,6 +26,22 @@
 
   const PROPS = { tema: "chiaro", colorePrimario: "#0E5A75", coloreAccento: "#4C93C9" };
 
+  // Il giorno gas italiano non inizia alla mezzanotte locale: va dalle 06:00
+  // alle 05:59:59 del giorno dopo.  Uno shift fisso di 6 ore in UTC
+  // sbaglierebbe ai cambi dell'ora (tra le 06:00 e le 07:00 in inverno, le
+  // 06:00 e le 08:00 in estate): si legge l'ora locale di Roma e si scala il
+  // giorno solo sotto le 06:00.
+  const GIORNO_GAS_ISO = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  });
+  const giornoGasIso = (d = new Date()) => {
+    const parti = GIORNO_GAS_ISO.formatToParts(d);
+    const val = (tipo) => Number((parti.find((p) => p.type === tipo) || {}).value ?? 0);
+    const data = new Date(Date.UTC(val("year"), val("month") - 1, val("day")));
+    if (val("hour") < 6) data.setUTCDate(data.getUTCDate() - 1);
+    return data.toISOString().slice(0, 10);
+  };
+
   // Elenca i campi respinti dal server: senza, resta solo un messaggio generico.
   const _dettagli = (error) =>
     error && Array.isArray(error.dettagli) && error.dettagli.length
@@ -594,15 +610,11 @@
       // restano visibili anche a demo spenta. Il giorno gas non e' la mezzanotte
       // locale: alle 02:00, in pieno intraday, contare su new Date() direbbe
       // zero documenti con cinque nomine aperte.
-      const GIORNO_GAS_ISO = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit",
-      });
-      const giornoGasIso = (d = new Date()) => GIORNO_GAS_ISO.format(new Date(d.getTime() - 6 * 3600 * 1000));
+      const oggiGG = giornoGasIso();
       const _rem = this.state.remReports || [];
       const _edg = this.state.edgNomine || [];
       const _emr = this.state.emrSegnalazioni || [];
       const _emrEsiti = this.state.emrEsitiList || [];
-      const oggiGG = giornoGasIso();
       const regCaricamento = !!(this.state.remCaricamento || this.state.pdrCaricamento);
       const nReg = {
         bozze: _rem.filter((r) => r.status === "bozza").length,
@@ -2237,7 +2249,7 @@
   }
 
   if (typeof window !== "undefined") window.VettoreApp = App;
-  if (typeof module !== "undefined" && module.exports) module.exports = { App };
+  if (typeof module !== "undefined" && module.exports) module.exports = { App, giornoGasIso };
 
   if (typeof document !== "undefined" && document.getElementById("app")) {
     const app = new App();

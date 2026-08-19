@@ -5,7 +5,7 @@ Codice di Rete Snam): i test fissano le date attese per un Anno Termico
 noto, così un refuso nella tabella del modello non passa inosservato.
 """
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -70,17 +70,17 @@ def test_prossima_occorrenza_trimestrale_e_giorno_gas():
 
 
 def test_stato_effettivo_deriva_la_scaduta():
-    oggi = date(2026, 8, 19)
+    mezzogiorno = datetime(2026, 8, 19, 12, 0)
     riga_aperta = {"stato": "aperta", "data_scadenza": "2026-08-19"}
     riga_scaduta = {"stato": "aperta", "data_scadenza": "2026-08-18"}
-    assert agenda.stato_effettivo(riga_aperta, oggi) == "aperta"
-    assert agenda.stato_effettivo(riga_scaduta, oggi) == "scaduta"
-    assert agenda.stato_effettivo({**riga_scaduta, "stato": "saltata"}, oggi) == "saltata"
-    assert agenda.stato_effettivo({**riga_scaduta, "stato": "adempiuta"}, oggi) == "adempiuta"
+    assert agenda.stato_effettivo(riga_aperta, mezzogiorno) == "aperta"
+    assert agenda.stato_effettivo(riga_scaduta, mezzogiorno) == "scaduta"
+    assert agenda.stato_effettivo({**riga_scaduta, "stato": "saltata"}, mezzogiorno) == "saltata"
+    assert agenda.stato_effettivo({**riga_scaduta, "stato": "adempiuta"}, mezzogiorno) == "adempiuta"
 
 
 def test_contatori_distinguono_scadenze_e_adempiute():
-    oggi = date(2026, 8, 19)
+    mezzogiorno = datetime(2026, 8, 19, 12, 0)
     scadenze = [
         {"stato": "aperta", "data_scadenza": "2026-08-10"},   # scaduta
         {"stato": "aperta", "data_scadenza": "2026-08-19"},   # oggi
@@ -90,8 +90,33 @@ def test_contatori_distinguono_scadenze_e_adempiute():
         {"stato": "adempiuta", "data_scadenza": "2026-08-05"},  # nel mese
         {"stato": "saltata", "data_scadenza": "2026-08-01"},    # non conta
     ]
-    assert agenda.contatori(scadenze, oggi) == {
+    assert agenda.contatori(scadenze, mezzogiorno) == {
         "oggi": 2, "sette": 3, "trenta": 4, "scadute": 1, "adempiute_mese": 1,
+    }
+
+
+def test_stato_effettivo_operativo_scade_alle_06_del_giorno_dopo():
+    """Una voce operativa vale sul giorno gas (06:00 → 06:00): «entro il
+    giorno gas X» resta aperta fino alle 06:00 di X+1, non a mezzanotte."""
+
+    riga = {"stato": "aperta", "data_scadenza": "2026-08-19", "categoria": "operativo"}
+    assert agenda.stato_effettivo(riga, datetime(2026, 8, 20, 5, 59)) == "aperta"
+    assert agenda.stato_effettivo(riga, datetime(2026, 8, 20, 6, 0)) == "scaduta"
+    calendario = {**riga, "categoria": "regolatorio"}
+    assert agenda.stato_effettivo(calendario, datetime(2026, 8, 20, 0, 1)) == "scaduta"
+    assert agenda.stato_effettivo(calendario, datetime(2026, 8, 19, 23, 59)) == "aperta"
+
+
+def test_contatori_con_l_ora_del_giorno_gas():
+    """Alle 05:00 del giorno dopo una voce operativa è ancora «oggi» e non
+    scaduta; alle 07:00 è scaduta."""
+
+    righe = [{"stato": "aperta", "data_scadenza": "2026-08-19", "categoria": "operativo"}]
+    assert agenda.contatori(righe, datetime(2026, 8, 20, 5, 0)) == {
+        "oggi": 1, "sette": 1, "trenta": 1, "scadute": 0, "adempiute_mese": 0,
+    }
+    assert agenda.contatori(righe, datetime(2026, 8, 20, 7, 0)) == {
+        "oggi": 1, "sette": 1, "trenta": 1, "scadute": 1, "adempiute_mese": 0,
     }
 
 
