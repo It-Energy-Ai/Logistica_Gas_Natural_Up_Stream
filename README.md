@@ -171,7 +171,7 @@ La schermata **Trasporto · Interruzioni e UIOLI** sta dal lato giusto del Codic
 
 ## Previsione della domanda
 
-La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest incorporato** — il modello è addestrato senza vedere gli ultimi giorni noti e confrontato con la realtà — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui). Metodo trasparente e deterministico (Holt-Winters settimanale in puro Python, zero dipendenze scientifiche): stesso input, stessa previsione. Dettagli in [docs/previsione.md](docs/previsione.md).
+La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest a finestre scorrevoli** — l'ensemble è addestrato fino a quattro volte senza vedere la coda di ogni finestra e confrontato con la realtà (MAE, RMSE, MAPE, MASE, sMAPE) — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui out-of-sample). Metodo trasparente e deterministico: un **ensemble pesato** di Holt-Winters con trend smorzato, metodo Theta e naive stagionale, in puro Python, zero dipendenze scientifiche — stesso input, stessa previsione. Dettagli in [docs/previsione.md](docs/previsione.md).
 
 ## Agenda regolatoria
 
@@ -186,7 +186,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Cinquecentoquindici verifiche fra Python e Node (414 pytest + 91 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Cinquecentoventuno verifiche fra Python e Node (420 pytest + 91 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

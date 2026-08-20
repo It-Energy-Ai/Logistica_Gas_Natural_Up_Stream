@@ -1302,7 +1302,7 @@ input::placeholder{color:var(--ink3)}
 <section data-screen-label="Previsione" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Previsione della domanda</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Storico giornaliero → backtest sugli ultimi giorni noti → previsione dei prossimi, con banda dichiarata</p></div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Holt-Winters settimanale · deterministico</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Ensemble: Holt-Winters smorzato + Theta + naive · deterministico</span>
   </div>
   <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>Il modello è dichiarato e il backtest è incorporato: prima di fidarti della previsione guarda quanto ha sbagliato sugli ultimi giorni noti. La banda è indicativa (quantili dei residui), non un intervallo di confidenza parametrico. Nulla viene conservato: lo storico resta tuo.</span></div>
 
@@ -1323,8 +1323,8 @@ input::placeholder{color:var(--ink3)}
 
     <div style="display:flex;flex-direction:column;gap:18px">
       <sc-if value="{{ prvHa }}" hint-placeholder-val="{{ false }}">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <sc-for list="{{ prvMetriche }}" as="pm" hint-placeholder-count="3">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+          <sc-for list="{{ prvMetriche }}" as="pm" hint-placeholder-count="5">
             <div style="display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
               <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--ink3)">{{ pm.nome }}</span>
               <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ pm.valore }}</span>
@@ -1332,6 +1332,16 @@ input::placeholder{color:var(--ink3)}
             </div>
           </sc-for>
         </div>
+        <sc-if value="{{ prvHaMembri }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">I membri dell'ensemble</h3><span style="font-size:12px;color:var(--ink3)">Chi contribuisce alla previsione e con quale peso: i pesi nascono dall'errore di ciascun membro sul backtest.</span></div>
+          <sc-for list="{{ prvMembri }}" as="pmb" hint-placeholder-count="3">
+            <div style="display:flex;gap:10px;align-items:center;padding:9px 12px;background:var(--bg);border:1px solid var(--line);border-radius:9px">
+              <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:color-mix(in oklab,var(--prim) 12%,var(--surface));color:var(--primText)">{{ pmb.peso }}</span>
+              <span style="flex:1;font-size:12px;color:var(--ink2);line-height:1.4">{{ pmb.descrizione }}</span>
+              <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">MAE {{ pmb.mae }}</span>
+            </div>
+          </sc-for>
+        </div></sc-if>
         <sc-if value="{{ prvHaNaive }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px"><span style="flex:none;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:{{ prvNaive.bg }};color:{{ prvNaive.fg }}">{{ prvNaive.etichetta }}</span><span style="font-size:12px;color:var(--ink2);line-height:1.5">{{ prvNaive.testo }}</span></div></sc-if>
         <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
           <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Ultime quattro settimane e previsione</h3><span style="font-size:12px;color:var(--ink3)">Storico {{ prvIntervallo }} · barre piene: previsione</span></div>

@@ -1321,7 +1321,7 @@ test("Previsione: ogni binding del pannello ha un valore dal render", () => {
   const app = new App();
   app.setState({ screen: "previsione" });
   const v = app.renderVals();
-  const locali = new Set(["pe", "pa", "pm", "pb", "pr2", "true", "false"]);
+  const locali = new Set(["pe", "pa", "pm", "pb", "pr2", "pmb", "true", "false"]);
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);

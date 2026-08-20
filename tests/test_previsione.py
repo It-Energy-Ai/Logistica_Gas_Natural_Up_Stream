@@ -222,3 +222,74 @@ def test_il_naive_e_davvero_lultima_settimana_ripetuta():
     # nessun vantaggio dichiarabile del modello
     assert esito["backtest"]["naive"]["mae"] == 0
     assert esito["backtest"]["vantaggio_percentuale"] == 0
+
+
+# ----------------------------------------------------------------- ensemble
+
+def test_l_ensemble_ha_tre_membri_con_pesi_che_sommano_uno():
+    esito = previsione.prevedi({"csv": csv_sintetico(), "orizzonte": 7})
+    nomi = {m["nome"] for m in esito["membri"]}
+    assert nomi == {"holt_winters", "theta", "naive_stagionale"}
+    # i pesi esposti sono arrotondati a 3 decimali: tolleranza sull'arrotondamento
+    assert abs(sum(m["peso"] for m in esito["membri"]) - 1) < 0.002
+    for membro in esito["membri"]:
+        assert membro["mae_backtest"] >= 0
+        assert "Ensemble" in esito["metodo"]
+
+
+def test_l_ensemble_non_fa_peggio_del_suo_membro_peggiore():
+    """Per la disuguaglianza triangolare l'errore della combinazione pesata
+    non supera mai il peggiore dei membri: una garanzia che vale sempre."""
+
+    esito = previsione.prevedi({"csv": csv_sintetico(rumore=15), "orizzonte": 7})
+    peggiore = max(m["mae_backtest"] for m in esito["membri"])
+    assert esito["backtest"]["mae"] <= peggiore + 1e-9
+
+
+def test_su_una_serie_perfettamente_periodica_i_membri_perfetti_si_dividono_il_peso():
+    """Se tutti i membri sono perfetti (MAE 0), la regola dichiarata divide
+    il peso in parti uguali: nessuno viene escluso senza motivo."""
+
+    inizio = date(2026, 4, 6)
+    profilo = [100, 110, 120, 130, 120, 60, 40]
+    righe = ["data;valore"] + [
+        f"{(inizio + timedelta(days=i)).isoformat()};{profilo[i % 7]}" for i in range(70)
+    ]
+    esito = previsione.prevedi({"csv": "\n".join(righe), "orizzonte": 7})
+    pesi = {m["nome"]: m["peso"] for m in esito["membri"]}
+    # pesi esposti arrotondati a 3 decimali: 0.333 per ciascuno
+    assert all(abs(p - 1 / 3) < 0.002 for p in pesi.values())
+
+
+def test_il_trend_smorzato_non_estrapola_all_infinito():
+    """Su un trend forte, a 28 giorni la crescita prevista resta frenata:
+    il trend lineare puro avrebbe proiettato il doppio."""
+
+    random.seed(3)
+    inizio = date(2026, 4, 1)
+    righe = ["data;valore"] + [
+        f"{(inizio + timedelta(days=i)).isoformat()};{1000 + 8 * i + random.gauss(0, 10):.1f}"
+        for i in range(112)
+    ]
+    esito = previsione.prevedi({"csv": "\n".join(righe), "orizzonte": 28})
+    ultimo_reale = 1000 + 8 * 111
+    crescita_lineare = 8 * 28  # il trend non smorzato prevederebbe questo
+    crescita_prevista = esito["previsione"][-1]["valore"] - ultimo_reale
+    assert crescita_prevista < crescita_lineare
+
+
+def test_il_backtest_usa_piu_finestre_quando_lo_storico_lo_consente():
+    esito_lungo = previsione.prevedi({"csv": csv_sintetico(giorni=112), "orizzonte": 7})
+    assert esito_lungo["backtest"]["finestre"] == 4
+    # con lo storico minimo una sola finestra: il calcolo resta possibile
+    esito_corto = previsione.prevedi({"csv": csv_sintetico(giorni=35), "orizzonte": 7})
+    assert esito_corto["backtest"]["finestre"] == 1
+
+
+def test_le_nuove_metriche_ci_sono_e_sono_coerenti():
+    esito = previsione.prevedi({"csv": csv_sintetico(), "orizzonte": 7})
+    for blocco in (esito["backtest"], esito["backtest"]["naive"]):
+        assert blocco["mase"] is not None and blocco["mase"] > 0
+        assert 0 <= blocco["smape"] <= 200
+    # MASE dell'ensemble sotto 1: batte il naive a un passo sullo storico
+    assert esito["backtest"]["mase"] < 1

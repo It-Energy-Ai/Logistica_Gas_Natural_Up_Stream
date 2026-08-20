@@ -4,22 +4,29 @@ Uno shipper prevede per nominare: la domanda attesa dei prossimi giorni è la
 base del NOMINT. Questo modulo prende lo storico giornaliero incollato come
 CSV e produce tre cose, tutte verificabili:
 
-* un **backtest** sugli ultimi giorni noti — il modello viene addestrato
-  senza vederli e confrontato con la realtà (MAE, RMSE, MAPE): è la misura
-  onesta di quanto fidarsi;
+* un **backtest a finestre scorrevoli** — l'ensemble viene addestrato più
+  volte (quante lo storico consente, fino a quattro) senza vedere gli ultimi
+  giorni di ogni finestra e confrontato con la realtà (MAE, RMSE, MAPE,
+  MASE, sMAPE): è la misura onesta di quanto fidarsi;
 * la **previsione del futuro vero** — giorni successivi all'ultimo dato,
   mai una riproiezione del passato spacciata per previsione;
-* una **banda indicativa** costruita sui residui del modello (quantili
-  empirici 10°-90°, allargati con la radice dell'orizzonte), dichiarata per
-  quello che è: non un intervallo di confidenza parametrico.
+* una **banda indicativa** costruita sui residui out-of-sample dell'ensemble
+  (quantili empirici 10°-90° misurati sulle finestre del backtest, allargati
+  con la radice dell'orizzonte), dichiarata per quello che è: non un
+  intervallo di confidenza parametrico.
 
-Il metodo è Holt-Winters additivo con stagionalità settimanale, implementato
-qui in puro Python: niente pandas, statsmodels o pmdarima nei requisiti — il
-portale viaggia anche come eseguibile e cento megabyte di dipendenze
+Il metodo è un **ensemble** dei tre approcci che le competizioni M3/M4 di
+Makridakis indicano come i più affidabili sulle serie brevi con
+stagionalità: Holt-Winters additivo con **trend smorzato** (il trend non
+viene più estrapolato all'infinito), **metodo Theta** (Assimakopoulos &
+Nikolopoulos 2000, il più accurato dell'M3) e **naive stagionale**
+(l'ultima settimana ripetuta, il riferimento che ogni modello deve battere).
+I pesi sono proporzionali all'inverso dell'errore di ciascun membro sul
+backtest: stesso input, stessa previsione, sempre.
+
+Tutto in puro Python: niente pandas, statsmodels o pmdarima nei requisiti —
+il portale viaggia anche come eseguibile e cento megabyte di dipendenze
 scientifiche non valgono un'etichetta più altisonante sullo stesso lavoro.
-I tre coefficienti di lisciamento si scelgono con una piccola griglia
-deterministica minimizzando l'errore a un passo: stesso input, stessa
-previsione, sempre.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ PERIODO = 7  # stagionalità settimanale: il gas civile respira sui giorni della
 
 MIN_GIORNI_ADDESTRAMENTO = 28   # quattro settimane piene per stimare la stagionalità
 ORIZZONTI = (7, 14, 28)
+FINESTRE_BACKTEST = 4           # origini scorrevoli: più finestre, stima d'errore più robusta
 MAX_RIGHE = 20_000
 MAX_CORPO_BYTES = 1024 * 1024
 MAX_BUCO_GIORNI = 7
@@ -235,11 +243,18 @@ def serie_giornaliera(
     return inizio, valori, avvisi
 
 
-# ----------------------------------------------------- Holt-Winters additivo
+# ----------------------------------------------------- Holt-Winters smorzato
 
 
-def _adatta_holt_winters(valori: list[float], alfa: float, beta: float, gamma: float):
-    """Una passata del lisciamento; restituisce stato finale e residui a un passo."""
+def _adatta_holt_winters(valori: list[float], alfa: float, beta: float, gamma: float,
+                         phi: float = 1.0):
+    """Una passata del lisciamento; restituisce stato finale e residui a un passo.
+
+    Con ``phi`` < 1 il trend è smorzato: invece di crescere linearmente
+    all'infinito, il suo contributo si attenua passo dopo passo (ETS(A,Ad,A)
+    nella tassonomia di Hyndman). Sulle serie brevi di domanda è la scelta
+    prudente: il livello della domanda non tira dritto per mesi.
+    """
 
     settimane = len(valori) // PERIODO
     medie = [sum(valori[i * PERIODO:(i + 1) * PERIODO]) / PERIODO for i in range(settimane)]
@@ -253,44 +268,149 @@ def _adatta_holt_winters(valori: list[float], alfa: float, beta: float, gamma: f
     residui: list[float] = []
     for t, osservato in enumerate(valori):
         indice = t % PERIODO
-        previsto = livello + trend + stagione[indice]
+        previsto = livello + phi * trend + stagione[indice]
         if t >= PERIODO:
             residui.append(osservato - previsto)
         stag_vecchia = stagione[indice]
-        livello_nuovo = alfa * (osservato - stag_vecchia) + (1 - alfa) * (livello + trend)
-        trend = beta * (livello_nuovo - livello) + (1 - beta) * trend
+        livello_nuovo = alfa * (osservato - stag_vecchia) + (1 - alfa) * (livello + phi * trend)
+        trend = beta * (livello_nuovo - livello) + (1 - beta) * phi * trend
         stagione[indice] = gamma * (osservato - livello_nuovo) + (1 - gamma) * stag_vecchia
         livello = livello_nuovo
     return livello, trend, stagione, residui
 
 
 def _previsione_da_stato(livello: float, trend: float, stagione: list[float],
-                         partenza: int, orizzonte: int) -> list[float]:
-    return [
-        livello + (h + 1) * trend + stagione[(partenza + h) % PERIODO]
-        for h in range(orizzonte)
-    ]
+                         partenza: int, orizzonte: int, phi: float = 1.0) -> list[float]:
+    """Previsione h passi avanti con trend smorzato: somma φ+φ²+…+φʰ."""
+
+    previsti = []
+    smorzamento = 0.0
+    for h in range(orizzonte):
+        smorzamento += phi ** (h + 1)
+        previsti.append(livello + smorzamento * trend + stagione[(partenza + h) % PERIODO])
+    return previsti
 
 
 GRIGLIA_ALFA = (0.1, 0.3, 0.5, 0.7, 0.9)
 GRIGLIA_BETA = (0.01, 0.05, 0.15)
 GRIGLIA_GAMMA = (0.05, 0.15, 0.35)
+GRIGLIA_PHI = (0.80, 0.90, 0.98, 1.00)
 
 
-def _migliori_coefficienti(valori: list[float]) -> tuple[float, float, float]:
+def _migliori_coefficienti(valori: list[float]) -> tuple[float, float, float, float]:
     """Griglia deterministica: vince l'errore quadratico a un passo più basso."""
 
     migliore = None
-    scelta = (GRIGLIA_ALFA[1], GRIGLIA_BETA[1], GRIGLIA_GAMMA[1])
+    scelta = (GRIGLIA_ALFA[1], GRIGLIA_BETA[1], GRIGLIA_GAMMA[1], 1.0)
     for alfa in GRIGLIA_ALFA:
         for beta in GRIGLIA_BETA:
             for gamma in GRIGLIA_GAMMA:
-                _, _, _, residui = _adatta_holt_winters(valori, alfa, beta, gamma)
-                errore = sum(r * r for r in residui)
-                if migliore is None or errore < migliore - 1e-9:
-                    migliore = errore
-                    scelta = (alfa, beta, gamma)
+                for phi in GRIGLIA_PHI:
+                    _, _, _, residui = _adatta_holt_winters(valori, alfa, beta, gamma, phi)
+                    errore = sum(r * r for r in residui)
+                    if migliore is None or errore < migliore - 1e-9:
+                        migliore = errore
+                        scelta = (alfa, beta, gamma, phi)
     return scelta
+
+
+def _holt_winters(valori: list[float], orizzonte: int) -> list[float]:
+    alfa, beta, gamma, phi = _migliori_coefficienti(valori)
+    livello, trend, stagione, _ = _adatta_holt_winters(valori, alfa, beta, gamma, phi)
+    return _previsione_da_stato(livello, trend, stagione, len(valori), orizzonte, phi)
+
+
+# ------------------------------------------------------------- metodo Theta
+
+
+GRIGLIA_THETA = (0.1, 0.3, 0.5, 0.7, 0.9)
+
+
+def _theta(valori: list[float], orizzonte: int) -> list[float]:
+    """Metodo Theta (Assimakopoulos & Nikolopoulos 2000), il più accurato dell'M3.
+
+    La serie «theta» con θ=2 raddoppia la curvatura locale; la pratica
+    standard la scompone in una regressione lineare sul tempo — che cattura
+    il trend — più un lisciamento esponenziale semplice, che cattura il
+    livello. Il trend è stimato sulle medie settimanali, non sulla serie
+    grezza: su un profilo settimanale asimmetrico la regressione grezza
+    vedrebbe una pendenza spuria, mentre le medie di settimane intere la
+    annullano. La stagionalità rientra come aggiustamento medio per giorno
+    della settimana sugli scarti dal trend.
+    """
+
+    n = len(valori)
+    settimane = n // PERIODO
+    medie = [sum(valori[i * PERIODO:(i + 1) * PERIODO]) / PERIODO for i in range(settimane)]
+    centri = [i * PERIODO + (PERIODO - 1) / 2 for i in range(settimane)]
+    if settimane > 1:
+        intercetta, pendenza = _ols_medie(medie, centri)
+    else:
+        intercetta, pendenza = medie[0], 0.0
+
+    stagionali = [0.0] * PERIODO
+    for j in range(PERIODO):
+        scarti = [valori[t] - (intercetta + pendenza * t) for t in range(j, n, PERIODO)]
+        stagionali[j] = sum(scarti) / len(scarti)
+
+    residui = [valori[t] - stagionali[t % PERIODO] - (intercetta + pendenza * t) for t in range(n)]
+
+    migliore, livello = None, residui[0]
+    for alfa in GRIGLIA_THETA:
+        liv, errore = residui[0], 0.0
+        for t in range(1, n):
+            errore += (residui[t] - liv) ** 2
+            liv = alfa * residui[t] + (1 - alfa) * liv
+        if migliore is None or errore < migliore - 1e-9:
+            migliore, livello = errore, liv
+
+    return [
+        intercetta + pendenza * (n + h) + livello + stagionali[(n + h) % PERIODO]
+        for h in range(orizzonte)
+    ]
+
+
+def _ols_medie(medie: list[float], centri: list[float]) -> tuple[float, float]:
+    """Regressione lineare delle medie settimanali sul tempo: (intercetta, pendenza)."""
+
+    n = len(medie)
+    media_y = sum(medie) / n
+    media_x = sum(centri) / n
+    var_x = sum((x - media_x) ** 2 for x in centri)
+    cov = sum((x - media_x) * (y - media_y) for x, y in zip(centri, medie))
+    pendenza = cov / var_x if var_x > 0 else 0.0
+    return media_y - pendenza * media_x, pendenza
+
+
+# ------------------------------------------------------- naive stagionale
+
+
+def _naive_stagionale(valori: list[float], orizzonte: int) -> list[float]:
+    """L'ultima settimana osservata, ripetuta: il riferimento minimo di ogni
+    previsione. Un modello che non la batte non merita fiducia — e qui,
+    invece di nasconderlo, la si mette nell'ensemble e la si dichiara."""
+
+    ultima = valori[-PERIODO:]
+    return [ultima[h % PERIODO] for h in range(orizzonte)]
+
+
+MEMBRI = (
+    ("holt_winters", "Holt-Winters additivo con trend smorzato", _holt_winters),
+    ("theta", "Metodo Theta", _theta),
+    ("naive_stagionale", "Naive stagionale (ultima settimana ripetuta)", _naive_stagionale),
+)
+
+
+def _pesi_da_errori(errori: list[float]) -> list[float]:
+    """Pesi proporzionali all'inverso dell'errore; i membri perfetti si
+    dividono il peso in parti uguali, gli altri restano a zero."""
+
+    inversi = [1.0 / e if e > 1e-9 else None for e in errori]
+    if any(inv is None for inv in inversi):
+        perfetti = [i for i, inv in enumerate(inversi) if inv is None]
+        return [1.0 / len(perfetti) if i in perfetti else 0.0 for i in range(len(errori))]
+    totale = sum(inversi)
+    return [inv / totale for inv in inversi]
 
 
 def _quantile(ordinati: list[float], q: float) -> float:
@@ -307,7 +427,8 @@ def _quantile(ordinati: list[float], q: float) -> float:
 
 
 def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
-    """Dal CSV incollato alla previsione: backtest, futuro vero, banda dichiarata."""
+    """Dal CSV incollato alla previsione: backtest a finestre scorrevoli,
+    futuro vero, banda sui residui out-of-sample dell'ensemble."""
 
     if not isinstance(dati, dict):
         raise PrevisioneError("Dati non validi: atteso un oggetto.")
@@ -333,47 +454,99 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
 
     ultimo_giorno = inizio + timedelta(days=len(valori) - 1)
 
-    # ---- backtest: il modello non vede gli ultimi `orizzonte` giorni
-    addestramento = valori[:-orizzonte]
-    reali = valori[-orizzonte:]
-    alfa, beta, gamma = _migliori_coefficienti(addestramento)
-    livello, trend, stagione, _ = _adatta_holt_winters(addestramento, alfa, beta, gamma)
-    stimati = _previsione_da_stato(livello, trend, stagione, len(addestramento), orizzonte)
+    # ---- backtest a origini scorrevoli: tante finestre quante lo storico ne
+    # consente (almeno una, al massimo FINESTRE_BACKTEST), così lo storico
+    # minimo non cresce e chi ha più dati ottiene una stima d'errore più
+    # robusta. Ogni membro non vede mai la coda di ogni finestra.
+    finestre_disponibili = (len(valori) - MIN_GIORNI_ADDESTRAMENTO) // orizzonte
+    finestre = max(1, min(FINESTRE_BACKTEST, finestre_disponibili))
+    origini = [len(valori) - orizzonte * (finestre - k) for k in range(finestre)]
+    per_finestra: list[tuple[list[list[float]], list[float]]] = []
+    scarti_naive: list[float] = []
+    for origine in origini:
+        addestramento, reali = valori[:origine], valori[origine:origine + orizzonte]
+        previsioni = [metodo(addestramento, orizzonte) for _, _, metodo in MEMBRI]
+        per_finestra.append((previsioni, reali))
+        for reale, stimato in zip(reali, _naive_stagionale(addestramento, orizzonte)):
+            scarti_naive.append(reale - stimato)
 
-    def _metriche(previsti: list[float]) -> dict[str, float | None]:
-        scarti = [reale - stimato for reale, stimato in zip(reali, previsti)]
-        mae = sum(abs(s) for s in scarti) / len(scarti)
-        rmse = math.sqrt(sum(s * s for s in scarti) / len(scarti))
-        non_nulli = [(reale, scarto) for reale, scarto in zip(reali, scarti) if abs(reale) > 1e-9]
+    # I pesi nascono una volta sola, dalle medie degli errori out-of-sample
+    # dei membri su tutte le finestre: gli stessi pesi valutano l'ensemble e
+    # producono la previsione finale.
+    mae_membri = [
+        sum(
+            sum(abs(r - s) for r, s in zip(reali, previsioni[i])) / len(reali)
+            for previsioni, reali in per_finestra
+        ) / len(per_finestra)
+        for i in range(len(MEMBRI))
+    ]
+    pesi = _pesi_da_errori(mae_membri)
+
+    scarti_ensemble: list[float] = []
+    for previsioni, reali in per_finestra:
+        for h, reale in enumerate(reali):
+            stimato = sum(p * previsioni[i][h] for i, p in enumerate(pesi))
+            scarti_ensemble.append(reale - stimato)
+
+    def _metriche(scarti: list[float], reali_tutti: list[float]) -> dict[str, float | None]:
+        n = len(scarti)
+        mae = sum(abs(s) for s in scarti) / n
+        rmse = math.sqrt(sum(s * s for s in scarti) / n)
+        non_nulli = [(r, s) for r, s in zip(reali_tutti, scarti) if abs(r) > 1e-9]
         mape = (
-            sum(abs(scarto / reale) for reale, scarto in non_nulli) / len(non_nulli) * 100
+            sum(abs(s / r) for r, s in non_nulli) / len(non_nulli) * 100
             if non_nulli else None
         )
-        return {"mae": mae, "rmse": rmse, "mape": mape}
+        # MASE: l'errore diviso quello del naive a un passo sullo storico di
+        # addestramento — insensibile alla scala, confrontabile fra serie.
+        denominatori = []
+        for origine in origini:
+            addestramento = valori[:origine]
+            passo = sum(
+                abs(addestramento[t] - addestramento[t - PERIODO])
+                for t in range(PERIODO, len(addestramento))
+            ) / (len(addestramento) - PERIODO)
+            denominatori.append(passo)
+        mase = mae / (sum(denominatori) / len(denominatori)) if sum(denominatori) > 1e-9 else None
+        smape = sum(
+            2 * abs(s) / (abs(r) + abs(r - s))
+            for r, s in zip(reali_tutti, scarti)
+            if abs(r) + abs(r - s) > 1e-9
+        ) / n * 100
+        return {"mae": mae, "rmse": rmse, "mape": mape, "mase": mase, "smape": smape}
 
-    del_modello = _metriche(stimati)
-    # Il riferimento minimo di ogni previsione: l'ultima settimana osservata,
-    # ripetuta. Un modello che non batte «stesso giorno della settimana
-    # scorsa» non merita fiducia, e qui lo si dice invece di nasconderlo.
-    ultima_settimana = addestramento[-PERIODO:]
-    naive = [ultima_settimana[h % PERIODO] for h in range(orizzonte)]
-    del_naive = _metriche(naive)
+    reali_tutti = [valori[o + h] for o in origini for h in range(orizzonte)]
+    del_ensemble = _metriche(scarti_ensemble, reali_tutti)
+    del_naive = _metriche(scarti_naive, reali_tutti)
     if del_naive["mae"] > 1e-9:
-        vantaggio = round((1 - del_modello["mae"] / del_naive["mae"]) * 100, 1)
+        vantaggio = round((1 - del_ensemble["mae"] / del_naive["mae"]) * 100, 1)
     else:
         vantaggio = 0.0
-    batte_il_naive = del_modello["mae"] <= del_naive["mae"] + 1e-9
+    batte_il_naive = del_ensemble["mae"] <= del_naive["mae"] + 1e-9
 
-    # ---- previsione vera: riaddestra su TUTTO e guarda oltre l'ultimo giorno
-    alfa2, beta2, gamma2 = _migliori_coefficienti(valori)
-    livello, trend, stagione, residui = _adatta_holt_winters(valori, alfa2, beta2, gamma2)
-    futuri = _previsione_da_stato(livello, trend, stagione, len(valori), orizzonte)
+    # ---- previsione vera: ciascun membro riaddestrato su TUTTO lo storico,
+    # combinato con i pesi derivati dal backtest — non dai dati che i membri
+    # hanno già visto, altrimenti i pesi sarebbero truccati.
+    pesi = _pesi_da_errori(mae_membri)
+    ensemble = [0.0] * orizzonte
+    membri_finali = []
+    for i, (nome, descrizione, metodo) in enumerate(MEMBRI):
+        previsti = metodo(valori, orizzonte)
+        for h in range(orizzonte):
+            ensemble[h] += pesi[i] * previsti[h]
+        membri_finali.append({
+            "nome": nome, "descrizione": descrizione,
+            "peso": round(pesi[i], 3), "mae_backtest": round(mae_membri[i], 2),
+        })
 
-    ordinati = sorted(residui)
+    # Banda indicativa: quantili 10°-90° dei residui out-of-sample del
+    # backtest (pooled su tutte le finestre), allargati con la radice
+    # dell'orizzonte. Non è un intervallo di confidenza parametrico.
+    ordinati = sorted(scarti_ensemble)
     q10, q90 = _quantile(ordinati, 0.10), _quantile(ordinati, 0.90)
 
     previsione = []
-    for h, valore in enumerate(futuri):
+    for h, valore in enumerate(ensemble):
         giorno = ultimo_giorno + timedelta(days=h + 1)
         scala = math.sqrt(h + 1)
         previsione.append({
@@ -390,8 +563,9 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "metodo": (
-            "Holt-Winters additivo con stagionalità settimanale, coefficienti scelti su griglia "
-            f"deterministica (α={alfa2}, β={beta2}, γ={gamma2})"
+            "Ensemble pesato di Holt-Winters additivo con trend smorzato, metodo Theta e naive "
+            "stagionale; pesi proporzionali all'inverso dell'errore di ciascun membro sul "
+            f"backtest a {FINESTRE_BACKTEST} finestre scorrevoli"
         ),
         "aggregazione": aggregazione,
         "giorni_storico": len(valori),
@@ -399,23 +573,30 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
         "al": ultimo_giorno.isoformat(),
         "backtest": {
             "giorni": orizzonte,
-            "mae": round(del_modello["mae"], 2),
-            "rmse": round(del_modello["rmse"], 2),
-            "mape": round(del_modello["mape"], 1) if del_modello["mape"] is not None else None,
+            "finestre": len(origini),
+            "mae": round(del_ensemble["mae"], 2),
+            "rmse": round(del_ensemble["rmse"], 2),
+            "mape": round(del_ensemble["mape"], 1) if del_ensemble["mape"] is not None else None,
+            "mase": round(del_ensemble["mase"], 2) if del_ensemble["mase"] is not None else None,
+            "smape": round(del_ensemble["smape"], 1),
             "naive": {
                 "mae": round(del_naive["mae"], 2),
                 "rmse": round(del_naive["rmse"], 2),
                 "mape": round(del_naive["mape"], 1) if del_naive["mape"] is not None else None,
+                "mase": round(del_naive["mase"], 2) if del_naive["mase"] is not None else None,
+                "smape": round(del_naive["smape"], 1),
             },
             "batte_il_naive": batte_il_naive,
             "vantaggio_percentuale": vantaggio,
         },
+        "membri": membri_finali,
         "storico_recente": storico_recente,
         "previsione": previsione,
         "avvisi": avvisi,
         "nota": (
-            "La banda è indicativa: quantili 10°-90° dei residui del modello, allargati con la "
-            "radice dell'orizzonte. Il backtest dice quanto il metodo ha sbagliato sugli ultimi "
+            "La banda è indicativa: quantili 10°-90° dei residui dell'ensemble misurati fuori "
+            "campione sulle finestre del backtest, allargati con la radice dell'orizzonte. Il "
+            "backtest a finestre scorrevoli dice quanto il metodo ha sbagliato sugli ultimi "
             "giorni noti: è quella la misura da guardare prima di fidarsi."
         ),
     }

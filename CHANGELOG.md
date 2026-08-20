@@ -2,6 +2,21 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.13.0] — 2026-08-20
+
+**Previsione v2**: il modello singolo diventa un ensemble, il backtest a finestra unica diventa a finestre scorrevoli, le metriche si allargano a MASE e sMAPE. Stessa filosofia: puro Python, determinismo, nessun finto invio.
+
+### Aggiunto
+- **Ensemble pesato di tre membri** al posto del solo Holt-Winters: Holt-Winters additivo con **trend smorzato** (φ in griglia 0.80/0.90/0.98/1.00 — il trend non viene più estrapolato all'infinito), **metodo Theta** (Assimakopoulos & Nikolopoulos 2000, il più accurato dell'M3) e **naive stagionale** (l'ultima settimana ripetuta, il riferimento che ogni modello deve battere — messo nell'ensemble e dichiarato). I pesi sono proporzionali all'inverso dell'errore di ciascun membro sul backtest: stesso input, stessa previsione, sempre.
+- **Backtest a finestre scorrevoli** (rolling-origin): l'ensemble viene addestrato fino a quattro volte su origini diverse, senza mai vedere la coda di ogni finestra; con lo storico minimo resta una sola finestra, con più dati la stima d'errore diventa più robusta. I pesi nascono dal backtest e la previsione finale riaddestra i membri su tutto lo storico: i pesi non sono mai calcolati sui dati che i membri hanno già visto.
+- **Metriche MASE e sMAPE** accanto a MAE, RMSE e MAPE, per l'ensemble e per il naive: il MASE (errore diviso quello del naive a un passo) è insensibile alla scala e confrontabile fra serie; sotto 1 significa battere il naive a un passo.
+- **Schermata Previsione**: griglia delle metriche a cinque colonne e card «I membri dell'ensemble» con peso e MAE di backtest di ciascun membro — la combinazione non è una scatola nera.
+- **6 test Python nuovi** (420 pytest totali): ensemble con pesi che sommano uno, ensemble mai peggiore del suo membro peggiore, membri perfetti che si dividono il peso, trend smorzato che non estrapola all'infinito, backtest multi-finestra, coerenza delle nuove metriche.
+
+### Modificato
+- **docs/previsione.md**: il metodo dichiarato riscritto per l'ensemble, sezione nuova sulle cinque metriche del backtest.
+- **README**: descrizione del modulo e conteggio delle verifiche aggiornato (521: 420 pytest + 91 logica + 10 runtime).
+
 ## [1.12.0] — 2026-08-19
 
 **Sito vetrina** pubblicato su GitHub Pages: la landing page del progetto per far conoscere Vettore a chi non frequenta il repository.

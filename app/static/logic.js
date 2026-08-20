@@ -1612,7 +1612,16 @@
         { nome: "MAE", valore: numeroIt(prv.backtest.mae), spiega: "errore medio assoluto" },
         { nome: "RMSE", valore: numeroIt(prv.backtest.rmse), spiega: "errore quadratico medio" },
         { nome: "MAPE", valore: prv.backtest.mape === null ? "—" : `${prv.backtest.mape}%`, spiega: `sui ${prv.backtest.giorni} giorni di backtest` },
+        { nome: "MASE", valore: prv.backtest.mase === null ? "—" : numeroIt(prv.backtest.mase), spiega: "errore vs naive a un passo (<1 = meglio)" },
+        { nome: "sMAPE", valore: prv.backtest.smape === null ? "—" : `${prv.backtest.smape}%`, spiega: "errore percentuale simmetrico" },
       ] : [];
+      // I membri dell'ensemble: chi contribuisce alla previsione e con quale
+      // peso, così la combinazione non è una scatola nera.
+      const prvMembri = prv && Array.isArray(prv.membri) ? prv.membri.map((m) => ({
+        nome: m.nome, descrizione: m.descrizione,
+        peso: `${Math.round(m.peso * 100)}%`,
+        mae: numeroIt(m.mae_backtest),
+      })) : [];
 
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
@@ -2086,8 +2095,8 @@
         prvCsv: this.state.prvCsv, prvOrizzonte: this.state.prvOrizzonte,
         prvAggregazione: this.state.prvAggregazione, prvErrore: this.state.prvErrore,
         prvErroriCampo: this.state.prvErrori, prvCalcolo: this.state.prvCalcolo,
-        prvHa: !!prv, prvBarre, prvRighe, prvMetriche, calcolaPrevisione,
-        prvVuoto: !prv, prvNaive, prvHaNaive: !!prvNaive,
+        prvHa: !!prv, prvBarre, prvRighe, prvMetriche, prvMembri, calcolaPrevisione,
+        prvVuoto: !prv, prvNaive, prvHaNaive: !!prvNaive, prvHaMembri: prvMembri.length > 0,
         prvMetodo: prv ? prv.metodo : "", prvNota: prv ? prv.nota : "",
         prvAvvisi: prv ? (prv.avvisi || []).map((testo) => ({ testo })) : [],
         prvIntervallo: prv ? `${dataIt(prv.dal)} → ${dataIt(prv.al)} · ${prv.giorni_storico} giorni` : "",

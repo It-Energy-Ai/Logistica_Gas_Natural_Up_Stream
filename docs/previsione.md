@@ -8,26 +8,62 @@ Uno shipper prevede per nominare: la domanda attesa dei prossimi giorni è la
 base del NOMINT. Il modulo prende lo storico giornaliero incollato come CSV e
 restituisce tre cose, nell'ordine giusto:
 
-1. **il backtest** — il modello viene addestrato *senza vedere* gli ultimi
-   giorni noti e confrontato con la realtà: MAE, RMSE e MAPE dicono quanto ha
-   sbagliato, ed è quella la misura da guardare prima di fidarsi;
+1. **il backtest a finestre scorrevoli** — l'ensemble viene addestrato più
+   volte (quante lo storico consente, fino a quattro) *senza vedere* gli
+   ultimi giorni di ogni finestra e confrontato con la realtà: MAE, RMSE,
+   MAPE, MASE e sMAPE dicono quanto ha sbagliato, ed è quella la misura da
+   guardare prima di fidarsi;
 2. **la previsione del futuro vero** — giorni strettamente successivi
    all'ultimo osservato. Sembra ovvio; una proposta esterna respinta
    presentava come "previsione" la riproiezione degli ultimi giorni già noti;
-3. **una banda dichiarata** — quantili 10°–90° dei residui del modello,
-   allargati con la radice dell'orizzonte. Non è un intervallo di confidenza
-   parametrico e non viene spacciato per tale.
+3. **una banda dichiarata** — quantili 10°–90° dei residui out-of-sample
+   dell'ensemble misurati sulle finestre del backtest, allargati con la
+   radice dell'orizzonte. Non è un intervallo di confidenza parametrico e
+   non viene spacciato per tale.
 
 ## Il metodo, dichiarato
 
-Holt-Winters additivo con stagionalità settimanale (il gas civile respira sui
-giorni della settimana), implementato in **puro Python**: nessuna dipendenza
-da pandas, statsmodels o pmdarima. Il portale viaggia anche come eseguibile e
-cento megabyte di librerie scientifiche non valgono un'etichetta più
-altisonante sullo stesso lavoro. I tre coefficienti di lisciamento (α, β, γ)
-si scelgono su una piccola griglia deterministica minimizzando l'errore
-quadratico a un passo: **stesso input, stessa previsione, sempre** — e un
-test lo presidia.
+Un **ensemble pesato** dei tre approcci che le competizioni M3/M4 di
+Makridakis indicano come i più affidabili sulle serie brevi con stagionalità:
+
+- **Holt-Winters additivo con trend smorzato** (ETS(A,Ad,A) nella tassonomia
+  di Hyndman): il trend non viene estrapolato all'infinito, il suo
+  contributo si attenua passo dopo passo (φ in griglia: 0.80, 0.90, 0.98,
+  1.00). Sulle serie brevi di domanda è la scelta prudente;
+- **metodo Theta** (Assimakopoulos & Nikolopoulos 2000, il più accurato
+  dell'M3): regressione lineare sulle medie settimanali per il trend,
+  lisciamento esponenziale semplice per il livello, stagionalità come
+  aggiustamento medio per giorno della settimana;
+- **naive stagionale**: l'ultima settimana osservata, ripetuta. Il
+  riferimento che ogni modello deve battere — qui invece di nasconderlo lo
+  si mette nell'ensemble e lo si dichiara.
+
+I pesi sono proporzionali all'inverso dell'errore (MAE) di ciascun membro
+sul backtest: i membri perfetti si dividono il peso in parti uguali, gli
+altri restano a zero. La previsione finale riaddestra ogni membro su **tutto**
+lo storico, ma con i pesi derivati dal backtest — non dai dati che i membri
+hanno già visto, altrimenti i pesi sarebbero truccati.
+
+Tutto in **puro Python**: nessuna dipendenza da pandas, statsmodels o
+pmdarima. Il portale viaggia anche come eseguibile e cento megabyte di
+librerie scientifiche non valgono un'etichetta più altisonante sullo stesso
+lavoro. I coefficienti di lisciamento si scelgono su piccole griglie
+deterministiche minimizzando l'errore a un passo: **stesso input, stessa
+previsione, sempre** — e un test lo presidia.
+
+## Le metriche del backtest
+
+- **MAE** e **RMSE**: errore medio assoluto e quadratico, nella stessa unità
+  di misura della domanda;
+- **MAPE**: errore percentuale (assente se lo storico contiene zeri);
+- **MASE**: errore diviso quello del naive a un passo sullo storico di
+  addestramento — insensibile alla scala, confrontabile fra serie; sotto 1
+  significa battere il naive a un passo;
+- **sMAPE**: errore percentuale simmetrico, robusto sui valori piccoli.
+
+Le stesse cinque metriche sono calcolate per il naive stagionale, così il
+confronto è dichiarato nei due sensi («Batte il riferimento del X%» oppure
+«NON batte il riferimento»).
 
 Servono almeno **28 giorni di addestramento più l'orizzonte** (35 per
 prevedere una settimana). Orizzonti ammessi: 7, 14, 28 giorni.
