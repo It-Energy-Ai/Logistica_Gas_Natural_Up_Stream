@@ -151,6 +151,7 @@
         prvWkrCsv: "", prvWkrZona: "", prvWkrApplica: "",
         prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
         wkrCsv: "", wkrAnno: "", wkrEsito: null, wkrErrore: "", wkrErrori: [], wkrCalcolo: false,
+        prlFile: null, prlFileName: "", prlAnno: "", prlEsito: null, prlErrore: "", prlErrori: [], prlCalcolo: false,
         agnScadenze: [], agnCatalogo: null, agnContatori: null, agnOggi: "",
         agnErrore: "", agnInfo: "", agnErrori: [], agnElencoErrore: "",
         agnTitolo: "", agnCategoria: "operativo", agnData: "", agnRicorrenza: "una_tantum",
@@ -557,6 +558,7 @@
         trasporto: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Trasporto · Interruzioni e UIOLI" }],
         previsione: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Previsione della domanda" }],
         wkr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Coefficienti Wkr" }],
+        prelievo: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Profili di prelievo standard" }],
         agenda: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Agenda regolatoria" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
@@ -666,6 +668,7 @@
         { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: (this.state.trsInterruzioni || []).length === 1 ? "interruzione registrata" : "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
         { title: "Previsione della domanda", desc: "Storico giornaliero → backtest onesto e previsione dei prossimi giorni, con banda dichiarata: la base per preparare le nomine.", stat: "28", statLabel: "giorni di orizzonte massimo", reale: true, primary: true, go: go("previsione"), cursor: "pointer", border: "var(--line)" },
         { title: "Coefficienti Wkr", desc: "Il fattore di correzione climatica pubblicato ogni giorno da Snam per ciascuna zona climatica: incolla il CSV di Jarvis o scaricalo live.", stat: "18", statLabel: "zone climatiche", reale: true, primary: true, go: go("wkr"), cursor: "pointer", border: "var(--line)" },
+        { title: "Profili di prelievo standard", desc: "Le percentuali giornaliere dei profili di prelievo pubblicate da Snam: carica il file .xls/.xlsx o scaricalo live da Jarvis, con controllo che ogni colonna sommi 100 sull'anno termico.", stat: "20", statLabel: "parametri percentuali", reale: true, primary: true, go: go("prelievo"), cursor: "pointer", border: "var(--line)" },
         { title: "Agenda regolatoria", desc: "Scadenze di stoccaggio, trasporto e regolatorio: modello precompilato dalle fonti e voci personalizzate, con promemoria di adempimento.", stat: String(agnCont.scadute), statLabel: agnCont.scadute === 1 ? "scadenza aperta oltre la data" : "scadenze aperte oltre la data", reale: true, primary: true, go: go("agenda"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
@@ -1084,7 +1087,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", wkr: "moduli", agenda: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", wkr: "moduli", prelievo: "moduli", agenda: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1691,6 +1694,66 @@
         dataHdd: wkr.fonte.data_hdd || "—",
       } : null;
 
+      // --- Profili di prelievo standard: file Snam caricato o scaricato live -
+      const inviaPrelievo = async (payload) => {
+        this.setState({ prlErrore: "", prlErrori: [], prlCalcolo: true });
+        try {
+          const esito = await this._json("/api/prelievo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          this.setState({ prlEsito: esito, prlCalcolo: false });
+        } catch (error) {
+          this.setState({ prlErrore: `Profili non letti: ${error.message}`, prlErrori: error.dettagli || [], prlCalcolo: false, prlEsito: null });
+        }
+      };
+      const sistemaPrelievo = unaVolta("sistemaPrelievo", async () => {
+        const file = this.state.prlFile;
+        if (!file) {
+          this.setState({ prlErrore: "Seleziona prima il file .xls o .xlsx delle percentuali di prelievo." });
+          return;
+        }
+        try {
+          const contenuto = await fileToBase64(file);
+          await inviaPrelievo({ contenuto_base64: contenuto, nome_file: file.name || this.state.prlFileName });
+        } catch (error) {
+          this.setState({ prlErrore: `Lettura del file non riuscita: ${error.message}`, prlCalcolo: false });
+        }
+      });
+      const scaricaPrelievo = unaVolta("scaricaPrelievo", () => inviaPrelievo({ scarica: true, anno: this.state.prlAnno }));
+      const setPrlFile = (e) => {
+        const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+        this.setState({ prlFile: file, prlFileName: file?.name || "", prlErrore: "", prlErrori: [] });
+      };
+
+      // Un esito malformato non deve far cadere il render: forma non attesa →
+      // stato vuoto.
+      const prlGrezzo = this.state.prlEsito;
+      const prl = prlGrezzo && Array.isArray(prlGrezzo.righe) && Array.isArray(prlGrezzo.parametri) && prlGrezzo.fonte
+        ? prlGrezzo : null;
+      // Le colonne sono 20: una griglia fissa le tiene tutte leggibili senza
+      // far scorrere in orizzonte; i valori nulli (1E-8) restano deboli.
+      const prlRighe = prl ? prl.righe.map((r) => ({
+        data: dataIt(r.data), giorno: r.giorno,
+        celle: r.valori.map((v) => ({
+          v: v < 1e-6 ? "·" : numeroIt(v),
+          col: v < 1e-6 ? "var(--ink3)" : "var(--ink)",
+          fw: v < 1e-6 ? "400" : "500",
+        })),
+      })) : [];
+      const prlSomme = prl ? prl.parametri.map((p) => ({
+        nome: p,
+        somma: numeroIt(prl.somme ? prl.somme[p] : 100),
+        ok: prl.somme ? Math.abs((prl.somme[p] ?? 100) - 100) < 1e-6 : true,
+      })) : [];
+      const prlFonte = prl ? {
+        pubblicazione: prl.fonte.pubblicazione,
+        origine: prl.fonte.origine || "—",
+        file: prl.fonte.file || "—",
+        aggiornatoIl: prl.fonte.aggiornato_il || "—",
+      } : null;
+
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
         aperta: { testo: "aperta", ...RUN },
@@ -2037,7 +2100,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenWkr: s === "wkr", screenAgenda: s === "agenda",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenWkr: s === "wkr", screenPrelievo: s === "prelievo", screenAgenda: s === "agenda",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -2186,6 +2249,18 @@
         sistemaWkr, scaricaWkr,
         setWkrCsv: (e) => this.setSilent({ wkrCsv: e.target.value }),
         setWkrAnno: (e) => this.setSilent({ wkrAnno: e.target.value }),
+        prlFileName: this.state.prlFileName || "Nessun file selezionato",
+        prlAnno: this.state.prlAnno,
+        prlErrore: this.state.prlErrore, prlErroriCampo: this.state.prlErrori,
+        prlCalcolo: this.state.prlCalcolo,
+        prlHa: !!prl, prlVuoto: !prl,
+        prlAnnoTermico: prl ? prl.anno_termico : "", prlGiorni: prl ? String(prl.giorni) : "",
+        prlZeri: prl ? String(prl.zeri ?? 0) : "",
+        prlParametri: prl ? prl.parametri : [], prlRighe, prlSomme, prlFonte,
+        prlNota: prl ? prl.nota : "",
+        prlAvvisi: prl ? (prl.avvisi || []).map((testo) => ({ testo })) : [],
+        sistemaPrelievo, scaricaPrelievo, setPrlFile,
+        setPrlAnno: (e) => this.setSilent({ prlAnno: e.target.value }),
         agnRows, agnKpis, agnVuoto: !agnRows.length,
         agnOggi: dataIt(this.state.agnOggi || ""),
         agnAdempiute: String(agnCont.adempiute_mese),

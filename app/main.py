@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import agenda, edigas, emir, previsione, uti, pdr, remit, trasporto, wkr
+from . import agenda, edigas, emir, previsione, uti, pdr, prelievo, remit, trasporto, wkr
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -854,6 +854,31 @@ async def post_wkr(request: Request):
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
         return JSONResponse({"errore": f"Dati dei coefficienti Wkr non validi: {errore}"}, status_code=422)
+
+
+@app.post("/api/prelievo")
+async def post_prelievo(request: Request):
+    """Profili di prelievo standard dal file Snam (caricato o scaricato live).
+
+    Non conserva nulla: i dati sono mostrati all'operatore che li ha
+    richiesti, come prevede la licenza d'uso di Snam.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, prelievo.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        return prelievo.sistema(payload)
+    except prelievo.PrelievoError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, OverflowError, TypeError) as errore:
+        return JSONResponse({"errore": f"Dati dei profili di prelievo non validi: {errore}"}, status_code=422)
 
 
 @app.get("/api/agenda")

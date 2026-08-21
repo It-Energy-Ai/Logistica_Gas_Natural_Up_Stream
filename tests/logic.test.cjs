@@ -1383,7 +1383,7 @@ test("Previsione: ogni binding del pannello ha un valore dal render", () => {
 test("Wkr: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf('data-screen-label="Wkr"'), html.indexOf('data-screen-label="Agenda"'));
+  const blocco = html.slice(html.indexOf('data-screen-label="Wkr"'), html.indexOf('data-screen-label="Prelievo"'));
   assert.ok(blocco.length > 2000, "blocco Wkr non trovato");
   const app = new App();
   app.setState({ screen: "wkr" });
@@ -1474,6 +1474,122 @@ test("Wkr: un errore del server arriva a schermo e azzera l'esito", async () => 
   assert.match(app.state.wkrErrore, /intestazione/);
   assert.equal(app.state.wkrEsito, null);
   assert.equal(app.state.wkrErrori.length, 1);
+  global.fetch = FETCH_OK;
+});
+
+test("Prelievo: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Prelievo"'), html.indexOf('data-screen-label="Agenda"'));
+  assert.ok(blocco.length > 2000, "blocco Prelievo non trovato");
+  const app = new App();
+  app.setState({ screen: "prelievo" });
+  const v = app.renderVals();
+  const locali = new Set(["pe", "pa", "ps", "pp", "pr", "pc", "true", "false"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+test("Prelievo: avvio pulito, nessun esito e stato vuoto", () => {
+  const app = new App();
+  app.setState({ screen: "prelievo" });
+  const v = app.renderVals();
+  assert.equal(v.prlHa, false);
+  assert.equal(v.prlVuoto, true);
+  assert.deepEqual(v.prlRighe, []);
+  assert.deepEqual(v.prlParametri, []);
+  assert.equal(v.prlErrore, "");
+  assert.match(v.prlFileName, /Nessun file/);
+});
+
+test("Prelievo: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title === "Profili di prelievo standard");
+  assert.ok(card, "manca la card Profili di prelievo standard");
+  card.go();
+  assert.equal(app.state.screen, "prelievo");
+});
+
+test("Prelievo: senza file selezionato non parte la chiamata", async () => {
+  const app = new App();
+  app.setState({ screen: "prelievo" });
+  let chiamato = false;
+  global.fetch = async () => { chiamato = true; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; };
+  await app.renderVals().sistemaPrelievo();
+  assert.equal(chiamato, false);
+  assert.match(app.state.prlErrore, /Seleziona prima il file/);
+  global.fetch = FETCH_OK;
+});
+
+test("Prelievo: il file caricato va al server in base64 e la griglia arriva a schermo", async () => {
+  const app = new App();
+  app.setState({ screen: "prelievo" });
+  const azioni = app.renderVals();
+  azioni.setPrlFile({ target: { files: [{ name: "PERCENTUALI_DI_PRELIEVO_AT_2026-2027_IT.xls", arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }] } });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { pubblicazione: "VALORI PERCENTUALI PER LA DEFINIZIONE DEI PROFILI DI PRELIEVO STANDARD", origine: "File caricato", file: "PERCENTUALI_DI_PRELIEVO_AT_2026-2027_IT.xls", aggiornato_il: "" },
+      anno_termico: "2026-2027", giorni: 365, zeri: 3489,
+      parametri: ["c1%B1", "c2%"],
+      righe: [{ data: "2026-10-01", giorno: "giovedì", valori: [0, 0.11] }],
+      somme: { "c1%B1": 100, "c2%": 100 },
+      avvisi: ["3489 celle con valore nullo (1E-8)."], nota: "nota",
+    }), text: async () => "" };
+  };
+  await app.renderVals().sistemaPrelievo();
+  assert.equal(inviato.url, "/api/prelievo");
+  assert.equal(inviato.body.contenuto_base64, Buffer.from([1, 2, 3]).toString("base64"));
+  assert.match(inviato.body.nome_file, /PERCENTUALI_DI_PRELIEVO_AT_2026-2027/);
+  const v = app.renderVals();
+  assert.equal(v.prlHa, true);
+  assert.equal(v.prlAnnoTermico, "2026-2027");
+  assert.equal(v.prlRighe.length, 1);
+  // il valore nullo (1E-8) è reso come punto debole, l'altro come numero
+  assert.equal(v.prlRighe[0].celle[0].v, "·");
+  assert.notEqual(v.prlRighe[0].celle[1].v, "·");
+  assert.equal(v.prlSomme.length, 2);
+  assert.equal(v.prlSomme[0].ok, true);
+  global.fetch = FETCH_OK;
+});
+
+test("Prelievo: lo scarico live invia l'anno termico scelto", async () => {
+  const app = new App();
+  app.setState({ screen: "prelievo" });
+  const azioni = app.renderVals();
+  azioni.setPrlAnno(ev("2026-2027"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { pubblicazione: "p", origine: "Jarvis (Snam)", file: "f.xls", aggiornato_il: "" },
+      anno_termico: "2026-2027", giorni: 365, zeri: 0,
+      parametri: [], righe: [], somme: {}, avvisi: [], nota: "",
+    }), text: async () => "" };
+  };
+  await azioni.scaricaPrelievo();
+  assert.equal(inviato.url, "/api/prelievo");
+  assert.equal(inviato.body.scarica, true);
+  assert.equal(inviato.body.anno, "2026-2027");
+  global.fetch = FETCH_OK;
+});
+
+test("Prelievo: un errore del server arriva a schermo e azzera l'esito", async () => {
+  const app = new App();
+  app.setState({ screen: "prelievo", prlEsito: { finto: true }, prlFile: { name: "x.xls", arrayBuffer: async () => new Uint8Array([1]).buffer } });
+  global.fetch = async () => ({
+    ok: false, status: 422,
+    json: async () => ({ errore: "Il file non supera i controlli sui profili di prelievo.", errors: ["colonna c2%: la somma è 99.5, atteso 100"] }),
+    text: async () => "",
+  });
+  await app.renderVals().sistemaPrelievo();
+  assert.match(app.state.prlErrore, /controlli/);
+  assert.equal(app.state.prlEsito, null);
+  assert.equal(app.state.prlErrori.length, 1);
   global.fetch = FETCH_OK;
 });
 

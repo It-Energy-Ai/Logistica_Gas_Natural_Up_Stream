@@ -2,6 +2,19 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.15.0] — 2026-08-21
+
+**Profili di prelievo standard**: le percentuali giornaliere pubblicate da Snam entrano nel portale come modulo proprio, con un parser .xls/.xlsx scritto da zero in puro Python.
+
+### Aggiunto
+- **Modulo Profili di prelievo standard** (20ª schermata, `app/prelievo.py`): legge i file «PERCENTUALI_DI_PRELIEVO_AT_…» della pagina pubblica di Jarvis — caricati dall'operatore oppure **scaricati live** dal portale (con l'anno termico facoltativo: prende il file dell'anno chiesto, altrimenti il più recente). Tabella dei 365/366 giorni gas per i 20 parametri (`c1%B1`…`c1%F3`, `c2%`, `c4%`, `t1%1`…`t1%3`), con le somme per parametro in evidenza (atteso 100) e il valore `1E-8` contato come zero.
+- **Parser senza dipendenze nuove**: `.xlsx` come archivio ZIP con XML (`zipfile` + `xml.etree`), `.xls` come contenitore OLE2/CFB con record BIFF8 (`struct`: SST, LABELSST, NUMBER, RK, MULRK). La scelta del parser avviene dal firmamento del file, non dall'estensione. Validazione onesta: intestazione con i 20 parametri attesi, 365 o 366 righe, **ogni colonna deve sommare esattamente 100** (tolleranza 1e-6) altrimenti l'errore elenca le colonne fuori controllo; data come numero seriale di Excel (epoca 1899-12-30).
+- **Rotta `POST /api/prelievo`** stateless: il file arriva in base64, è validato e mostrato all'operatore che lo ha richiesto — mai conservato né ritrasmesso (Snam vieta la redistribuzione a terzi).
+- **35 test Python nuovi** (484 pytest totali, in `tests/test_prelievo.py`: parser .xlsx e .xls costruiti in memoria — incluse le fabbriche di file BIFF8/OLE2 minimi — validazione, somme, fetch live con Jarvis mockato e rotte) e **7 test Node nuovi** (106 totali) per card, binding, payload base64, scarico live e percorso d'errore.
+
+### Modificato
+- **docs/prelievo.md** nuovo; **README** con la sezione del modulo, il conteggio delle verifiche (600) e le schermate (20).
+
 ## [1.14.0] — 2026-08-21
 
 **Coefficienti Wkr**: il fattore di correzione climatica pubblicato ogni giorno da Snam entra nel portale come modulo proprio e si aggancia alla Previsione della domanda.

@@ -33,13 +33,13 @@ dipendenza nuova.
 
 from __future__ import annotations
 
-import json
 import re
 import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import date, datetime
 from typing import Any
+
+from . import jarvis
 
 # La finestra pubblicata: G−1 (consuntivo), G (in corso), G+1…G+5 (provvisori).
 TIPI_AMMESSI = ("C", "I", "P", "P2", "P3", "P4", "P5")
@@ -63,14 +63,14 @@ MAX_CORPO_BYTES = 512 * 1024
 WKR_MIN = 0.1
 WKR_MAX = 5.0
 
-JARVIS_CONFIG_URL = "https://jarvis.snam.it/config/portal-public-config.json"
+JARVIS_CONFIG_URL = jarvis.JARVIS_CONFIG_URL
 JARVIS_PAGINA_URL = (
     "https://jarvis.snam.it/public-data?pubblicazione=Coefficienti%20WKR"
     "&periodo={anno}&lang=it"
 )
 TIPOLOGIA_WKR = "Coefficienti WKR"
-USER_AGENT = "Vettore (portale shipper; lettura operativa dei dati pubblici Snam)"
-TIMEOUT_SECONDS = 15
+USER_AGENT = jarvis.USER_AGENT
+TIMEOUT_SECONDS = jarvis.TIMEOUT_SECONDS
 
 
 class WkrError(ValueError):
@@ -289,24 +289,15 @@ def fattori_per_zona(record: list[dict[str, Any]], zona: str) -> dict[date, floa
 
 
 def _http_json(url: str, payload: Any = None, headers: dict[str, str] | None = None) -> Any:
-    intestazioni = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-    if headers:
-        intestazioni.update(headers)
-    corpo = json.dumps(payload).encode("utf-8") if payload is not None else None
-    if corpo is not None:
-        intestazioni["Content-Type"] = "application/json"
-    richiesta = urllib.request.Request(url, data=corpo, headers=intestazioni)
-    with urllib.request.urlopen(richiesta, timeout=TIMEOUT_SECONDS) as risposta:
-        return json.loads(risposta.read().decode("utf-8"))
+    """Punto di aggancio per i test: delega al trasporto comune di Jarvis."""
+
+    return jarvis.http_json(url, payload=payload, headers=headers)
 
 
 def _http_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
-    intestazioni = {"User-Agent": USER_AGENT, "Accept": "application/octet-stream"}
-    if headers:
-        intestazioni.update(headers)
-    richiesta = urllib.request.Request(url, headers=intestazioni)
-    with urllib.request.urlopen(richiesta, timeout=TIMEOUT_SECONDS) as risposta:
-        return risposta.read()
+    """Punto di aggancio per i test: delega al trasporto comune di Jarvis."""
+
+    return jarvis.http_bytes(url, headers=headers)
 
 
 def scarica_da_jarvis(anno: int) -> tuple[str, dict[str, str]]:
@@ -330,12 +321,7 @@ def scarica_da_jarvis(anno: int) -> tuple[str, dict[str, str]]:
             f"(dettaglio: {errore})"
         ) from errore
 
-    intestazioni = {
-        "X-jarvis-multiCompany": "SNM",
-        "Accept": "application/jarvis.pubblicazioni_smart.v2+json",
-        "Origin": "https://jarvis.snam.it",
-        "Referer": "https://jarvis.snam.it/",
-    }
+    intestazioni = dict(jarvis.INTESTAZIONI_API)
     elenco_url = f"{base}/pubblicazioni/getPublications?user_key={urllib.parse.quote(user_key)}"
     payload = [
         {"tag": "tipologia", "value": TIPOLOGIA_WKR},
@@ -370,10 +356,7 @@ def scarica_da_jarvis(anno: int) -> tuple[str, dict[str, str]]:
         )
     prescelto = max(candidati, key=lambda v: str(v.get("aggiornato_il", "")))
     nome_file = f"{prescelto['nome_file_ITA']}.csv"
-    download_id = next(
-        (d["value"] for d in prescelto.get("download_id", []) if d.get("lang") == "ITA"),
-        None,
-    )
+    download_id = jarvis.download_id_ita(prescelto)
     if not download_id:
         raise WkrError("Il file scelto non ha un identificativo di download: riprova o incolla il CSV.")
 

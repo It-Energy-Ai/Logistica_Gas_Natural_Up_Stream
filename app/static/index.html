@@ -1435,6 +1435,70 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenPrelievo }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Prelievo" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Profili di prelievo standard</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Percentuali giornaliere dei profili di prelievo · pubblicate da Snam per anno termico, 20 parametri che sommano 100</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Fonte: Jarvis · dati pubblici Snam</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>I dati sono pubblici ma Snam ne vieta la redistribuzione a terzi: qui sono mostrati a te che li hai richiesti, non vengono conservati né ritrasmessi. L'API di Jarvis non è un contratto pubblico: se il download live fallisce, scarica il file dalla pagina Snam e caricalo qui.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">File delle percentuali di prelievo</h3><span style="font-size:12px;color:var(--ink3)">Carica il file «PERCENTUALI_DI_PRELIEVO_AT_…» (.xls o .xlsx) scaricato dalla pagina pubblica di Jarvis, oppure lascia fare al portale: legge la configurazione pubblica del sito Snam e scarica il file più recente.</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">File .xls / .xlsx<input type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange="{{ setPrlFile }}" style="padding:8px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><span style="font-size:11px;font-weight:400;color:var(--ink3)">{{ prlFileName }} · di norma <span style="font-family:'IBM Plex Mono',monospace">PERCENTUALI_DI_PRELIEVO_AT_AAAA-AAAA_IT.xls</span></span></label>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Anno termico<input value="{{ prlAnno }}" onChange="{{ setPrlAnno }}" placeholder="es. 2026-2027" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px"></label>
+        <button onClick="{{ scaricaPrelievo }}" style="padding:11px 16px;border:1px solid var(--prim);border-radius:9px;background:var(--surface);color:var(--primText);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Scarica da Jarvis</button>
+      </div>
+      <button onClick="{{ sistemaPrelievo }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Sistema i profili</button>
+      <sc-if value="{{ prlCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Lettura in corso…</span></sc-if>
+      <sc-if value="{{ prlErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ prlErrore }}</span></sc-if>
+      <sc-for list="{{ prlErroriCampo }}" as="pe" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ pe }}</span></sc-for>
+      <sc-for list="{{ prlAvvisi }}" as="pa" hint-placeholder-count="1"><span style="font-size:11.5px;color:var(--warn)">{{ pa.testo }}</span></sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ prlHa }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--ink)">{{ prlFonte.pubblicazione }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">{{ prlFonte.file }}</span></div>
+          <span style="font-size:12px;color:var(--ink2)">Origine: {{ prlFonte.origine }} · aggiornato il {{ prlFonte.aggiornatoIl }}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(47,163,124,.15);color:#259372">Anno termico {{ prlAnnoTermico }}</span>
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(62,150,180,.16);color:#3E96B4">{{ prlGiorni }} giorni</span>
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:var(--surface2);color:var(--ink2)">{{ prlZeri }} celle nulle (1E-8)</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Somme per parametro (atteso 100)</h3><span style="font-size:12px;color:var(--ink3)">Ogni colonna percentuale deve sommare esattamente 100 sull'anno termico: è il controllo di coerenza della pubblicazione.</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ prlSomme }}" as="ps" hint-placeholder-count="20"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 9px;border-radius:99px;background:{{ ps.ok ? 'rgba(47,163,124,.15)' : 'rgba(180,35,24,.12)' }};color:{{ ps.ok ? '#259372' : '#B42318' }}">{{ ps.nome }} · {{ ps.somma }}</span></sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Giorni dell'anno termico × parametri</h3><span style="font-size:12px;color:var(--ink3)">Una riga per giorno gas (dal 1° ottobre); il punto «·» indica valore nullo (1E-8 = zero / non applicabile).</span></div>
+          <div style="overflow-x:auto">
+            <div style="display:grid;grid-template-columns:86px 70px repeat(20,minmax(58px,1fr));gap:4px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--ink3)">
+              <span>DATA</span><span>GIORNO</span>
+              <sc-for list="{{ prlParametri }}" as="pp" hint-placeholder-count="20"><span style="text-align:right">{{ pp }}</span></sc-for>
+            </div>
+            <sc-for list="{{ prlRighe }}" as="pr" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:86px 70px repeat(20,minmax(58px,1fr));gap:4px;padding:4px 0;border-top:1px solid var(--line)">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">{{ pr.data }}</span>
+                <span style="font-size:11px;color:var(--ink3)">{{ pr.giorno }}</span>
+                <sc-for list="{{ pr.celle }}" as="pc" hint-placeholder-count="20"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;text-align:right;color:{{ pc.col }};font-weight:{{ pc.fw }}">{{ pc.v }}</span></sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <span style="font-size:11px;color:var(--ink3);line-height:1.5;text-wrap:pretty">{{ prlNota }}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ prlVuoto }}" hint-placeholder-val="{{ true }}"><div style="padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessun profilo caricato. Carica il file «PERCENTUALI_DI_PRELIEVO_AT_…» scaricato dalla pagina Snam oppure premi «Scarica da Jarvis»: il portale valida che ogni colonna percentuale sommi 100 sull'anno termico.</span></div></sc-if>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 <sc-if value="{{ screenAgenda }}" hint-placeholder-val="{{ false }}">
 <section data-screen-label="Agenda" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
