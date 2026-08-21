@@ -192,12 +192,13 @@ class _RispostaFinta:
 def test_richiesta_invia_autenticazione_basic(monkeypatch):
     catturata = {}
 
-    def urlopen_finto(richiesta, timeout=None):
+    def open_finto(richiesta, timeout=None):
         catturata["auth"] = richiesta.get_header("Authorization")
         catturata["metodo"] = richiesta.get_method()
         return _RispostaFinta(b"ok")
 
-    monkeypatch.setattr(misure.urllib.request, "urlopen", urlopen_finto)
+    monkeypatch.setattr(misure, "_verifica_destinazione", lambda url: None)
+    monkeypatch.setattr(misure._OPENER, "open", open_finto)
     corpo = misure._richiesta("https://x/dav/", "PROPFIND", "utente", "segreto")
     assert corpo == b"ok"
     assert catturata["metodo"] == "PROPFIND"
@@ -205,23 +206,90 @@ def test_richiesta_invia_autenticazione_basic(monkeypatch):
 
 
 def test_richiesta_traduce_errore_http_401(monkeypatch):
-    def urlopen_finto(*args, **kwargs):
+    def open_finto(*args, **kwargs):
         raise urllib.error.HTTPError("https://x", 401, "Unauthorized", {}, None)
 
-    monkeypatch.setattr(misure.urllib.request, "urlopen", urlopen_finto)
+    monkeypatch.setattr(misure, "_verifica_destinazione", lambda url: None)
+    monkeypatch.setattr(misure._OPENER, "open", open_finto)
     with pytest.raises(misure.MisureError) as errore:
         misure._richiesta("https://x/dav/", "PROPFIND", "u", "p")
     assert "credenziali rifiutate" in str(errore.value)
 
 
 def test_richiesta_traduce_server_irraggiungibile(monkeypatch):
-    def urlopen_finto(*args, **kwargs):
+    def open_finto(*args, **kwargs):
         raise urllib.error.URLError("dns fallito")
 
-    monkeypatch.setattr(misure.urllib.request, "urlopen", urlopen_finto)
+    monkeypatch.setattr(misure, "_verifica_destinazione", lambda url: None)
+    monkeypatch.setattr(misure._OPENER, "open", open_finto)
     with pytest.raises(misure.MisureError) as errore:
         misure._richiesta("https://x/dav/", "GET", "u", "p")
     assert "non raggiungibile" in str(errore.value)
+
+
+# ------------------------------------------------------------- anti-SSRF
+
+def _finto_dns(monkeypatch, ip):
+    def getaddrinfo_finto(host, porta, proto=0):
+        return [(2, 1, proto, "", (ip, porta))]
+
+    monkeypatch.setattr(misure.socket, "getaddrinfo", getaddrinfo_finto)
+
+
+def test_ssrf_blocca_loopback(monkeypatch):
+    _finto_dns(monkeypatch, "127.0.0.1")
+    with pytest.raises(misure.MisureError) as errore:
+        misure._verifica_destinazione("https://siicloud.example/dav/")
+    assert "rete privata o locale" in str(errore.value)
+
+
+def test_ssrf_blocca_metadata_link_local(monkeypatch):
+    _finto_dns(monkeypatch, "169.254.169.254")
+    with pytest.raises(misure.MisureError) as errore:
+        misure._verifica_destinazione("http://siicloud.example/dav/")
+    assert "rete privata o locale" in str(errore.value)
+
+
+def test_ssrf_blocca_reti_private(monkeypatch):
+    for ip in ("10.0.0.5", "192.168.1.1", "172.16.0.9", "::1"):
+        _finto_dns(monkeypatch, ip)
+        with pytest.raises(misure.MisureError):
+            misure._verifica_destinazione("https://siicloud.example/dav/")
+
+
+def test_ssrf_blocca_schemi_non_http():
+    with pytest.raises(misure.MisureError) as errore:
+        misure._verifica_destinazione("ftp://siicloud.example/dav/")
+    assert "solo gli indirizzi http" in str(errore.value)
+
+
+def test_ssrf_host_mancante():
+    with pytest.raises(misure.MisureError) as errore:
+        misure._verifica_destinazione("https:///dav/")
+    assert "host mancante" in str(errore.value)
+
+
+def test_ssrf_host_non_risolvibile(monkeypatch):
+    def getaddrinfo_finto(host, porta, proto=0):
+        raise misure.socket.gaierror("nome sconosciuto")
+
+    monkeypatch.setattr(misure.socket, "getaddrinfo", getaddrinfo_finto)
+    with pytest.raises(misure.MisureError) as errore:
+        misure._verifica_destinazione("https://inesistente.example/dav/")
+    assert "non risolvibile" in str(errore.value)
+
+
+def test_ssrf_ammette_host_pubblico(monkeypatch):
+    _finto_dns(monkeypatch, "93.184.216.34")
+    misure._verifica_destinazione("https://siicloud.example/dav/")
+
+
+def test_ssrf_redirect_verso_host_privato_bloccato(monkeypatch):
+    _finto_dns(monkeypatch, "127.0.0.1")
+    richiesta = urllib.request.Request("https://siicloud.example/dav/")
+    gestore = misure._RedirectSicuro()
+    with pytest.raises(misure.MisureError):
+        gestore.redirect_request(richiesta, None, 302, "Found", {}, "http://127.0.0.1/segreto")
 
 
 # ------------------------------------------------------------- sistema

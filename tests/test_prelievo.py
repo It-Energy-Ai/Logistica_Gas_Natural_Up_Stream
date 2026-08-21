@@ -186,6 +186,28 @@ def test_un_xlsx_corrotto_è_rifiutato():
     assert "non è un archivio valido" in str(errore.value)
 
 
+def test_un_xlsx_con_colonna_enorme_è_rifiutato():
+    foglio = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        f'<worksheet xmlns="{prelievo._NS[1:-1]}"><sheetData>'
+        '<row r="1"><c r="ZZZZZ1"><v>1</v></c></row>'
+        "</sheetData></worksheet>"
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archivio:
+        archivio.writestr("xl/worksheets/sheet1.xml", foglio)
+    with pytest.raises(prelievo.PrelievoError) as errore:
+        prelievo.leggi_griglia(buffer.getvalue(), "bomba.xlsx")
+    assert "riferimento di cella non valido" in str(errore.value)
+
+
+def test_un_xlsx_con_xml_gonfiato_è_rifiutato(monkeypatch):
+    monkeypatch.setattr(prelievo, "MAX_XML_DECOMPRESSO", 1024)
+    with pytest.raises(prelievo.PrelievoError) as errore:
+        prelievo.leggi_griglia(xlsx_prelievo(), "gonfio.xlsx")
+    assert "dati troppo grandi" in str(errore.value)
+
+
 # -------------------------------------------------------------- parser .xls
 
 
@@ -221,6 +243,26 @@ def test_formato_non_riconosciuto_è_rifiutato():
     with pytest.raises(prelievo.PrelievoError) as errore:
         prelievo.leggi_griglia(b"ciao mondo", "testo.txt")
     assert "Formato non riconosciuto" in str(errore.value)
+
+
+def test_un_xls_con_settore_assurdo_è_rifiutato():
+    contenuto = bytearray(_ole2())
+    struct.pack_into("<H", contenuto, 0x1E, 30)
+    with pytest.raises(prelievo.PrelievoError) as errore:
+        prelievo.leggi_griglia(bytes(contenuto), "settore.xls")
+    assert "dimensione di settore non valida" in str(errore.value)
+
+
+def test_un_xls_con_griglia_enorme_è_rifiutato():
+    sst = struct.pack("<II", 0, 1) + _stringa_sst("Data")
+    records = [_record(0x0208, struct.pack("<HHIBBI", 0x0600, 0x10, 0, 0, 0, 0))]
+    records.append(_record(0x00FC, sst))
+    records.append(_record(0x00FD, struct.pack("<HHHI", 0, 0, 0, 0)))
+    records.append(_record(0x0203, struct.pack("<HHHd", 65535, 65535, 0, 1.0)))
+    records.append(_record(0x000A))
+    with pytest.raises(prelievo.PrelievoError) as errore:
+        prelievo._griglia_xls(_ole2(b"".join(records)))
+    assert "griglia troppo grande" in str(errore.value)
 
 
 # --------------------------------------------------------------- validazione

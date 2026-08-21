@@ -50,6 +50,9 @@ EPOCA_EXCEL = date(1899, 12, 30)
 TOLLERANZA_SOMMA = 1e-6
 MAX_CORPO_BYTES = 1024 * 1024
 MAX_CELLE = 40_000
+MAX_COLONNE = 16_384
+MAX_XML_DECOMPRESSO = 64 * 1024 * 1024
+POTENZE_SETTORE_OLE2 = (9, 12)
 FIRMAMENTO_OLE2 = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 FIRMAMENTO_ZIP = b"PK\x03\x04"
 _NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -58,11 +61,23 @@ _NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 # ------------------------------------------------------------- parser .xlsx
 
 
+def _leggi_voce_zip(archivio: zipfile.ZipFile, nome: str) -> bytes:
+    """Legge una voce dello zip con tetto sulla dimensione decompressa."""
+
+    info = archivio.getinfo(nome)
+    if info.file_size > MAX_XML_DECOMPRESSO:
+        raise PrelievoError("Il file .xlsx contiene dati troppo grandi.")
+    contenuto = archivio.read(nome)
+    if len(contenuto) > MAX_XML_DECOMPRESSO:
+        raise PrelievoError("Il file .xlsx contiene dati troppo grandi.")
+    return contenuto
+
+
 def _stringhe_condivise_xlsx(archivio: zipfile.ZipFile) -> list[str]:
     """Le stringhe condivise di una cartella .xlsx (xl/sharedStrings.xml)."""
 
     try:
-        contenuto = archivio.read("xl/sharedStrings.xml")
+        contenuto = _leggi_voce_zip(archivio, "xl/sharedStrings.xml")
     except KeyError:
         return []
     radice = ElementTree.fromstring(contenuto)
@@ -120,12 +135,14 @@ def _griglia_xlsx(contenuto: bytes) -> list[list[Any]]:
     if not nomi:
         raise PrelievoError("Nessun foglio trovato nel file .xlsx.")
     stringhe = _stringhe_condivise_xlsx(archivio)
-    radice = ElementTree.fromstring(archivio.read(nomi[0]))
+    radice = ElementTree.fromstring(_leggi_voce_zip(archivio, nomi[0]))
     griglia: list[list[Any]] = []
     for riga in radice.iter(f"{_NS}row"):
         valori: list[Any] = []
         for cella in riga.findall(f"{_NS}c"):
             indice = _colonna_da_riferimento(cella.get("r") or "")
+            if indice < 0 or indice >= MAX_COLONNE:
+                raise PrelievoError("Il file .xlsx contiene un riferimento di cella non valido.")
             while len(valori) <= indice:
                 valori.append(None)
             valori[indice] = _valore_cella_xlsx(cella, stringhe)
@@ -142,7 +159,10 @@ def _flussi_ole2(contenuto: bytes) -> dict[str, bytes]:
 
     if contenuto[:8] != FIRMAMENTO_OLE2:
         raise PrelievoError("Il file .xls non ha la firma OLE2 attesa.")
-    dimensione_settore = 1 << int.from_bytes(contenuto[0x1E:0x20], "little")
+    potenza_settore = int.from_bytes(contenuto[0x1E:0x20], "little")
+    if potenza_settore not in POTENZE_SETTORE_OLE2:
+        raise PrelievoError("Il file .xls dichiara una dimensione di settore non valida.")
+    dimensione_settore = 1 << potenza_settore
     primo_dir = int.from_bytes(contenuto[0x30:0x34], "little")
     fat: list[int] = []
     for i in range(109):
@@ -264,6 +284,8 @@ def _griglia_xls(contenuto: bytes) -> list[list[Any]]:
         raise PrelievoError("Nessuna cella letta dal file .xls.")
     righe = max(r for r, _ in celle) + 1
     colonne = max(c for _, c in celle) + 1
+    if righe * colonne > MAX_CELLE:
+        raise PrelievoError("Il file .xls contiene una griglia troppo grande.")
     return [[celle.get((r, c)) for c in range(colonne)] for r in range(righe)]
 
 

@@ -9,6 +9,8 @@ utente e password arrivano con la richiesta e non vengono mai salvati.
 from __future__ import annotations
 
 import base64
+import ipaddress
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +22,7 @@ MAX_RECORD = 200
 TIMEOUT_SECONDS = 30
 USER_AGENT = "Vettore (portale shipper; misure SIICloud)"
 NS_DAV = "DAV:"
+SCHEMI_CONSENTITI = ("http", "https")
 
 TIPO_GIORNALIERA = "giornaliera"
 TIPO_MENSILE = "mensile"
@@ -63,6 +66,50 @@ def _valida_credenziali(url, utente, password):
         raise MisureError("dati di accesso incompleti", errori)
 
 
+def _indirizzo_pubblico(indirizzo):
+    """Vero se l'IP non appartiene a reti private, locali o riservate."""
+    return not (
+        indirizzo.is_private
+        or indirizzo.is_loopback
+        or indirizzo.is_link_local
+        or indirizzo.is_reserved
+        or indirizzo.is_multicast
+        or indirizzo.is_unspecified
+    )
+
+
+def _verifica_destinazione(url):
+    """Impedisce richieste verso host interni o non HTTP(S) (SSRF)."""
+    parti = urllib.parse.urlparse(url)
+    if parti.scheme not in SCHEMI_CONSENTITI:
+        raise MisureError("solo gli indirizzi http:// e https:// sono ammessi")
+    host = parti.hostname
+    if not host:
+        raise MisureError("indirizzo WebDAV non valido: host mancante")
+    try:
+        risoluzioni = socket.getaddrinfo(host, parti.port or (443 if parti.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except socket.gaierror as errore:
+        raise MisureError(f"host non risolvibile (dettaglio: {errore})") from errore
+    for _famiglia, _tipo, _proto, _canon, (_ip, *_altro) in risoluzioni:
+        try:
+            indirizzo = ipaddress.ip_address(_ip)
+        except ValueError as errore:
+            raise MisureError("indirizzo WebDAV non valido") from errore
+        if not _indirizzo_pubblico(indirizzo):
+            raise MisureError("l'indirizzo punta a una rete privata o locale: non è ammesso")
+
+
+class _RedirectSicuro(urllib.request.HTTPRedirectHandler):
+    """Segue i redirect solo verso http(s) e host pubblici."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _verifica_destinazione(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_RedirectSicuro)
+
+
 def _messaggio_http(errore):
     codici = {
         401: "credenziali rifiutate dal server (401): verificare utente e password",
@@ -74,6 +121,7 @@ def _messaggio_http(errore):
 
 
 def _richiesta(url, metodo, utente, password, intestazioni=None):
+    _verifica_destinazione(url)
     token = base64.b64encode(f"{utente}:{password}".encode("utf-8")).decode("ascii")
     headers = {
         "Authorization": f"Basic {token}",
@@ -82,7 +130,7 @@ def _richiesta(url, metodo, utente, password, intestazioni=None):
     }
     richiesta = urllib.request.Request(url, method=metodo, headers=headers)
     try:
-        with urllib.request.urlopen(richiesta, timeout=TIMEOUT_SECONDS) as risposta:
+        with _OPENER.open(richiesta, timeout=TIMEOUT_SECONDS) as risposta:
             return risposta.read(MAX_FILE_BYTES + 1)
     except urllib.error.HTTPError as errore:
         raise MisureError(_messaggio_http(errore)) from errore
