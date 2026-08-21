@@ -545,16 +545,85 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
     ordinati = sorted(scarti_ensemble)
     q10, q90 = _quantile(ordinati, 0.10), _quantile(ordinati, 0.90)
 
+    # ---- aggancio Wkr (facoltativo): il fattore di correzione climatica
+    # ufficiale pubblicato da Snam, mostrato accanto a ciascun giorno previsto
+    # e — solo se l'operatore lo chiede — applicato come semplice
+    # moltiplicazione. Non è una stima del modello: è il fattore ufficiale.
+    wkr_csv = dati.get("wkr_csv")
+    wkr_zona = str(dati.get("wkr_zona") or "").strip()
+    wkr_applica = bool(dati.get("wkr_applica"))
+    fattori_wkr: dict[date, float] | None = None
+    tipi_wkr: dict[date, str] = {}
+    if isinstance(wkr_csv, str) and wkr_csv.strip():
+        from . import wkr as _wkr
+
+        try:
+            record_wkr = _wkr.leggi_csv_wkr(wkr_csv)
+            _wkr._verifica_griglia(record_wkr)
+        except _wkr.WkrError as errore:
+            raise PrevisioneError(f"CSV Wkr non leggibile: {errore}", errore.errors) from errore
+        zone_disponibili = sorted({r["zona"] for r in record_wkr}, key=int)
+        if not wkr_zona:
+            raise PrevisioneError(
+                "Indica la zona climatica del CSV Wkr da usare: disponibili "
+                + ", ".join(zone_disponibili) + "."
+            )
+        if wkr_zona not in zone_disponibili:
+            raise PrevisioneError(
+                f"La zona climatica «{wkr_zona}» non è nel CSV Wkr: disponibili "
+                + ", ".join(zone_disponibili) + "."
+            )
+        fattori_wkr = _wkr.fattori_per_zona(record_wkr, wkr_zona)
+        tipi_wkr = {r["giorno"]: r["tipo"] for r in record_wkr if r["zona"] == wkr_zona}
+
     previsione = []
+    giorni_coperti = 0
     for h, valore in enumerate(ensemble):
         giorno = ultimo_giorno + timedelta(days=h + 1)
         scala = math.sqrt(h + 1)
-        previsione.append({
+        punto = {
             "data": giorno.isoformat(),
             "valore": round(max(0.0, valore), 2),
             "minimo": round(max(0.0, valore + q10 * scala), 2),
             "massimo": round(max(0.0, valore + q90 * scala), 2),
-        })
+        }
+        if fattori_wkr is not None:
+            fattore = fattori_wkr.get(giorno)
+            punto["wkr"] = None if fattore is None else round(fattore, 6)
+            punto["wkr_tipo"] = tipi_wkr.get(giorno)
+            if fattore is not None:
+                giorni_coperti += 1
+                if wkr_applica:
+                    punto["valore_modello"] = punto["valore"]
+                    punto["valore"] = round(max(0.0, valore * fattore), 2)
+                    punto["minimo"] = round(max(0.0, (valore + q10 * scala) * fattore), 2)
+                    punto["massimo"] = round(max(0.0, (valore + q90 * scala) * fattore), 2)
+                    punto["wkr_applicato"] = True
+        previsione.append(punto)
+
+    blocco_wkr = None
+    if fattori_wkr is not None:
+        giorni_scoperti = orizzonte - giorni_coperti
+        if giorni_scoperti > 0:
+            avvisi.append(
+                f"{giorni_scoperti} giorni previsti su {orizzonte} non sono coperti dalla "
+                "finestra Wkr pubblicata (che arriva a G+5): per quei giorni il fattore non "
+                "è applicato."
+            )
+        blocco_wkr = {
+            "zona": wkr_zona,
+            "applica": wkr_applica,
+            "giorni_coperti": giorni_coperti,
+            "giorni_scoperti": giorni_scoperti,
+            "nota": (
+                "Il Wkr è il fattore di correzione climatica ufficiale pubblicato ogni giorno "
+                "da Snam per la zona scelta. Se «applica» è attivo, i valori previsti sono "
+                "moltiplicati per il fattore del giorno: è una semplice moltiplicazione per il "
+                "fattore ufficiale, non una stima del modello. Verifica che la direzione "
+                "(moltiplicare o dividere) corrisponda al tuo uso: la normalizzazione di "
+                "settlement e la previsione della domanda sono operazioni diverse."
+            ),
+        }
 
     storico_recente = [
         {"data": (inizio + timedelta(days=len(valori) - k)).isoformat(), "valore": round(valori[-k], 2)}
@@ -592,6 +661,7 @@ def prevedi(dati: dict[str, Any]) -> dict[str, Any]:
         "membri": membri_finali,
         "storico_recente": storico_recente,
         "previsione": previsione,
+        "wkr": blocco_wkr,
         "avvisi": avvisi,
         "nota": (
             "La banda è indicativa: quantili 10°-90° dei residui dell'ensemble misurati fuori "

@@ -97,3 +97,22 @@ Non conserva nulla (lo storico resta dell'operatore), non pretende di essere
 un oracolo, non nasconde il metodo dietro un nome di libreria. Se un giorno
 serviranno modelli più ricchi (ARIMA, regressori climatici), la strada è la
 stessa: metodo dichiarato, backtest incorporato, determinismo verificato.
+
+## La correzione climatica Wkr (facoltativa)
+
+Accanto alla previsione il modulo può mostrare — e, se l'operatore lo
+chiede, applicare — il **fattore di correzione climatica Wkr** pubblicato
+ogni giorno da Snam per ciascuna zona climatica (vedi
+[docs/wkr.md](wkr.md)). Si incolla il CSV di Jarvis e si indica la zona:
+
+- ogni giorno previsto espone il fattore ufficiale (tipo C/I/P…) in una
+  colonna dedicata;
+- con «Applica il fattore» attivo, valore, minimo e massimo sono
+  moltiplicati per il fattore del giorno; il valore del modello resta
+  visibile. È una semplice moltiplicazione per il fattore ufficiale, **non**
+  una stima del modello;
+- la finestra pubblicata arriva a G+5: i giorni previsti oltre non hanno un
+  fattore (mai inventato) e un avviso lo dichiara.
+
+Senza CSV Wkr l'output è identico a prima: l'aggancio è del tutto
+facoltativo e retrocompatibile.

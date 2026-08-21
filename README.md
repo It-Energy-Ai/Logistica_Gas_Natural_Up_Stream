@@ -80,7 +80,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["18 schermate"]
+    R --> UI["19 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```
@@ -171,7 +171,11 @@ La schermata **Trasporto · Interruzioni e UIOLI** sta dal lato giusto del Codic
 
 ## Previsione della domanda
 
-La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest a finestre scorrevoli** — l'ensemble è addestrato fino a quattro volte senza vedere la coda di ogni finestra e confrontato con la realtà (MAE, RMSE, MAPE, MASE, sMAPE) — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui out-of-sample). Metodo trasparente e deterministico: un **ensemble pesato** di Holt-Winters con trend smorzato, metodo Theta e naive stagionale, in puro Python, zero dipendenze scientifiche — stesso input, stessa previsione. Dettagli in [docs/previsione.md](docs/previsione.md).
+La schermata **Previsione della domanda** chiude il cerchio: si prevede per nominare. Storico giornaliero incollato come CSV (formati italiani, righe illeggibili indicate per numero), **backtest a finestre scorrevoli** — l'ensemble è addestrato fino a quattro volte senza vedere la coda di ogni finestra e confrontato con la realtà (MAE, RMSE, MAPE, MASE, sMAPE) — e poi la **previsione dei giorni futuri veri**, con una banda dichiarata per quello che è (quantili dei residui out-of-sample). Metodo trasparente e deterministico: un **ensemble pesato** di Holt-Winters con trend smorzato, metodo Theta e naive stagionale, in puro Python, zero dipendenze scientifiche — stesso input, stessa previsione. Facoltativamente, accanto a ogni giorno previsto compare il **fattore di correzione climatica Wkr** ufficiale (e, se richiesto, viene applicato). Dettagli in [docs/previsione.md](docs/previsione.md).
+
+## Coefficienti Wkr
+
+La schermata **Coefficienti Wkr** porta nel portale il fattore di correzione climatica pubblicato **ogni giorno** da Snam Rete Gas su Jarvis, per ciascuna delle 18 zone climatiche. Si incolla il CSV della pagina pubblica «Coefficienti WKR» oppure lo si **scarica live** (il portale legge la configurazione pubblica del sito Snam e prende il file più recente, con `urllib` della libreria standard — nessuna dipendenza nuova). La tabella mostra le zone per la finestra di sette giorni pubblicata — ieri consuntivo, oggi in corso, i prossimi cinque provvisori — evidenziando i valori diversi da 1. I dati sono mostrati all'operatore che li ha richiesti, **non conservati né ritrasmessi** (Snam ne vieta la redistribuzione). Lo stesso fattore alimenta l'aggancio con la Previsione. Dettagli in [docs/wkr.md](docs/wkr.md).
 
 ## Agenda regolatoria
 
@@ -186,7 +190,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Cinquecentoventuno verifiche fra Python e Node (420 pytest + 91 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Cinquecentocinquantotto verifiche fra Python e Node (449 pytest + 99 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, coefficienti Wkr di Snam (parsing del CSV di Jarvis, griglia zona × giorno, download live e aggancio alla previsione), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

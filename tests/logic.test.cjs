@@ -1313,10 +1313,63 @@ test("Previsione: un errore del server arriva a schermo e azzera l'esito", async
   global.fetch = FETCH_OK;
 });
 
+test("Previsione: il CSV Wkr e la zona viaggiano nel payload", async () => {
+  const app = new App();
+  app.setState({ screen: "previsione" });
+  const azioni = app.renderVals();
+  azioni.setPrvCsv(ev("data;valore\n01/06/2026;100"));
+  azioni.setPrvWkrCsv(ev("ZONA_CLIMATICA;GIORNO;DATA_WKR;Wkr;TIPO;DATA_HDD\n11;20260820;x;1.1;I;y"));
+  azioni.setPrvWkrZona(ev("11"));
+  azioni.setPrvWkrApplica(ev("si"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      metodo: "m", nota: "n", avvisi: [], dal: "2026-06-01", al: "2026-07-10", giorni_storico: 40,
+      backtest: { giorni: 7, mae: 1, rmse: 2, mape: 3 },
+      storico_recente: [{ data: "2026-07-10", valore: 100 }],
+      previsione: [{ data: "2026-07-11", valore: 110, minimo: 90, massimo: 130, wkr: 1.1, wkr_tipo: "I" }],
+      wkr: { zona: "11", applica: true, giorni_coperti: 1, giorni_scoperti: 0 },
+    }), text: async () => "" };
+  };
+  await azioni.calcolaPrevisione();
+  assert.equal(inviato.body.wkr_zona, "11");
+  assert.equal(inviato.body.wkr_applica, true);
+  assert.match(inviato.body.wkr_csv, /ZONA_CLIMATICA/);
+  const v = app.renderVals();
+  // la colonna Wkr compare solo quando il blocco wkr è presente
+  assert.equal(v.prvHaWkr, true);
+  assert.equal(v.prvGridCols, "1fr 1fr 1fr 1fr 70px");
+  assert.equal(v.prvRighe[0].wkr, "1,1");
+  assert.match(v.prvWkrTesto, /applicato/);
+  global.fetch = FETCH_OK;
+});
+
+test("Previsione: senza Wkr la tabella resta a quattro colonne", async () => {
+  const app = new App();
+  app.setState({ screen: "previsione" });
+  const azioni = app.renderVals();
+  azioni.setPrvCsv(ev("data;valore\n01/06/2026;100"));
+  global.fetch = async () => ({
+    ok: true, status: 200, json: async () => ({
+      metodo: "m", nota: "n", avvisi: [], dal: "2026-06-01", al: "2026-07-10", giorni_storico: 40,
+      backtest: { giorni: 7, mae: 1, rmse: 2, mape: 3 },
+      storico_recente: [{ data: "2026-07-10", valore: 100 }],
+      previsione: [{ data: "2026-07-11", valore: 110, minimo: 90, massimo: 130 }],
+      wkr: null,
+    }), text: async () => ""
+  });
+  await azioni.calcolaPrevisione();
+  const v = app.renderVals();
+  assert.equal(v.prvHaWkr, false);
+  assert.equal(v.prvGridCols, "1fr 1fr 1fr 1fr");
+  global.fetch = FETCH_OK;
+});
+
 test("Previsione: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf('data-screen-label="Previsione"'), html.indexOf('data-screen-label="Agenda"'));
+  const blocco = html.slice(html.indexOf('data-screen-label="Previsione"'), html.indexOf('data-screen-label="Wkr"'));
   assert.ok(blocco.length > 2000, "blocco Previsione non trovato");
   const app = new App();
   app.setState({ screen: "previsione" });
@@ -1325,6 +1378,103 @@ test("Previsione: ogni binding del pannello ha un valore dal render", () => {
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);
+});
+
+test("Wkr: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Wkr"'), html.indexOf('data-screen-label="Agenda"'));
+  assert.ok(blocco.length > 2000, "blocco Wkr non trovato");
+  const app = new App();
+  app.setState({ screen: "wkr" });
+  const v = app.renderVals();
+  const locali = new Set(["we", "wa", "wl", "wg", "wr", "wc", "true", "false"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+test("Wkr: avvio pulito, nessun esito e stato vuoto", () => {
+  const app = new App();
+  app.setState({ screen: "wkr" });
+  const v = app.renderVals();
+  assert.equal(v.wkrHa, false);
+  assert.equal(v.wkrVuoto, true);
+  assert.deepEqual(v.wkrRighe, []);
+  assert.deepEqual(v.wkrGiorni, []);
+  assert.equal(v.wkrErrore, "");
+});
+
+test("Wkr: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title === "Coefficienti Wkr");
+  assert.ok(card, "manca la card Wkr");
+  card.go();
+  assert.equal(app.state.screen, "wkr");
+});
+
+test("Wkr: il CSV incollato va al server e la griglia arriva a schermo", async () => {
+  const app = new App();
+  app.setState({ screen: "wkr" });
+  const azioni = app.renderVals();
+  azioni.setWkrCsv(ev("ZONA_CLIMATICA;GIORNO;DATA_WKR;Wkr;TIPO;DATA_HDD\n11;20260820;x;1;I;y"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { pubblicazione: "Coefficienti WKR · Snam Rete Gas (Jarvis)", url: "https://jarvis.snam.it/x", file: "CSV incollato", data_wkr: "20260820 10:41:06", data_hdd: "20260820 11:00:00" },
+      giorni: [{ data: "2026-08-20", tipo: "I", etichetta: "In corso (giorno gas)" }],
+      zone: ["11"], righe: [{ zona: "11", valori: [1.25] }],
+      non_unitari: 1, avvisi: [], nota: "nota",
+    }), text: async () => "" };
+  };
+  await azioni.sistemaWkr();
+  assert.equal(inviato.url, "/api/wkr");
+  assert.match(inviato.body.csv, /ZONA_CLIMATICA/);
+  const v = app.renderVals();
+  assert.equal(v.wkrHa, true);
+  assert.equal(v.wkrRighe.length, 1);
+  // il valore diverso da 1 è evidenziato
+  assert.equal(v.wkrRighe[0].celle[0].fw, "600");
+  assert.equal(v.wkrGiorni[0].etichetta, "In corso (giorno gas)");
+  global.fetch = FETCH_OK;
+});
+
+test("Wkr: lo scarico live invia l'anno scelto", async () => {
+  const app = new App();
+  app.setState({ screen: "wkr" });
+  const azioni = app.renderVals();
+  azioni.setWkrAnno(ev("2026"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { pubblicazione: "p", url: "u", file: "CoefficientiWkr_ore18.csv", data_wkr: "", data_hdd: "" },
+      giorni: [], zone: [], righe: [], non_unitari: 0, avvisi: [], nota: "",
+    }), text: async () => "" };
+  };
+  await azioni.scaricaWkr();
+  assert.equal(inviato.url, "/api/wkr");
+  assert.equal(inviato.body.scarica, true);
+  assert.equal(inviato.body.anno, "2026");
+  global.fetch = FETCH_OK;
+});
+
+test("Wkr: un errore del server arriva a schermo e azzera l'esito", async () => {
+  const app = new App();
+  app.setState({ screen: "wkr", wkrEsito: { finto: true } });
+  global.fetch = async () => ({
+    ok: false, status: 422,
+    json: async () => ({ errore: "L'intestazione non è quella del CSV Wkr", errors: [{ field: "riga 3", message: "zona non numerica" }] }),
+    text: async () => "",
+  });
+  await app.renderVals().sistemaWkr();
+  assert.match(app.state.wkrErrore, /intestazione/);
+  assert.equal(app.state.wkrEsito, null);
+  assert.equal(app.state.wkrErrori.length, 1);
+  global.fetch = FETCH_OK;
 });
 
 test("Agenda: ogni binding del pannello ha un valore dal render", () => {

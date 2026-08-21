@@ -148,7 +148,9 @@
         trsNotaPunto: "Tarvisio", trsNotaAnno: "", trsNotaCapacita: "", trsNotaDurata: "", trsNotaMotivazioni: "", trsNotaMittente: "",
         trsNote: [], trsNotaErrore: "", trsNotaInfo: "", trsNotaErrori: [], trsCatalogo: null,
         prvCsv: "", prvOrizzonte: "7", prvAggregazione: "somma",
+        prvWkrCsv: "", prvWkrZona: "", prvWkrApplica: "",
         prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
+        wkrCsv: "", wkrAnno: "", wkrEsito: null, wkrErrore: "", wkrErrori: [], wkrCalcolo: false,
         agnScadenze: [], agnCatalogo: null, agnContatori: null, agnOggi: "",
         agnErrore: "", agnInfo: "", agnErrori: [], agnElencoErrore: "",
         agnTitolo: "", agnCategoria: "operativo", agnData: "", agnRicorrenza: "una_tantum",
@@ -554,6 +556,7 @@
         emir: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "EMIR · Trade Repository" }],
         trasporto: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Trasporto · Interruzioni e UIOLI" }],
         previsione: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Previsione della domanda" }],
+        wkr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Coefficienti Wkr" }],
         agenda: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Agenda regolatoria" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
@@ -662,6 +665,7 @@
         { title: "EMIR · Trade Repository", desc: "Segnalazione ISO 20022 auth.030 del derivato, validata contro lo schema ESMA, ed esito del Trade Repository.", stat: String(nReg.emirFile), statLabel: nReg.emirFile === 1 ? "segnalazione generata" : "segnalazioni generate", reale: true, primary: true, go: go("emir"), cursor: "pointer", border: "var(--line)" },
         { title: "Trasporto · Interruzioni e UIOLI", desc: "Registro delle interruzioni comunicate da Snam, Utilizzo Medio per semestre e nota giustificativa use-it-or-lose-it.", stat: String((this.state.trsInterruzioni || []).length), statLabel: (this.state.trsInterruzioni || []).length === 1 ? "interruzione registrata" : "interruzioni registrate", reale: true, primary: true, go: go("trasporto"), cursor: "pointer", border: "var(--line)" },
         { title: "Previsione della domanda", desc: "Storico giornaliero → backtest onesto e previsione dei prossimi giorni, con banda dichiarata: la base per preparare le nomine.", stat: "28", statLabel: "giorni di orizzonte massimo", reale: true, primary: true, go: go("previsione"), cursor: "pointer", border: "var(--line)" },
+        { title: "Coefficienti Wkr", desc: "Il fattore di correzione climatica pubblicato ogni giorno da Snam per ciascuna zona climatica: incolla il CSV di Jarvis o scaricalo live.", stat: "18", statLabel: "zone climatiche", reale: true, primary: true, go: go("wkr"), cursor: "pointer", border: "var(--line)" },
         { title: "Agenda regolatoria", desc: "Scadenze di stoccaggio, trasporto e regolatorio: modello precompilato dalle fonti e voci personalizzate, con promemoria di adempimento.", stat: String(agnCont.scadute), statLabel: agnCont.scadute === 1 ? "scadenza aperta oltre la data" : "scadenze aperte oltre la data", reale: true, primary: true, go: go("agenda"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
@@ -1080,7 +1084,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", agenda: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", wkr: "moduli", agenda: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1562,6 +1566,9 @@
               csv: this.state.prvCsv,
               orizzonte: this.state.prvOrizzonte,
               aggregazione: this.state.prvAggregazione,
+              wkr_csv: this.state.prvWkrCsv,
+              wkr_zona: this.state.prvWkrZona,
+              wkr_applica: this.state.prvWkrApplica === "si",
             }),
           });
           this.setState({ prvEsito: esito, prvCalcolo: false });
@@ -1600,7 +1607,20 @@
       const prvRighe = prv ? prv.previsione.map((punto) => ({
         data: dataIt(punto.data), valore: numeroIt(punto.valore),
         minimo: numeroIt(punto.minimo), massimo: numeroIt(punto.massimo),
+        // Colonna Wkr: presente solo se l'operatore ha dato il CSV; il fattore
+        // mancante (fuori dalla finestra pubblicata) resta un «—» onesto.
+        wkr: punto.wkr == null ? "—" : numeroIt(punto.wkr),
+        wkrCol: punto.wkr == null ? "var(--ink3)" : (Math.abs(punto.wkr - 1) > 1e-9 ? "var(--primText)" : "var(--ink3)"),
+        wkrFw: punto.wkr != null && Math.abs(punto.wkr - 1) > 1e-9 ? "600" : "400",
+        wkrTitolo: punto.wkr == null
+          ? "fuori dalla finestra Wkr pubblicata"
+          : (punto.wkr_applicato ? `fattore applicato (${punto.wkr_tipo || ""})` : `fattore ufficiale (${punto.wkr_tipo || ""})`),
       })) : [];
+      const prvHaWkr = !!(prv && prv.wkr);
+      const prvGridCols = prvHaWkr ? "1fr 1fr 1fr 1fr 70px" : "1fr 1fr 1fr 1fr";
+      const prvWkrTesto = prv && prv.wkr ? (prv.wkr.applica
+        ? `Fattore applicato: i valori previsti sono moltiplicati per il Wkr del giorno (${prv.wkr.giorni_coperti} giorni coperti${prv.wkr.giorni_scoperti ? `, ${prv.wkr.giorni_scoperti} fuori finestra` : ""}).`
+        : `Fattore mostrato, non applicato: i valori previsti restano quelli del modello (${prv.wkr.giorni_coperti} giorni coperti${prv.wkr.giorni_scoperti ? `, ${prv.wkr.giorni_scoperti} fuori finestra` : ""}).`) : "";
       const prvNaive = prv && prv.backtest.naive ? (prv.backtest.batte_il_naive ? {
         testo: `Batte il riferimento naive stagionale («stessa settimana precedente») del ${prv.backtest.vantaggio_percentuale}%: MAE ${numeroIt(prv.backtest.mae)} contro ${numeroIt(prv.backtest.naive.mae)}.`,
         bg: OK.bg, fg: OK.fg, etichetta: "modello utile",
@@ -1622,6 +1642,54 @@
         peso: `${Math.round(m.peso * 100)}%`,
         mae: numeroIt(m.mae_backtest),
       })) : [];
+
+      // --- Coefficienti Wkr: CSV di Jarvis incollato o scaricato live -------
+      const inviaWkr = async (payload) => {
+        this.setState({ wkrErrore: "", wkrErrori: [], wkrCalcolo: true });
+        try {
+          const esito = await this._json("/api/wkr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          this.setState({ wkrEsito: esito, wkrCalcolo: false });
+        } catch (error) {
+          this.setState({ wkrErrore: `Coefficienti non letti: ${error.message}`, wkrErrori: error.dettagli || [], wkrCalcolo: false, wkrEsito: null });
+        }
+      };
+      const sistemaWkr = unaVolta("sistemaWkr", () => inviaWkr({ csv: this.state.wkrCsv }));
+      const scaricaWkr = unaVolta("scaricaWkr", () => inviaWkr({ scarica: true, anno: this.state.wkrAnno }));
+
+      // Un esito malformato non deve far cadere il render: forma non attesa →
+      // stato vuoto.
+      const wkrGrezzo = this.state.wkrEsito;
+      const wkr = wkrGrezzo && Array.isArray(wkrGrezzo.giorni) && Array.isArray(wkrGrezzo.righe) && wkrGrezzo.fonte
+        ? wkrGrezzo : null;
+      const wkrGiorni = wkr ? wkr.giorni.map((g) => ({
+        data: dataIt(g.data), etichetta: g.etichetta,
+      })) : [];
+      // I valori diversi da 1 sono la correzione effettiva: in grassetto e in
+      // tinta primaria; l'1 estivo resta inchiostro debole.
+      const wkrRighe = wkr ? wkr.righe.map((r) => ({
+        zona: r.zona,
+        celle: r.valori.map((v) => ({
+          v: numeroIt(v),
+          col: Math.abs(v - 1) > 1e-9 ? "var(--primText)" : "var(--ink3)",
+          fw: Math.abs(v - 1) > 1e-9 ? "600" : "400",
+        })),
+      })) : [];
+      const wkrLegenda = wkr ? [
+        { testo: "C · consuntivo (G−1)", bg: OK.bg, fg: OK.fg },
+        { testo: "I · giorno gas in corso", bg: RUN.bg, fg: RUN.fg },
+        { testo: "P…P5 · provvisori (G+1…G+5)", bg: "var(--surface2)", fg: "var(--ink2)" },
+      ] : [];
+      const wkrFonte = wkr ? {
+        pubblicazione: wkr.fonte.pubblicazione,
+        file: wkr.fonte.file,
+        url: wkr.fonte.url,
+        dataWkr: wkr.fonte.data_wkr || "—",
+        dataHdd: wkr.fonte.data_hdd || "—",
+      } : null;
 
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
@@ -1969,7 +2037,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenAgenda: s === "agenda",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenWkr: s === "wkr", screenAgenda: s === "agenda",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -2095,14 +2163,29 @@
         prvCsv: this.state.prvCsv, prvOrizzonte: this.state.prvOrizzonte,
         prvAggregazione: this.state.prvAggregazione, prvErrore: this.state.prvErrore,
         prvErroriCampo: this.state.prvErrori, prvCalcolo: this.state.prvCalcolo,
+        prvWkrCsv: this.state.prvWkrCsv, prvWkrZona: this.state.prvWkrZona,
+        prvWkrApplica: this.state.prvWkrApplica,
         prvHa: !!prv, prvBarre, prvRighe, prvMetriche, prvMembri, calcolaPrevisione,
         prvVuoto: !prv, prvNaive, prvHaNaive: !!prvNaive, prvHaMembri: prvMembri.length > 0,
+        prvHaWkr, prvGridCols, prvWkrTesto, prvWkr: prv && prv.wkr ? prv.wkr : null,
         prvMetodo: prv ? prv.metodo : "", prvNota: prv ? prv.nota : "",
         prvAvvisi: prv ? (prv.avvisi || []).map((testo) => ({ testo })) : [],
         prvIntervallo: prv ? `${dataIt(prv.dal)} → ${dataIt(prv.al)} · ${prv.giorni_storico} giorni` : "",
         setPrvCsv: (e) => this.setSilent({ prvCsv: e.target.value }),
         setPrvOrizzonte: (e) => this.setSilent({ prvOrizzonte: e.target.value }),
         setPrvAggregazione: (e) => this.setSilent({ prvAggregazione: e.target.value }),
+        setPrvWkrCsv: (e) => this.setSilent({ prvWkrCsv: e.target.value }),
+        setPrvWkrZona: (e) => this.setSilent({ prvWkrZona: e.target.value }),
+        setPrvWkrApplica: (e) => this.setSilent({ prvWkrApplica: e.target.value }),
+        wkrCsv: this.state.wkrCsv, wkrAnno: this.state.wkrAnno,
+        wkrErrore: this.state.wkrErrore, wkrErroriCampo: this.state.wkrErrori,
+        wkrCalcolo: this.state.wkrCalcolo,
+        wkrHa: !!wkr, wkrVuoto: !wkr, wkrGiorni, wkrRighe, wkrLegenda,
+        wkrFonte, wkrNota: wkr ? wkr.nota : "",
+        wkrAvvisi: wkr ? (wkr.avvisi || []).map((testo) => ({ testo })) : [],
+        sistemaWkr, scaricaWkr,
+        setWkrCsv: (e) => this.setSilent({ wkrCsv: e.target.value }),
+        setWkrAnno: (e) => this.setSilent({ wkrAnno: e.target.value }),
         agnRows, agnKpis, agnVuoto: !agnRows.length,
         agnOggi: dataIt(this.state.agnOggi || ""),
         agnAdempiute: String(agnCont.adempiute_mese),

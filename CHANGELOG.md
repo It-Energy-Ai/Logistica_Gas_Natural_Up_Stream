@@ -2,6 +2,20 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.14.0] — 2026-08-21
+
+**Coefficienti Wkr**: il fattore di correzione climatica pubblicato ogni giorno da Snam entra nel portale come modulo proprio e si aggancia alla Previsione della domanda.
+
+### Aggiunto
+- **Modulo Coefficienti Wkr** (19ª schermata, `app/wkr.py`): legge il CSV della pagina pubblica «Coefficienti WKR» di Jarvis — incollato dall'operatore oppure **scaricato live** dal portale, che legge la configurazione pubblica del sito Snam (`user_key` e indirizzo API compresi) e prende il file più recente. Tabella delle 18 zone climatiche per la finestra di sette giorni pubblicata (ieri consuntivo, oggi in corso, i prossimi cinque provvisori), con i valori diversi da 1 evidenziati e la fonte dichiarata.
+- **Download live senza dipendenze nuove**: il fetch usa `urllib` della libreria standard (timeout 15 s); se la rete o l'API non rispondono l'errore invita a incollare il CSV a mano. L'API di Jarvis non è un contratto pubblico e il modulo lo dichiara.
+- **Aggancio alla Previsione**: nella schermata Previsione un riquadro facoltativo accetta il CSV Wkr e la zona climatica; ogni giorno previsto espone il fattore ufficiale (tipo C/I/P…) e, con «Applica il fattore» attivo, valore/minimo/massimo sono moltiplicati per il fattore del giorno (il valore del modello resta visibile). La finestra pubblicata arriva a G+5: i giorni oltre restano senza fattore, mai inventato, e un avviso lo dichiara. Senza CSV Wkr l'output è identico a prima (retrocompatibile).
+- **Due onestà dichiarate in schermata e docs**: i dati sono pubblici ma Snam vieta la redistribuzione a terzi — qui sono mostrati all'operatore che li ha richiesti, non conservati né ritrasmessi (rotta stateless); il Wkr applicato è una semplice moltiplicazione per il fattore ufficiale, non una stima del modello.
+- **29 test Python nuovi** (449 pytest totali: 22 in `tests/test_wkr.py` per parsing, griglia, fetch live con rete mockata e rotte; 7 in `tests/test_previsione.py` per l'aggancio) e **8 test Node nuovi** (99 totali) per card, binding, payload e colonna Wkr.
+
+### Modificato
+- **docs/wkr.md** nuovo; **docs/previsione.md** con la sezione sull'aggancio Wkr; **README** con la sezione del modulo, il conteggio delle verifiche (558) e le schermate (19).
+
 ## [1.13.0] — 2026-08-20
 
 **Previsione v2**: il modello singolo diventa un ensemble, il backtest a finestra unica diventa a finestre scorrevoli, le metriche si allargano a MASE e sMAPE. Stessa filosofia: puro Python, determinismo, nessun finto invio.

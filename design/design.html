@@ -1289,6 +1289,14 @@ input::placeholder{color:var(--ink3)}
         <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Orizzonte<select value="{{ prvOrizzonte }}" onChange="{{ setPrvOrizzonte }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="7">7 giorni</option><option value="14">14 giorni</option><option value="28">28 giorni</option></select></label>
         <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Giorni doppi<select value="{{ prvAggregazione }}" onChange="{{ setPrvAggregazione }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="somma">Somma dei valori</option><option value="media">Media dei valori</option></select></label>
       </div>
+      <div style="display:flex;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:10px;padding:12px 14px">
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12.5px;font-weight:600;color:var(--ink)">Correzione climatica Wkr (facoltativa)</span><span style="font-size:11.5px;color:var(--ink3)">Incolla il CSV Wkr di Jarvis e indica la zona climatica: il fattore ufficiale comparirà accanto a ogni giorno previsto. La finestra pubblicata arriva a G+5.</span></div>
+        <textarea value="{{ prvWkrCsv }}" onChange="{{ setPrvWkrCsv }}" rows="3" placeholder="ZONA_CLIMATICA;GIORNO;DATA_WKR;Wkr;TIPO;DATA_HDD&#10;…" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11px;resize:vertical"></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Zona climatica<input value="{{ prvWkrZona }}" onChange="{{ setPrvWkrZona }}" placeholder="es. 11" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Applica il fattore<select value="{{ prvWkrApplica }}" onChange="{{ setPrvWkrApplica }}" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><option value="">No · mostra solo il Wkr</option><option value="si">Sì · moltiplica i previsti</option></select></label>
+        </div>
+      </div>
       <button onClick="{{ calcolaPrevisione }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Calcola backtest e previsione</button>
       <sc-if value="{{ prvCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Calcolo in corso…</span></sc-if>
       <sc-if value="{{ prvErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ prvErrore }}</span></sc-if>
@@ -1327,18 +1335,76 @@ input::placeholder{color:var(--ink3)}
         </div>
         <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
           <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Valori previsti</h3><span style="font-size:12px;color:var(--ink3)">{{ prvNota }}</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)"><span>GIORNO</span><span style="text-align:right">PREVISTO</span><span style="text-align:right">MINIMO</span><span style="text-align:right">MASSIMO</span></div>
+          <sc-if value="{{ prvHaWkr }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:10px;align-items:center;padding:9px 12px;background:var(--bg);border:1px solid var(--line);border-radius:9px"><span style="flex:none;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:color-mix(in oklab,var(--prim) 12%,var(--surface));color:var(--primText)">Wkr · zona {{ prvWkr.zona }}</span><span style="font-size:12px;color:var(--ink2);line-height:1.5">{{ prvWkrTesto }}</span></div></sc-if>
+          <div style="display:grid;grid-template-columns:{{ prvGridCols }};gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--ink3)"><span>GIORNO</span><span style="text-align:right">PREVISTO</span><span style="text-align:right">MINIMO</span><span style="text-align:right">MASSIMO</span><sc-if value="{{ prvHaWkr }}" hint-placeholder-val="{{ false }}"><span style="text-align:right">WKR</span></sc-if></div>
           <sc-for list="{{ prvRighe }}" as="pr2" hint-placeholder-count="7">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:7px 0;border-top:1px solid var(--line)">
+            <div style="display:grid;grid-template-columns:{{ prvGridCols }};gap:12px;padding:7px 0;border-top:1px solid var(--line)">
               <span style="font-family:'IBM Plex Mono',monospace;font-size:12px">{{ pr2.data }}</span>
               <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;text-align:right">{{ pr2.valore }}</span>
               <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ pr2.minimo }}</span>
               <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink3);text-align:right">{{ pr2.massimo }}</span>
+              <sc-if value="{{ prvHaWkr }}" hint-placeholder-val="{{ false }}"><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:{{ pr2.wkrCol }};font-weight:{{ pr2.wkrFw }};text-align:right" title="{{ pr2.wkrTitolo }}">{{ pr2.wkr }}</span></sc-if>
             </div>
           </sc-for>
         </div>
       </sc-if>
       <sc-if value="{{ prvVuoto }}" hint-placeholder-val="{{ true }}"><div style="padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessuna previsione calcolata. Incolla almeno cinque settimane di storico giornaliero: il modello si valuta da solo sugli ultimi giorni noti prima di guardare avanti.</span></div></sc-if>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ screenWkr }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Wkr" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Coefficienti Wkr</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Fattore di correzione climatica · pubblicato ogni giorno da Snam Rete Gas, per zona climatica</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Fonte: Jarvis · dati pubblici Snam</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>I dati sono pubblici ma Snam ne vieta la redistribuzione a terzi: qui sono mostrati a te che li hai richiesti, non vengono conservati né ritrasmessi. L'API di Jarvis non è un contratto pubblico: se il download live fallisce, scarica il CSV dalla pagina Snam e incollalo qui.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">CSV dei coefficienti</h3><span style="font-size:12px;color:var(--ink3)">Scarica il CSV dalla pagina pubblica di Jarvis e incollalo qui, oppure lascia fare al portale: legge la configurazione pubblica del sito Snam e scarica il file più recente.</span></div>
+      <textarea value="{{ wkrCsv }}" onChange="{{ setWkrCsv }}" rows="8" placeholder="ZONA_CLIMATICA;GIORNO;DATA_WKR;Wkr;TIPO;DATA_HDD&#10;11;20260820;20260820 10:41:06;1;I;20260820 11:00:00&#10;…" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11.5px;resize:vertical"></textarea>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Anno di pubblicazione<input value="{{ wkrAnno }}" onChange="{{ setWkrAnno }}" placeholder="anno corrente" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px"></label>
+        <button onClick="{{ scaricaWkr }}" style="padding:11px 16px;border:1px solid var(--prim);border-radius:9px;background:var(--surface);color:var(--primText);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Scarica da Jarvis</button>
+      </div>
+      <button onClick="{{ sistemaWkr }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Sistema i coefficienti</button>
+      <sc-if value="{{ wkrCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Lettura in corso…</span></sc-if>
+      <sc-if value="{{ wkrErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ wkrErrore }}</span></sc-if>
+      <sc-for list="{{ wkrErroriCampo }}" as="we" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ we.field }}: {{ we.message }}</span></sc-for>
+      <sc-for list="{{ wkrAvvisi }}" as="wa" hint-placeholder-count="1"><span style="font-size:11.5px;color:var(--warn)">{{ wa.testo }}</span></sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ wkrHa }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--ink)">{{ wkrFonte.pubblicazione }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">{{ wkrFonte.file }}</span></div>
+          <span style="font-size:12px;color:var(--ink2)">Pubblicato il {{ wkrFonte.dataWkr }} · HDD calcolati al {{ wkrFonte.dataHdd }}</span>
+          <a href="{{ wkrFonte.url }}" target="_blank" rel="noopener" style="font-size:12px;color:var(--primText);text-decoration:underline">Apri la pagina «Coefficienti WKR» su Jarvis</a>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Zone climatiche × giorni pubblicati</h3><span style="font-size:12px;color:var(--ink3)">I valori diversi da 1 sono evidenziati: sono la correzione climatica effettiva. In estate il Wkr è 1 ovunque.</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ wkrLegenda }}" as="wl" hint-placeholder-count="3"><span style="font-size:11px;padding:3px 9px;border-radius:99px;background:{{ wl.bg }};color:{{ wl.fg }}">{{ wl.testo }}</span></sc-for>
+          </div>
+          <div style="overflow-x:auto">
+            <div style="display:grid;grid-template-columns:70px repeat(7,minmax(86px,1fr));gap:6px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10.5px;font-weight:600;letter-spacing:.05em;color:var(--ink3)">
+              <span>ZONA</span>
+              <sc-for list="{{ wkrGiorni }}" as="wg" hint-placeholder-count="7"><span style="text-align:right">{{ wg.data }}<br><span style="font-weight:400;color:var(--ink3)">{{ wg.etichetta }}</span></span></sc-for>
+            </div>
+            <sc-for list="{{ wkrRighe }}" as="wr" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:70px repeat(7,minmax(86px,1fr));gap:6px;padding:6px 0;border-top:1px solid var(--line)">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600">{{ wr.zona }}</span>
+                <sc-for list="{{ wr.celle }}" as="wc" hint-placeholder-count="7"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;color:{{ wc.col }};font-weight:{{ wc.fw }}">{{ wc.v }}</span></sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <span style="font-size:11px;color:var(--ink3);line-height:1.5;text-wrap:pretty">{{ wkrNota }}</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ wkrVuoto }}" hint-placeholder-val="{{ true }}"><div style="padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessun coefficiente caricato. Incolla il CSV di Jarvis oppure premi «Scarica da Jarvis»: la finestra pubblicata copre ieri (consuntivo), oggi e i prossimi cinque giorni (provvisori).</span></div></sc-if>
     </div>
   </div>
 </section>

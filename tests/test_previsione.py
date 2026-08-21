@@ -293,3 +293,127 @@ def test_le_nuove_metriche_ci_sono_e_sono_coerenti():
         assert 0 <= blocco["smape"] <= 200
     # MASE dell'ensemble sotto 1: batte il naive a un passo sullo storico
     assert esito["backtest"]["mase"] < 1
+
+
+# ------------------------------------------------------------- aggancio Wkr
+
+def csv_domanda_fino_a(ultimo: date, giorni=112):
+    """Storico giornaliero che termina esattamente in ``ultimo``."""
+
+    inizio = ultimo - timedelta(days=giorni - 1)
+    righe = ["data;valore"] + [
+        f"{(inizio + timedelta(days=i)).isoformat()};{1000 + 180 * math.sin(2 * math.pi * (i % 7) / 7):.1f}"
+        for i in range(giorni)
+    ]
+    return "\n".join(righe)
+
+
+def csv_wkr_finestra(primo_giorno: date, zone=("11", "24"), fattore_fn=None):
+    """CSV Wkr nella forma di Jarvis: finestra di 7 giorni da ``primo_giorno``."""
+
+    tipi = ["C", "I", "P", "P2", "P3", "P4", "P5"]
+    righe = ["ZONA_CLIMATICA;GIORNO;DATA_WKR;Wkr;TIPO;DATA_HDD"]
+    for zona in zone:
+        for k, tipo in enumerate(tipi):
+            giorno = primo_giorno + timedelta(days=k)
+            valore = fattore_fn(zona, giorno) if fattore_fn else 1.1
+            righe.append(f"{zona};{giorno.strftime('%Y%m%d')};20260820 10:41:06;{valore};{tipo};20260820 11:00:00")
+    return "\n".join(righe)
+
+
+def test_senza_wkr_la_previsione_non_cambia():
+    """Compatibilità: senza CSV Wkr l'output è identico a prima (wkr: null)."""
+
+    esito = previsione.prevedi({"csv": csv_sintetico(), "orizzonte": 7})
+    assert esito["wkr"] is None
+    assert all("wkr" not in punto for punto in esito["previsione"])
+
+
+def test_col_wkr_ogni_giorno_previsto_espone_il_fattore():
+    ultimo = date(2026, 8, 18)
+    wkr_csv = csv_wkr_finestra(date(2026, 8, 19))
+    esito = previsione.prevedi({
+        "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+        "wkr_csv": wkr_csv, "wkr_zona": "11",
+    })
+    assert esito["wkr"]["zona"] == "11"
+    assert esito["wkr"]["applica"] is False
+    assert esito["wkr"]["giorni_coperti"] == 7
+    assert esito["wkr"]["giorni_scoperti"] == 0
+    for punto in esito["previsione"]:
+        assert punto["wkr"] == 1.1
+        assert punto["wkr_tipo"] in ("C", "I", "P", "P2", "P3", "P4", "P5")
+        assert "valore_modello" not in punto  # non applicato: il valore è del modello
+
+
+def test_applica_moltiplica_valore_e_banda_per_il_fattore():
+    ultimo = date(2026, 8, 18)
+    wkr_csv = csv_wkr_finestra(date(2026, 8, 19), fattore_fn=lambda z, g: 1.2)
+    senza = previsione.prevedi({
+        "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+        "wkr_csv": wkr_csv, "wkr_zona": "11",
+    })
+    con = previsione.prevedi({
+        "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+        "wkr_csv": wkr_csv, "wkr_zona": "11", "wkr_applica": True,
+    })
+    assert con["wkr"]["applica"] is True
+    for punto_senza, punto_con in zip(senza["previsione"], con["previsione"]):
+        assert punto_con["valore_modello"] == punto_senza["valore"]
+        assert punto_con["valore"] == round(punto_senza["valore"] * 1.2, 2)
+        assert punto_con["minimo"] == round(punto_senza["minimo"] * 1.2, 2)
+        assert punto_con["massimo"] == round(punto_senza["massimo"] * 1.2, 2)
+        assert punto_con["wkr_applicato"] is True
+
+
+def test_zona_mancante_o_sbagliata_elenca_le_disponibili():
+    ultimo = date(2026, 8, 18)
+    wkr_csv = csv_wkr_finestra(date(2026, 8, 19), zone=("11", "24"))
+    with pytest.raises(previsione.PrevisioneError) as errore:
+        previsione.prevedi({
+            "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7, "wkr_csv": wkr_csv,
+        })
+    assert "11, 24" in str(errore.value)
+    with pytest.raises(previsione.PrevisioneError) as errore:
+        previsione.prevedi({
+            "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+            "wkr_csv": wkr_csv, "wkr_zona": "99",
+        })
+    assert "11, 24" in str(errore.value)
+
+
+def test_csv_wkr_non_leggibile_diventa_errore_di_previsione():
+    ultimo = date(2026, 8, 18)
+    with pytest.raises(previsione.PrevisioneError) as errore:
+        previsione.prevedi({
+            "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+            "wkr_csv": "data;valore\n01/01/2026;1", "wkr_zona": "11",
+        })
+    assert "Wkr" in str(errore.value)
+
+
+def test_giorni_fuori_dalla_finestra_wkr_restano_scoperti():
+    # la finestra pubblicata arriva a G+5: con orizzonte 7 gli ultimi due
+    # giorni previsti non hanno un fattore ufficiale, e va dichiarato
+    ultimo = date(2026, 8, 20)
+    wkr_csv = csv_wkr_finestra(date(2026, 8, 19))
+    esito = previsione.prevedi({
+        "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+        "wkr_csv": wkr_csv, "wkr_zona": "11", "wkr_applica": True,
+    })
+    assert esito["wkr"]["giorni_coperti"] == 5
+    assert esito["wkr"]["giorni_scoperti"] == 2
+    assert any("non sono coperti" in a for a in esito["avvisi"])
+    scoperti = [p for p in esito["previsione"] if p["wkr"] is None]
+    assert len(scoperti) == 2
+    assert all("valore_modello" not in p for p in scoperti)  # nessun fattore inventato
+
+
+def test_col_wkr_il_determinismo_regge():
+    ultimo = date(2026, 8, 18)
+    payload = {
+        "csv": csv_domanda_fino_a(ultimo), "orizzonte": 7,
+        "wkr_csv": csv_wkr_finestra(date(2026, 8, 19)), "wkr_zona": "24",
+        "wkr_applica": True,
+    }
+    assert previsione.prevedi(payload) == previsione.prevedi(payload)
