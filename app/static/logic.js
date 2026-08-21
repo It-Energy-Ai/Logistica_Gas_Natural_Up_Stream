@@ -152,6 +152,7 @@
         prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
         wkrCsv: "", wkrAnno: "", wkrEsito: null, wkrErrore: "", wkrErrori: [], wkrCalcolo: false,
         prlFile: null, prlFileName: "", prlAnno: "", prlEsito: null, prlErrore: "", prlErrori: [], prlCalcolo: false,
+        msrUrl: "", msrUtente: "", msrPassword: "", msrPercorso: "", msrEsito: null, msrErrore: "", msrErrori: [], msrCalcolo: false,
         agnScadenze: [], agnCatalogo: null, agnContatori: null, agnOggi: "",
         agnErrore: "", agnInfo: "", agnErrori: [], agnElencoErrore: "",
         agnTitolo: "", agnCategoria: "operativo", agnData: "", agnRicorrenza: "una_tantum",
@@ -559,6 +560,7 @@
         previsione: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Previsione della domanda" }],
         wkr: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Coefficienti Wkr" }],
         prelievo: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Profili di prelievo standard" }],
+        misure: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Misure dei PDR" }],
         agenda: [{ label: "Moduli", t: "hub" }, { label: "Logistica Gas", t: "moduli" }, { label: "Agenda regolatoria" }],
       })[s] || [];
       const crumbs = trail.map((c, i) => ({
@@ -669,6 +671,7 @@
         { title: "Previsione della domanda", desc: "Storico giornaliero → backtest onesto e previsione dei prossimi giorni, con banda dichiarata: la base per preparare le nomine.", stat: "28", statLabel: "giorni di orizzonte massimo", reale: true, primary: true, go: go("previsione"), cursor: "pointer", border: "var(--line)" },
         { title: "Coefficienti Wkr", desc: "Il fattore di correzione climatica pubblicato ogni giorno da Snam per ciascuna zona climatica: incolla il CSV di Jarvis o scaricalo live.", stat: "18", statLabel: "zone climatiche", reale: true, primary: true, go: go("wkr"), cursor: "pointer", border: "var(--line)" },
         { title: "Profili di prelievo standard", desc: "Le percentuali giornaliere dei profili di prelievo pubblicate da Snam: carica il file .xls/.xlsx o scaricalo live da Jarvis, con controllo che ogni colonna sommi 100 sull'anno termico.", stat: "20", statLabel: "parametri percentuali", reale: true, primary: true, go: go("prelievo"), cursor: "pointer", border: "var(--line)" },
+        { title: "Misure dei PDR", desc: "Le misure pubblicate dal distributore su SIICloud (WebDAV Nextcloud): elenca i file per percorso, distinguendo le letture giornaliere (TGL) dalle mensili (TMG/TML), e apri gli XML.", stat: "2", statLabel: "classi di lettura: giornaliera e mensile", reale: true, primary: true, go: go("misure"), cursor: "pointer", border: "var(--line)" },
         { title: "Agenda regolatoria", desc: "Scadenze di stoccaggio, trasporto e regolatorio: modello precompilato dalle fonti e voci personalizzate, con promemoria di adempimento.", stat: String(agnCont.scadute), statLabel: agnCont.scadute === 1 ? "scadenza aperta oltre la data" : "scadenze aperte oltre la data", reale: true, primary: true, go: go("agenda"), cursor: "pointer", border: "var(--line)" },
       ];
       // Solo i numeri di scena vanno azzerati: quelli regolatori sono dati
@@ -1087,7 +1090,7 @@
       ];
       const repFiles = allRep.filter((r) => repCat === "tutti" || r.cat === repCat);
       const repProg = !demoOn ? [] : [["Bilancio giornaliero · 06:30", "rg"], ["Alert sbilanciamento", "rs"], ["Pacchetto regolatorio ARERA", "rr"]].map(([name, k]) => ({ name, go: () => this.setState((st) => ({ reps: { ...st.reps, [k]: !st.reps[k] } })), ...knob(this.state.reps[k]) }));
-      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", wkr: "moduli", prelievo: "moduli", agenda: "moduli" };
+      const backMap = { moduli: "hub", dash: "moduli", config: "hub", cfgSis: "config", cfgImp: "config", nomine: "moduli", bilancio: "moduli", capacita: "moduli", stoccaggio: "moduli", report: "moduli", remit: "moduli", pdr: "moduli", emir: "moduli", trasporto: "moduli", previsione: "moduli", wkr: "moduli", prelievo: "moduli", misure: "moduli", agenda: "moduli" };
 
       // --- REMIT: dominio server-side, auditabile e senza falsi invii ---
       const remStatoC = {
@@ -1754,6 +1757,62 @@
         aggiornatoIl: prl.fonte.aggiornato_il || "—",
       } : null;
 
+      // --- Misure dei PDR: SIICloud via WebDAV, credenziali mai salvate ----
+      const inviaMisure = async (payload) => {
+        this.setState({ msrErrore: "", msrErrori: [], msrCalcolo: true });
+        try {
+          const esito = await this._json("/api/misure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          this.setState({ msrEsito: esito, msrCalcolo: false });
+        } catch (error) {
+          this.setState({ msrErrore: `Misure non lette: ${error.message}`, msrErrori: error.dettagli || [], msrCalcolo: false, msrEsito: null });
+        }
+      };
+      const credenzialiMisure = () => ({
+        url: this.state.msrUrl, utente: this.state.msrUtente,
+        password: this.state.msrPassword, percorso: this.state.msrPercorso,
+      });
+      const elencaMisure = unaVolta("elencaMisure", () => inviaMisure({ ...credenzialiMisure(), azione: "elenca" }));
+      const apriMisure = (voce) => unaVolta(`apriMisure:${voce.percorso}`, () => inviaMisure({ ...credenzialiMisure(), azione: "apri", percorso: voce.percorso }))();
+
+      // Un esito malformato non deve far cadere il render: forma non attesa →
+      // stato vuoto.
+      const msrGrezzo = this.state.msrEsito;
+      const msr = msrGrezzo && msrGrezzo.fonte && (Array.isArray(msrGrezzo.voci) || msrGrezzo.contenuto) ? msrGrezzo : null;
+      const msrVoci = msr && Array.isArray(msr.voci) ? msr.voci.map((v) => {
+        const etichetta = v.cartella ? "Cartella" : v.tipo === "giornaliera" ? "TGL" : v.tipo === "mensile" ? "TMG/TML" : "File";
+        const colori = v.cartella ? RUN : v.tipo === "giornaliera" ? OK : v.tipo === "mensile" ? WAIT : NEG;
+        const dettaglio = v.cartella
+          ? "cartella"
+          : `${v.tipo === "giornaliera" ? "lettura giornaliera" : v.tipo === "mensile" ? "lettura mensile" : "file"} · ${v.dimensione != null ? `${v.dimensione.toLocaleString("it-IT")} byte` : "—"}`;
+        return {
+          nome: v.nome, etichetta, dettaglio, ...colori,
+          apri: v.cartella ? () => this.setState({ msrPercorso: v.percorso, msrEsito: null, msrErrore: "" }) : () => apriMisure(v),
+        };
+      }) : [];
+      const msrContenuto = msr && msr.contenuto && Array.isArray(msr.contenuto.campi) && Array.isArray(msr.contenuto.record) ? {
+        radice: msr.contenuto.radice || "—",
+        tagRecord: msr.contenuto.tag_record || "—",
+        numeroRecord: msr.contenuto.numero_record != null ? String(msr.contenuto.numero_record) : "0",
+        numeroCampi: String(Math.max(msr.contenuto.campi.length, 1)),
+        campi: msr.contenuto.campi,
+        record: msr.contenuto.record.map((r) => ({
+          celle: msr.contenuto.campi.map((c) => ({ v: r[c] != null && r[c] !== "" ? String(r[c]) : "—" })),
+        })),
+      } : null;
+      const msrFile = msr && msr.file ? {
+        nome: msr.file.nome || "—",
+        tipo: msr.file.tipo === "giornaliera" ? "lettura giornaliera (TGL)" : msr.file.tipo === "mensile" ? "lettura mensile (TMG/TML)" : "file XML",
+        dimensione: msr.file.dimensione != null ? `${msr.file.dimensione.toLocaleString("it-IT")} byte` : "—",
+      } : null;
+      const msrFonte = msr ? { origine: msr.fonte.origine || "—", percorso: msr.fonte.percorso || "/" } : null;
+      const msrGiornaliere = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella && v.tipo === "giornaliera").length : 0;
+      const msrMensili = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella && v.tipo === "mensile").length : 0;
+      const msrTotale = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella).length : 0;
+
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
         aperta: { testo: "aperta", ...RUN },
@@ -2100,7 +2159,7 @@
         pdrVuoto: !remRows.length, goRemit: go("remit"),
         theme, themeLabel: theme === "dark" ? "chiaro" : "scuro",
         primC: p.colorePrimario ?? "#0E5A75", accC: p.coloreAccento ?? "#2FA37C",
-        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenWkr: s === "wkr", screenPrelievo: s === "prelievo", screenAgenda: s === "agenda",
+        loggedIn: s !== "login", screenLogin: s === "login", screenHub: s === "hub", screenModuli: s === "moduli", screenDash: s === "dash", screenConfig: s === "config", screenCfgSis: s === "cfgSis", screenCfgImp: s === "cfgImp", screenNomine: s === "nomine", screenBilancio: s === "bilancio", screenCapacita: s === "capacita", screenStoccaggio: s === "stoccaggio", screenReport: s === "report", screenRemit: s === "remit", screenPdr: s === "pdr", screenEmir: s === "emir", screenTrasporto: s === "trasporto", screenPrevisione: s === "previsione", screenWkr: s === "wkr", screenPrelievo: s === "prelievo", screenMisure: s === "misure", screenAgenda: s === "agenda",
         remAcer: cfg.acer || "da configurare",
         remAcerVal: typeof cfg.acer === "string" ? cfg.acer : "",
         setRemAcer: (e) => this.setSilent((st) => ({ cfg: { ...st.cfg, acer: cap(e.target.value, 12) } })),
@@ -2261,6 +2320,20 @@
         prlAvvisi: prl ? (prl.avvisi || []).map((testo) => ({ testo })) : [],
         sistemaPrelievo, scaricaPrelievo, setPrlFile,
         setPrlAnno: (e) => this.setSilent({ prlAnno: e.target.value }),
+        msrUrl: this.state.msrUrl, msrUtente: this.state.msrUtente, msrPassword: this.state.msrPassword,
+        msrPercorso: this.state.msrPercorso,
+        msrErrore: this.state.msrErrore, msrErroriCampo: this.state.msrErrori,
+        msrCalcolo: this.state.msrCalcolo,
+        msrHa: !!msr, msrVuoto: !msr,
+        msrFonte, msrVoci, msrTotale: String(msrTotale),
+        msrGiornaliere: String(msrGiornaliere), msrMensili: String(msrMensili),
+        msrFile, msrContenuto,
+        msrNota: msr ? (msr.nota || "") : "",
+        elencaMisure,
+        setMsrUrl: (e) => this.setSilent({ msrUrl: e.target.value }),
+        setMsrUtente: (e) => this.setSilent({ msrUtente: e.target.value }),
+        setMsrPassword: (e) => this.setSilent({ msrPassword: e.target.value }),
+        setMsrPercorso: (e) => this.setSilent({ msrPercorso: e.target.value }),
         agnRows, agnKpis, agnVuoto: !agnRows.length,
         agnOggi: dataIt(this.state.agnOggi || ""),
         agnAdempiute: String(agnCont.adempiute_mese),

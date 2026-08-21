@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
-from . import agenda, edigas, emir, previsione, uti, pdr, prelievo, remit, trasporto, wkr
+from . import agenda, edigas, emir, misure, previsione, uti, pdr, prelievo, remit, trasporto, wkr
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "vettore_session"
@@ -879,6 +879,31 @@ async def post_prelievo(request: Request):
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
         return JSONResponse({"errore": f"Dati dei profili di prelievo non validi: {errore}"}, status_code=422)
+
+
+@app.post("/api/misure")
+async def post_misure(request: Request):
+    """Misure dei PDR da SIICloud (WebDAV): elenca una cartella o apre un file.
+
+    Stateless: indirizzo WebDAV, utente e password arrivano con la
+    richiesta e non vengono mai salvati.
+    """
+
+    email = _sessione(request)
+    if not email:
+        return JSONResponse({"errore": "sessione assente"}, status_code=401)
+    troppo_grande = _corpo_eccessivo(request, misure.MAX_CORPO_BYTES)
+    if troppo_grande:
+        return troppo_grande
+    payload = await _body_object(request, required=True)
+    if payload is None:
+        return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
+    try:
+        return misure.sistema(payload)
+    except misure.MisureError as errore:
+        return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
+    except (ValueError, OverflowError, TypeError) as errore:
+        return JSONResponse({"errore": f"Dati delle misure non validi: {errore}"}, status_code=422)
 
 
 @app.get("/api/agenda")

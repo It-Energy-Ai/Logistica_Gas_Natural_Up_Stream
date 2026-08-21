@@ -2,6 +2,19 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.16.0] — 2026-08-21
+
+**Misure dei PDR**: le misure pubblicate dal distributore su SIICloud entrano nel portale come modulo proprio, via WebDAV standard di Nextcloud.
+
+### Aggiunto
+- **Modulo Misure dei PDR** (21ª schermata, `app/misure.py`): l'operatore incolla l'indirizzo WebDAV di SIICloud, utente e password; il modulo elenca file e sottocartelle della cartella indicata (`PROPFIND`, profondità 1, autenticazione HTTP Basic), distingue le classi di lettura dal prefisso del nome — **TGL letture giornaliere, TMG o TML letture mensili** — e apre il file scelto (`GET`) riassumendo l'XML in forma generica: radice, tag dei record, campi e prime righe.
+- **Client WebDAV senza dipendenze nuove**: solo `urllib` e `xml.etree` della libreria standard, timeout 30 secondi; errori HTTP tradotti in italiano (401 credenziali rifiutate, 403 accesso negato, 404 percorso non trovato, 502 SIICloud non disponibile).
+- **Rotta `POST /api/misure`** stateless: le credenziali viaggiano solo nella richiesta e **non vengono mai salvate**; i file sono aperti solo in memoria e mostrati all'operatore che li ha richiesti — mai conservati né ritrasmessi.
+- **30 test Python nuovi** (514 pytest totali, in `tests/test_misure.py`: classificatore, validazione credenziali, costruzione URL, parsing multistatus e XML, rete sempre mockata e rotte) e **7 test Node nuovi** (113 totali) per card, binding, elenco con classificazione, navigazione cartelle, apertura file e percorso d'errore.
+
+### Modificato
+- **docs/misure.md** nuovo; **README** con la sezione del modulo, il conteggio delle verifiche (637) e le schermate (21); **build_frontend.py** con l'ancora del campo password di login resa univoca (ora esiste anche il campo password di Misure).
+
 ## [1.15.0] — 2026-08-21
 
 **Profili di prelievo standard**: le percentuali giornaliere pubblicate da Snam entrano nel portale come modulo proprio, con un parser .xls/.xlsx scritto da zero in puro Python.

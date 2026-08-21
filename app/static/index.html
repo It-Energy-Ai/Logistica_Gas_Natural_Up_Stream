@@ -1499,6 +1499,76 @@ input::placeholder{color:var(--ink3)}
 </section>
 </sc-if>
 
+<sc-if value="{{ screenMisure }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Misure" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Misure dei PDR</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Letture pubblicate dal distributore su SIICloud · TGL letture giornaliere · TMG e TML letture mensili</p></div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Fonte: SIICloud · WebDAV Nextcloud</span>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>Le credenziali SIICloud sono tue e restano tue: il portale le usa solo per la richiesta che premi e non le salva mai. I file di misura sono aperti in memoria e mostrati a te che li hai richiesti, senza conservazione né ritrasmissione.</span></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:18px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+      <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Accesso a SIICloud</h3><span style="font-size:12px;color:var(--ink3)">L'indirizzo WebDAV è quello in calce alle Impostazioni del browser di SIICloud; le credenziali sono quelle rilasciate dal SII (helpdesk@siimail.acquirenteunico.it).</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Indirizzo WebDAV<input value="{{ msrUrl }}" onChange="{{ setMsrUrl }}" placeholder="https://…/remote.php/dav/files/utente/" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Utente<input value="{{ msrUtente }}" onChange="{{ setMsrUtente }}" placeholder="utente SIICloud" autocomplete="username" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:12px"></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Password<input type="password" value="{{ msrPassword }}" onChange="{{ setMsrPassword }}" placeholder="••••••••" autocomplete="current-password" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:12px"></label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)">Percorso della cartella<input value="{{ msrPercorso }}" onChange="{{ setMsrPercorso }}" placeholder="es. TMG_12345678901/DISTRIBUTORE/TMG_12345678901_23456789012/2026/0821" style="padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px"><span style="font-size:11px;font-weight:400;color:var(--ink3)">Alberatura tipica: TMG_[PIVA_DISTR]/DISTRIBUTORE/TMG_[PIVA_DISTR]_[PIVA_UDD]/[ANNO]/[MESEGIORNO] · vuoto = cartella iniziale</span></label>
+      <button onClick="{{ elencaMisure }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Elenca i file di misura</button>
+      <sc-if value="{{ msrCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Lettura in corso…</span></sc-if>
+      <sc-if value="{{ msrErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ msrErrore }}</span></sc-if>
+      <sc-for list="{{ msrErroriCampo }}" as="me" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ me }}</span></sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ msrHa }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--ink)">{{ msrFonte.origine }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">{{ msrFonte.percorso }}</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(62,150,180,.16);color:#3E96B4">{{ msrTotale }} voci</span>
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(47,163,124,.15);color:#259372">{{ msrGiornaliere }} letture giornaliere (TGL)</span>
+            <span style="font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(180,140,60,.16);color:#A07830">{{ msrMensili }} letture mensili (TMG/TML)</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">File e cartelle</h3><span style="font-size:12px;color:var(--ink3)">Apri un file XML per leggerne il contenuto; le cartelle si navigano copiando il percorso a sinistra.</span></div>
+          <sc-for list="{{ msrVoci }}" as="mv" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)">
+              <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;flex:none;background:{{ mv.bg }};color:{{ mv.fg }}">{{ mv.etichetta }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink);overflow-wrap:anywhere;flex:1">{{ mv.nome }}</span>
+              <span style="font-size:11px;color:var(--ink3);flex:none">{{ mv.dettaglio }}</span>
+              <sc-if value="{{ mv.apri }}" hint-placeholder-val="{{ null }}"><button onClick="{{ mv.apri }}" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--primText);font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;flex:none">Apri</button></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ msrFile }}" hint-placeholder-val="{{ null }}">
+          <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
+            <div style="display:flex;flex-direction:column;gap:3px"><h3 style="margin:0;font-size:15px;font-weight:600">Contenuto del file</h3><span style="font-size:12px;color:var(--ink3)">{{ msrFile.nome }} · {{ msrFile.tipo }} · {{ msrFile.dimensione }} byte · radice «{{ msrContenuto.radice }}» · {{ msrContenuto.numeroRecord }} elementi «{{ msrContenuto.tagRecord }}»</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ msrContenuto.campi }}" as="mc" hint-placeholder-count="6"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 9px;border-radius:99px;background:var(--surface2);color:var(--ink2)">{{ mc }}</span></sc-for>
+            </div>
+            <div style="overflow-x:auto">
+              <div style="display:grid;grid-template-columns:repeat({{ msrContenuto.numeroCampi }},minmax(110px,1fr));gap:4px;padding:8px 0;border-bottom:1px solid var(--line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--ink3)">
+                <sc-for list="{{ msrContenuto.campi }}" as="mh" hint-placeholder-count="6"><span>{{ mh }}</span></sc-for>
+              </div>
+              <sc-for list="{{ msrContenuto.record }}" as="mr" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:repeat({{ msrContenuto.numeroCampi }},minmax(110px,1fr));gap:4px;padding:4px 0;border-top:1px solid var(--line)">
+                  <sc-for list="{{ mr.celle }}" as="mcell" hint-placeholder-count="6"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;overflow-wrap:anywhere">{{ mcell }}</span></sc-for>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:11px;color:var(--ink3);line-height:1.5;text-wrap:pretty">{{ msrNota }}</span>
+          </div>
+        </sc-if>
+      </sc-if>
+      <sc-if value="{{ msrVuoto }}" hint-placeholder-val="{{ true }}"><div style="padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center"><span style="font-size:12.5px;color:var(--ink3);text-wrap:pretty">Nessuna cartella letta. Inserisci indirizzo WebDAV, utente e password di SIICloud e premi «Elenca i file di misura»: il portale distingue le letture giornaliere (TGL) dalle mensili (TMG/TML) e apre i file XML senza salvarli.</span></div></sc-if>
+    </div>
+  </div>
+</section>
+</sc-if>
+
 <sc-if value="{{ screenAgenda }}" hint-placeholder-val="{{ false }}">
 <section data-screen-label="Agenda" style="max-width:1180px;margin:0 auto;padding:32px 28px 60px;animation:vtFade .3s ease">
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">

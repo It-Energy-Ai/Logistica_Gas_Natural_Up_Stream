@@ -80,7 +80,7 @@ flowchart LR
     D["design/design.html<br>(file di design)"] -->|build_frontend.py| T["index.html<br>template + stili generati"]
     T --> R["runtime.js<br>interprete sc-if / sc-for / var"]
     L["logic.js<br>porting della classe Component"] --> R
-    R --> UI["20 schermate"]
+    R --> UI["21 schermate"]
     L <-->|"PUT /api/state (auto-diff, retry)"| B["FastAPI"]
     B --> DB[("SQLite")]
 ```
@@ -181,6 +181,10 @@ La schermata **Coefficienti Wkr** porta nel portale il fattore di correzione cli
 
 La schermata **Profili di prelievo standard** porta nel portale le percentuali giornaliere dei profili di prelievo pubblicate da Snam su Jarvis per anno termico. Si carica il file «PERCENTUALI_DI_PRELIEVO_AT_…» (.xls o .xlsx) oppure lo si **scarica live** indicando l'anno termico. Il parser è puro Python senza dipendenze nuove: `.xlsx` come ZIP con XML, `.xls` come contenitore OLE2 con record BIFF8, scelto dal firmamento del file e non dall'estensione. La validazione è onesta: 365 o 366 giorni, i 20 parametri attesi (`c1%B1`…`t1%3`) e **ogni colonna che deve sommare esattamente 100** sull'anno termico — altrimenti l'errore elenca le colonne fuori controllo. Il valore `1E-8` è contato come zero. I dati sono mostrati all'operatore che li ha richiesti, **non conservati né ritrasmessi** (Snam ne vieta la redistribuzione). Dettagli in [docs/prelievo.md](docs/prelievo.md).
 
+## Misure dei PDR
+
+La schermata **Misure dei PDR** porta nel portale le misure pubblicate dal distributore su SIICloud, il cloud Nextcloud gestito da Acquirente Unico. Si incollano l'indirizzo WebDAV, utente e password; il modulo elenca file e sottocartelle della cartella indicata (protocollo WebDAV standard, solo libreria Python), distingue le classi di lettura dal prefisso — **TGL letture giornaliere, TMG o TML letture mensili** — e apre il file scelto riassumendo l'XML (radice, tag dei record, campi e prime righe). Le credenziali viaggiano solo nella richiesta e **non vengono mai salvate**; i file sono aperti solo in memoria e mostrati all'operatore che li ha richiesti. Dettagli in [docs/misure.md](docs/misure.md).
+
 ## Agenda regolatoria
 
 La schermata **Agenda regolatoria** tiene le scadenze vere dello shipper senza inventarne una. Il **modello regolatorio** precompila le 14 voci la cui data è fissata dalle fonti — fasi e programmi stagionali dello stoccaggio (Codice di Stoccaggio Stogit, §6.3.1, §6.3.2, Cap. 7 Allegato 1), calendario di conferimento, fatture di riaddebito, Anno Termico di trasporto e termine della nota UIOLI (Codice di Rete Snam) — e istanzia tutto per l'Anno Termico scelto con un clic, in modo idempotente. Consultazioni ARERA, aste Snam su Jarvis e obblighi REMIT legati a una transazione non hanno date fisse: si creano a mano con la stessa schermata. «Scaduta» è uno stato **derivato dalla data**, mai scritto: ogni voce si adempie (generando la prossima occorrenza se ricorrente) o si dichiara saltata. Dettagli in [docs/agenda.md](docs/agenda.md).
@@ -194,7 +198,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Seicento verifiche fra Python e Node (484 pytest + 106 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, coefficienti Wkr di Snam (parsing del CSV di Jarvis, griglia zona × giorno, download live e aggancio alla previsione), profili di prelievo standard (parser .xls BIFF8 e .xlsx senza dipendenze, validazione delle somme a 100 per colonna, download live), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Seicentotrentasette verifiche fra Python e Node (514 pytest + 113 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, coefficienti Wkr di Snam (parsing del CSV di Jarvis, griglia zona × giorno, download live e aggancio alla previsione), profili di prelievo standard (parser .xls BIFF8 e .xlsx senza dipendenze, validazione delle somme a 100 per colonna, download live), misure dei PDR da SIICloud (client WebDAV con classificazione TGL/TMG-TML, riassunto XML, credenziali mai salvate), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

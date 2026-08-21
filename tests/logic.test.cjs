@@ -1480,7 +1480,7 @@ test("Wkr: un errore del server arriva a schermo e azzera l'esito", async () => 
 test("Prelievo: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
-  const blocco = html.slice(html.indexOf('data-screen-label="Prelievo"'), html.indexOf('data-screen-label="Agenda"'));
+  const blocco = html.slice(html.indexOf('data-screen-label="Prelievo"'), html.indexOf('data-screen-label="Misure"'));
   assert.ok(blocco.length > 2000, "blocco Prelievo non trovato");
   const app = new App();
   app.setState({ screen: "prelievo" });
@@ -1590,6 +1590,143 @@ test("Prelievo: un errore del server arriva a schermo e azzera l'esito", async (
   assert.match(app.state.prlErrore, /controlli/);
   assert.equal(app.state.prlEsito, null);
   assert.equal(app.state.prlErrori.length, 1);
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: ogni binding del pannello ha un valore dal render", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");
+  const blocco = html.slice(html.indexOf('data-screen-label="Misure"'), html.indexOf('data-screen-label="Agenda"'));
+  assert.ok(blocco.length > 2000, "blocco Misure non trovato");
+  const app = new App();
+  app.setState({ screen: "misure" });
+  const v = app.renderVals();
+  const locali = new Set(["me", "mv", "mc", "mh", "mr", "mcell", "true", "false", "null"]);
+  const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
+    .filter((nome) => !locali.has(nome) && !(nome in v));
+  assert.deepEqual(mancanti, []);
+});
+
+test("Misure: avvio pulito, nessun esito e stato vuoto", () => {
+  const app = new App();
+  app.setState({ screen: "misure" });
+  const v = app.renderVals();
+  assert.equal(v.msrHa, false);
+  assert.equal(v.msrVuoto, true);
+  assert.deepEqual(v.msrVoci, []);
+  assert.equal(v.msrErrore, "");
+  assert.equal(v.msrUrl, "");
+});
+
+test("Misure: è un modulo a sé con card propria", () => {
+  const app = new App();
+  app.setState({ screen: "moduli" });
+  const v = app.renderVals();
+  const card = v.moduli.find((m) => m.title === "Misure dei PDR");
+  assert.ok(card, "manca la card Misure dei PDR");
+  card.go();
+  assert.equal(app.state.screen, "misure");
+});
+
+test("Misure: l'elenco invia le credenziali e classifica TGL e TMG", async () => {
+  const app = new App();
+  app.setState({ screen: "misure" });
+  const azioni = app.renderVals();
+  azioni.setMsrUrl(ev("https://cloud.example.com/remote.php/dav/files/utente/"));
+  azioni.setMsrUtente(ev("udd"));
+  azioni.setMsrPassword(ev("segreto"));
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { origine: "SIICloud (WebDAV)", url: "https://cloud.example.com/remote.php/dav/files/utente/", percorso: "/" },
+      voci: [
+        { nome: "TMG_123", percorso: "TMG_123", cartella: true, dimensione: null, modificato: "", tipo: null },
+        { nome: "TGL_20260101.xml", percorso: "TGL_20260101.xml", cartella: false, dimensione: 1234, modificato: "", tipo: "giornaliera" },
+        { nome: "TMG_202601.xml", percorso: "TMG_202601.xml", cartella: false, dimensione: 99, modificato: "", tipo: "mensile" },
+      ],
+      nota: "Alberatura tipica pubblicata dal distributore.",
+    }), text: async () => "" };
+  };
+  await app.renderVals().elencaMisure();
+  assert.equal(inviato.url, "/api/misure");
+  assert.equal(inviato.body.azione, "elenca");
+  assert.equal(inviato.body.utente, "udd");
+  assert.equal(inviato.body.password, "segreto");
+  const v = app.renderVals();
+  assert.equal(v.msrHa, true);
+  assert.equal(v.msrVoci.length, 3);
+  assert.equal(v.msrVoci[0].etichetta, "Cartella");
+  assert.equal(v.msrVoci[1].etichetta, "TGL");
+  assert.equal(v.msrVoci[2].etichetta, "TMG/TML");
+  assert.equal(v.msrGiornaliere, "1");
+  assert.equal(v.msrMensili, "1");
+  assert.equal(v.msrTotale, "2");
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: aprire una cartella aggiorna il percorso senza chiamare il server", async () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrEsito: {
+    fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" },
+    voci: [{ nome: "TMG_123", percorso: "TMG_123", cartella: true, dimensione: null, modificato: "", tipo: null }],
+    nota: "",
+  } });
+  let chiamato = false;
+  global.fetch = async () => { chiamato = true; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; };
+  const v = app.renderVals();
+  await v.msrVoci[0].apri();
+  assert.equal(chiamato, false);
+  assert.equal(app.state.msrPercorso, "TMG_123");
+  assert.equal(app.state.msrEsito, null);
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: l'apertura di un file XML mostra radice, campi e record", async () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrUrl: "https://x/dav/", msrUtente: "u", msrPassword: "p", msrEsito: {
+    fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" },
+    voci: [{ nome: "TGL_20260101.xml", percorso: "TGL_20260101.xml", cartella: false, dimensione: 512, modificato: "", tipo: "giornaliera" }],
+    nota: "",
+  } });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "TGL_20260101.xml" },
+      file: { nome: "TGL_20260101.xml", tipo: "giornaliera", dimensione: 512 },
+      contenuto: { radice: "Misure", elementi: 7, tag_record: "Record", numero_record: 2, campi: ["PDR", "Consumo"], record: [{ PDR: "123", Consumo: "100" }, { PDR: "124", Consumo: "200" }] },
+      nota: "",
+    }), text: async () => "" };
+  };
+  await app.renderVals().msrVoci[0].apri();
+  assert.equal(inviato.url, "/api/misure");
+  assert.equal(inviato.body.azione, "apri");
+  assert.equal(inviato.body.percorso, "TGL_20260101.xml");
+  const v = app.renderVals();
+  assert.equal(v.msrFile.nome, "TGL_20260101.xml");
+  assert.match(v.msrFile.tipo, /giornaliera/);
+  assert.equal(v.msrContenuto.radice, "Misure");
+  assert.equal(v.msrContenuto.numeroRecord, "2");
+  assert.equal(v.msrContenuto.numeroCampi, "2");
+  assert.deepEqual(v.msrContenuto.campi, ["PDR", "Consumo"]);
+  assert.equal(v.msrContenuto.record.length, 2);
+  assert.equal(v.msrContenuto.record[0].celle[0].v, "123");
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: un errore del server arriva a schermo e azzera l'esito", async () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrEsito: { finto: true }, msrUrl: "https://x/dav/", msrUtente: "u", msrPassword: "p" });
+  global.fetch = async () => ({
+    ok: false, status: 422,
+    json: async () => ({ errore: "dati di accesso incompleti", errors: ["password mancante"] }),
+    text: async () => "",
+  });
+  await app.renderVals().elencaMisure();
+  assert.match(app.state.msrErrore, /incompleti/);
+  assert.equal(app.state.msrEsito, null);
+  assert.equal(app.state.msrErrori.length, 1);
   global.fetch = FETCH_OK;
 });
 
