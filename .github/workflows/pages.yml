@@ -37,6 +37,8 @@ jobs:
           done
           # dashboard.png resta anche in PNG: è l'immagine dei meta tag social
           cp docs/screenshots/dashboard.png _site/screenshots/dashboard.png
+          # social.png è l'immagine dedicata ai social (1200x627, formato LinkedIn)
+          cp docs/screenshots/social.png _site/screenshots/social.png
 
       - name: Controlli di struttura
         run: |
@@ -45,6 +47,7 @@ jobs:
           test -f _site/404.html
           test -f _site/screenshots/dashboard.webp
           test -f _site/screenshots/dashboard.png
+          test -f _site/screenshots/social.png
           grep -q "screenshots/" _site/index.html
 
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
