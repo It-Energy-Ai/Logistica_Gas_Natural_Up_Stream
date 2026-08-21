@@ -34,7 +34,7 @@
       <p class="sub">Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, previsione della domanda e agenda regolatoria — in un'unica piattaforma che gira sul tuo computer.</p>
       <p class="sub2">Progettato per il mercato italiano: giorno gas reale, calendario italiano, documenti validati contro gli schemi ufficiali.</p>
       <div class="badges">
-        <span class="badge"><b>17 moduli</b> · 18 schermate</span>
+        <span class="badge"><b>20 moduli</b> · 21 schermate</span>
         <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest"><img src="https://img.shields.io/github/v/release/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream?label=release&color=0E5A75" alt="release" style="vertical-align:middle"></a>
         <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml">CI <b>verde</b></a>
         <span class="badge">MIT</span>
@@ -79,7 +79,7 @@
   <section id="funzioni">
     <div class="section-inner">
       <h2>I moduli</h2>
-      <p class="lead">Diciassette aree di lavoro, dall'accesso ai registri regolatori. Clicca su una schermata per vederla da vicino.</p>
+      <p class="lead">Venti aree di lavoro, dall'accesso ai registri regolatori. Clicca su una schermata per vederla da vicino.</p>
       <div class="grid">
 
         <div class="card" data-cap="Login — email/password o SSO aziendale con scelta account">
@@ -147,6 +147,21 @@
           <div class="body"><h3>Previsione della domanda</h3><p>Backtest onesto e futuro vero, con banda dichiarata.</p></div>
         </div>
 
+        <div class="card" data-cap="Coefficienti Wkr — fattore di correzione climatica di Snam per zona, con download live da Jarvis">
+          <img loading="lazy" src="screenshots/wkr.png" alt="Coefficienti Wkr">
+          <div class="body"><h3>Coefficienti Wkr</h3><p>Fattore di correzione climatica di Snam per zona, con download live da Jarvis.</p><span class="tag">Snam</span></div>
+        </div>
+
+        <div class="card" data-cap="Profili di prelievo standard — percentuali giornaliere Snam per anno termico, con controllo delle somme a 100">
+          <img loading="lazy" src="screenshots/prelievo.png" alt="Profili di prelievo standard">
+          <div class="body"><h3>Profili di prelievo standard</h3><p>Percentuali giornaliere Snam per anno termico, con controllo delle somme a 100.</p><span class="tag">Snam</span></div>
+        </div>
+
+        <div class="card" data-cap="Misure dei PDR — letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate">
+          <img loading="lazy" src="screenshots/misure.png" alt="Misure dei PDR">
+          <div class="body"><h3>Misure dei PDR</h3><p>Letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate.</p><span class="tag">SIICloud</span></div>
+        </div>
+
         <div class="card" data-cap="Report & Analisi — estrazioni e invii programmati per categoria">
           <img loading="lazy" src="screenshots/report.png" alt="Report e Analisi">
           <div class="body"><h3>Report &amp; Analisi</h3><p>Estrazioni e invii programmati per categoria.</p></div>
@@ -182,6 +197,9 @@
         <li><b>EMIR · Trade Repository</b> — <span>segnalazione ISO 20022 <code>auth.030</code> nelle otto azioni, validata contro gli schemi ESMA, esito <code>auth.092</code> abbinato agli UTI inviati.</span></li>
         <li><b>Trasporto · Interruzioni e UIOLI</b> — <span>registro delle interruzioni comunicate da Snam con i controlli del Codice di Rete, Utilizzo Medio per semestre, nota giustificativa scaricabile.</span></li>
         <li><b>PDR · GME</b> — <span>readiness e controlli preliminari, senza credenziali locali né falso invio.</span></li>
+        <li><b>Coefficienti Wkr</b> — <span>il fattore di correzione climatica pubblicato ogni giorno da Snam Rete Gas: griglia zona × giorno, download live da Jarvis e aggancio alla previsione della domanda.</span></li>
+        <li><b>Profili di prelievo standard</b> — <span>le percentuali giornaliere dei profili di prelievo pubblicate da Snam: parser .xls/.xlsx senza dipendenze e controllo che ogni colonna sommi 100 sull'anno termico.</span></li>
+        <li><b>Misure dei PDR</b> — <span>le letture pubblicate dal distributore su SIICloud (WebDAV Nextcloud): giornaliere TGL e mensili TMG/TML, apertura XML in memoria, credenziali usa-e-getta mai salvate.</span></li>
         <li><b>Agenda regolatoria</b> — <span>scadenze con data certa dalle fonti (modello Stogit/Snam, 14 voci per Anno Termico) e voci personalizzate, con stati adempiuta/saltata e occorrenze ricorrenti.</span></li>
       </ul>
     </div>
