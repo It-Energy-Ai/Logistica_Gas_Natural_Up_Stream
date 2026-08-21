@@ -1777,17 +1777,26 @@
       });
       const elencaMisure = unaVolta("elencaMisure", () => inviaMisure({ ...credenzialiMisure(), azione: "elenca" }));
       const apriMisure = (voce) => unaVolta(`apriMisure:${voce.percorso}`, () => inviaMisure({ ...credenzialiMisure(), azione: "apri", percorso: voce.percorso }))();
+      const serieMisure = unaVolta("serieMisure", () => inviaMisure({ ...credenzialiMisure(), azione: "serie" }));
+      // La serie costruita dalle misure diventa il CSV della previsione:
+      // intestazione data,valore e una riga per giorno di consumo.
+      const usaSerieInPrevisione = () => {
+        const serie = this.state.msrEsito && Array.isArray(this.state.msrEsito.serie) ? this.state.msrEsito.serie : [];
+        if (!serie.length) return;
+        const csv = ["data,valore", ...serie.map((p) => `${p.data},${p.valore}`)].join("\n");
+        this.setState({ prvCsv: csv, prvEsito: null, prvErrore: "", prvErrori: [], screen: "previsione" });
+      };
 
       // Un esito malformato non deve far cadere il render: forma non attesa →
       // stato vuoto.
       const msrGrezzo = this.state.msrEsito;
-      const msr = msrGrezzo && msrGrezzo.fonte && (Array.isArray(msrGrezzo.voci) || msrGrezzo.contenuto) ? msrGrezzo : null;
+      const msr = msrGrezzo && msrGrezzo.fonte && (Array.isArray(msrGrezzo.voci) || msrGrezzo.contenuto || Array.isArray(msrGrezzo.serie)) ? msrGrezzo : null;
       const msrVoci = msr && Array.isArray(msr.voci) ? msr.voci.map((v) => {
-        const etichetta = v.cartella ? "Cartella" : v.tipo === "giornaliera" ? "TGL" : v.tipo === "mensile" ? "TMG/TML" : "File";
-        const colori = v.cartella ? RUN : v.tipo === "giornaliera" ? OK : v.tipo === "mensile" ? WAIT : NEG;
+        const etichetta = v.cartella ? "Cartella" : v.tipo === "giornaliera" ? "TGL" : v.tipo === "mensile" ? "TMV/SWG1" : v.tipo === "cambio" ? "IGMG" : "File";
+        const colori = v.cartella ? RUN : v.tipo === "giornaliera" ? OK : v.tipo === "mensile" ? WAIT : v.tipo === "cambio" ? NEG : NEG;
         const dettaglio = v.cartella
           ? "cartella"
-          : `${v.tipo === "giornaliera" ? "lettura giornaliera" : v.tipo === "mensile" ? "lettura mensile" : "file"} · ${v.dimensione != null ? `${v.dimensione.toLocaleString("it-IT")} byte` : "—"}`;
+          : `${v.tipo === "giornaliera" ? "lettura giornaliera" : v.tipo === "mensile" ? "lettura mensile" : v.tipo === "cambio" ? "cambio contatore" : "file"} · ${v.dimensione != null ? `${v.dimensione.toLocaleString("it-IT")} byte` : "—"}`;
         return {
           nome: v.nome, etichetta, dettaglio, ...colori,
           apri: v.cartella ? () => this.setState({ msrPercorso: v.percorso, msrEsito: null, msrErrore: "" }) : () => apriMisure(v),
@@ -1805,13 +1814,23 @@
       } : null;
       const msrFile = msr && msr.file ? {
         nome: msr.file.nome || "—",
-        tipo: msr.file.tipo === "giornaliera" ? "lettura giornaliera (TGL)" : msr.file.tipo === "mensile" ? "lettura mensile (TMG/TML)" : "file XML",
+        tipo: msr.file.tipo === "giornaliera" ? "lettura giornaliera (TGL)" : msr.file.tipo === "mensile" ? "lettura mensile (TMV/SWG1)" : msr.file.tipo === "cambio" ? "cambio contatore (IGMG)" : "file XML",
         dimensione: msr.file.dimensione != null ? `${msr.file.dimensione.toLocaleString("it-IT")} byte` : "—",
       } : null;
       const msrFonte = msr ? { origine: msr.fonte.origine || "—", percorso: msr.fonte.percorso || "/" } : null;
       const msrGiornaliere = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella && v.tipo === "giornaliera").length : 0;
       const msrMensili = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella && v.tipo === "mensile").length : 0;
       const msrTotale = msr && Array.isArray(msr.voci) ? msr.voci.filter((v) => !v.cartella).length : 0;
+      const msrSerie = msr && Array.isArray(msr.serie) ? {
+        giorni: String(msr.serie.length),
+        pdr: msr.dettagli && msr.dettagli.pdr != null ? String(msr.dettagli.pdr) : "0",
+        letture: msr.dettagli && msr.dettagli.letture != null ? String(msr.dettagli.letture) : "0",
+        cambi: msr.dettagli && msr.dettagli.cambi != null ? String(msr.dettagli.cambi) : "0",
+        fileElaborati: msr.dettagli && msr.dettagli.file_elaborati != null ? String(msr.dettagli.file_elaborati) : "0",
+        righe: msr.serie.map((p) => ({ data: p.data, valore: numeroIt(p.valore) })),
+        pronta: msr.serie.length > 0,
+      } : null;
+      const msrAvvisi = msr && Array.isArray(msr.avvisi) ? msr.avvisi : [];
 
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
@@ -2327,9 +2346,9 @@
         msrHa: !!msr, msrVuoto: !msr,
         msrFonte, msrVoci, msrTotale: String(msrTotale),
         msrGiornaliere: String(msrGiornaliere), msrMensili: String(msrMensili),
-        msrFile, msrContenuto,
+        msrFile, msrContenuto, msrSerie, msrAvvisi,
         msrNota: msr ? (msr.nota || "") : "",
-        elencaMisure,
+        elencaMisure, serieMisure, usaSerieInPrevisione,
         setMsrUrl: (e) => this.setSilent({ msrUrl: e.target.value }),
         setMsrUtente: (e) => this.setSilent({ msrUtente: e.target.value }),
         setMsrPassword: (e) => this.setSilent({ msrPassword: e.target.value }),

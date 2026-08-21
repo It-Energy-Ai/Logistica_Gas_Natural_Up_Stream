@@ -2,6 +2,21 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.17.0] — 2026-08-22
+
+**Misure dei PDR → previsione della domanda**: il modulo misure impara i tracciati reali pubblicati su SIICloud e costruisce la serie giornaliera dei consumi, pronta per l'ensemble di previsione.
+
+### Aggiunto
+- **Azione «serie»** (`POST /api/misure`): il modulo scarica i file di misura del percorso indicato (o scende nelle ultime sottocartelle giorno, fino a 60), interpreta i tracciati reali `FlussoMisure` (TGL, TMV, SWG1) e `FlussoIGMG`, calcola per ogni PDR la differenza fra letture cumulative consecutive e somma i contributi per giorno. Esito con serie, dettagli (PDR, letture, cambi, file elaborati) e avvisi per i file non leggibili.
+- **Flussi reali riconosciuti**: `TGL` letture giornaliere, `TMV` e `SWG1` letture mensili, `IGMG` cambio contatore/correttore. Ogni file è un archivio ZIP con un solo XML: il modulo apre l'archivio in memoria (l'azione «apri» ora mostra anche il contenuto degli ZIP).
+- **Cambio contatore come nuova base**: la lettura `Post-int` del flusso IGMG diventa il riferimento della serie — il contatore che riparte da zero non produce consumi negativi. Le differenze negative (ricalcoli del distributore) sono ignorate, non inventate.
+- **Ponte con la previsione**: il bottone «Usa la serie nella previsione della domanda» compila il CSV della previsione (data,valore) e apre la schermata; servono almeno 28 giorni perché l'ensemble si addestri.
+- **23 test Python nuovi** (556 pytest totali, in `tests/test_misure.py`: classificatore sui nomi reali dei flussi, apertura ZIP, date italiane, parsing dei tracciati con fixture anonimizzate, serie giornaliera con cambi e ricalcoli, costruisci_serie con rete mockata) e **4 test Node nuovi** (117 totali) per serie, aggancio alla previsione e etichette IGMG.
+
+### Modificato
+- **Classificatore dei flussi** (`app/misure.py`): il token nel nome del file (non solo il prefisso) decide la classe; `TMG`/`TML` restano mensili per compatibilità con i nomi delle cartelle.
+- **docs/misure.md** aggiornato con i flussi reali, l'alberatura semplificata e il ponte con la previsione; **README** con il conteggio delle verifiche (683).
+
 ## [1.16.1] — 2026-08-21
 
 **Robustezza e sicurezza**: esito delle due review complete del progetto (analisi manuale + pip-audit, bandit, semgrep, checklist OWASP).

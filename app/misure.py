@@ -1,37 +1,50 @@
 """Misure dei PDR da SIICloud (WebDAV Nextcloud).
 
 Il distributore pubblica i file di misura su SIICloud; l'UDD li scarica.
-Tutti i file sono XML: i prefissi TGL indicano letture giornaliere,
-TMG e TML letture mensili. Il modulo è stateless: indirizzo WebDAV,
-utente e password arrivano con la richiesta e non vengono mai salvati.
+I file sono archivi ZIP contenenti un singolo XML del tracciato
+FlussiDatiMisuraPrelievoGAS. I flussi reali sono: TGL letture giornaliere,
+TMV e SWG1 letture mensili, IGMG cambio contatore/correttore con lettura
+d'avvio del nuovo apparato. Il modulo è stateless: indirizzo WebDAV, utente
+e password arrivano con la richiesta e non vengono mai salvati.
 """
 
 from __future__ import annotations
 
 import base64
+import io
 import ipaddress
+import re
 import socket
 import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 
 MAX_CORPO_BYTES = 512 * 1024
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_RECORD = 200
+MAX_GIORNI_SERIE = 60
 TIMEOUT_SECONDS = 30
 USER_AGENT = "Vettore (portale shipper; misure SIICloud)"
 NS_DAV = "DAV:"
 SCHEMI_CONSENTITI = ("http", "https")
+FIRMAMENTO_ZIP = b"PK\x03\x04"
 
 TIPO_GIORNALIERA = "giornaliera"
 TIPO_MENSILE = "mensile"
+TIPO_CAMBIO = "cambio"
 
 NOTA_ALBERATURA = (
     "Alberatura tipica pubblicata dal distributore: "
-    "TMG_[PIVA_DISTR]/DISTRIBUTORE/TMG_[PIVA_DISTR]_[PIVA_UDD]/[ANNO]/[MESEGIORNO]. "
-    "Prefissi dei file: TGL letture giornaliere, TMG o TML letture mensili."
+    "TMG_[PIVA_DISTR]_[PIVA_UDD]/[ANNO]/[MESEGIORNO]. "
+    "Flussi: TGL letture giornaliere, TMV e SWG1 letture mensili, "
+    "IGMG cambio contatore con lettura d'avvio del nuovo apparato."
 )
+
+_FLUSSO_NEL_NOME = re.compile(r"_(TGL|TMV|SWG\d*|TML|TMG|IGMG)_")
 
 
 class MisureError(ValueError):
@@ -43,12 +56,18 @@ class MisureError(ValueError):
 
 
 def classifica(nome_file):
-    """Riconosce il tipo di misura dal prefisso del nome del file."""
+    """Riconosce il tipo di misura dal nome del file (prefisso o token)."""
     nome = (nome_file or "").strip().upper()
-    if nome.startswith("TGL"):
+    if not nome:
+        return None
+    corrispondenza = _FLUSSO_NEL_NOME.search(nome)
+    token = corrispondenza.group(1) if corrispondenza else nome
+    if token.startswith("TGL"):
         return TIPO_GIORNALIERA
-    if nome.startswith(("TMG", "TML")):
+    if token.startswith(("TMV", "SWG", "TMG", "TML")):
         return TIPO_MENSILE
+    if token.startswith("IGMG"):
+        return TIPO_CAMBIO
     return None
 
 
@@ -174,7 +193,7 @@ def _parse_multistatus(corpo, base_path):
             "nome": nome,
             "percorso": relativo,
             "cartella": cartella,
-            "dimensione": int(dimensione) if (dimensione or "").isdigit() else None,
+            "dimensione": int(dimensione) if dimensione and dimensione.isdigit() else None,
             "modificato": modificato or "",
             "tipo": None if cartella else classifica(nome),
         })
@@ -187,6 +206,13 @@ def elenca(url, utente, password, percorso=""):
     corpo = _richiesta(destinazione, "PROPFIND", utente, password, {"Depth": "1"})
     base_path = urllib.parse.urlparse(_url_percorso(url, "")).path
     return _parse_multistatus(corpo, base_path)
+
+
+def _elenca_sicura(url, utente, password, percorso):
+    try:
+        return elenca(url, utente, password, percorso)
+    except MisureError:
+        return []
 
 
 def scarica_file(url, utente, password, percorso):
@@ -204,6 +230,21 @@ def _locale(tag):
     return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
 
+def _contenuto_xml(contenuto, nome_file=""):
+    """Apre lo ZIP se necessario e restituisce i byte dell'XML interno."""
+    if contenuto[:4] == FIRMAMENTO_ZIP:
+        try:
+            archivio = zipfile.ZipFile(io.BytesIO(contenuto))
+        except zipfile.BadZipFile as errore:
+            raise MisureError("il file non è un archivio ZIP valido") from errore
+        with archivio:
+            nomi_xml = [n for n in archivio.namelist() if n.lower().endswith(".xml")]
+            if not nomi_xml:
+                raise MisureError("l'archivio non contiene file XML")
+            return archivio.read(nomi_xml[0])
+    return contenuto
+
+
 def riassumi_xml(contenuto):
     """Riassume il contenuto di un file di misura XML in forma generica."""
     try:
@@ -216,7 +257,7 @@ def riassumi_xml(contenuto):
         if elemento is not radice and len(elemento) > 0:
             tag = _locale(elemento.tag)
             conteggi[tag] = conteggi.get(tag, 0) + 1
-    tag_record = max(conteggi, key=conteggi.get) if conteggi else None
+    tag_record = max(conteggi, key=lambda tag: conteggi[tag]) if conteggi else None
     campi = []
     record = []
     if tag_record:
@@ -242,12 +283,173 @@ def riassumi_xml(contenuto):
     }
 
 
+def _testo_locale(elemento, *tags):
+    """Testo del primo figlio il cui tag locale è fra quelli indicati."""
+    cercati = {t.lower() for t in tags}
+    for figlio in elemento:
+        if _locale(figlio.tag).lower() in cercati:
+            return (figlio.text or "").strip()
+    return ""
+
+
+def _data_it(testo):
+    """Converte una data GG/MM/AAAA in formato ISO AAAA-MM-GG."""
+    testo = (testo or "").strip()
+    parti = testo.split("/")
+    if len(parti) != 3 or not all(p.isdigit() for p in parti):
+        return None
+    giorno, mese, anno = parti
+    try:
+        return date(int(anno), int(mese), int(giorno)).isoformat()
+    except ValueError:
+        return None
+
+
+def _intero(testo):
+    testo = (testo or "").strip()
+    return int(testo) if testo.isdigit() else None
+
+
+def _lettura(blocco, cod_pdr):
+    data = _data_it(_testo_locale(blocco, "data_comp", "data_racc", "data_mis_eff"))
+    valore = _intero(_testo_locale(blocco, "let_tot_conv"))
+    if valore is None:
+        valore = _intero(_testo_locale(blocco, "let_tot_prel"))
+    if data is None or valore is None:
+        return None
+    return {"pdr": cod_pdr, "data": data, "valore": valore}
+
+
+def _cambio(blocco, cod_pdr, data_misura):
+    valore = _intero(_testo_locale(blocco, "let_misuratore"))
+    data = _data_it(data_misura)
+    if data is None or valore is None:
+        return None
+    return {"pdr": cod_pdr, "data": data, "valore": valore}
+
+
+def leggi_flusso(contenuto):
+    """Estrae letture cumulative e cambi contatore da un XML di misura."""
+    try:
+        radice = ET.fromstring(contenuto)
+    except ET.ParseError as errore:
+        raise MisureError("il file non è un XML valido") from errore
+    letture = []
+    cambi = []
+    for nodo in radice.iter():
+        if _locale(nodo.tag).lower() != "datipdr":
+            continue
+        cod_pdr = _testo_locale(nodo, "cod_pdr", "cod_PdDR")
+        if not cod_pdr:
+            continue
+        for blocco in nodo:
+            tag = _locale(blocco.tag).lower()
+            if tag in ("letturegiornaliere", "datilettura"):
+                lettura = _lettura(blocco, cod_pdr)
+                if lettura:
+                    letture.append(lettura)
+            elif tag == "post-int":
+                cambio = _cambio(blocco, cod_pdr, _testo_locale(nodo, "data_misura"))
+                if cambio:
+                    cambi.append(cambio)
+    return letture, cambi
+
+
+def serie_giornaliera(letture, cambi):
+    """Trasforma letture cumulative in consumi giornalieri aggregati.
+
+    Il consumo di un giorno è la differenza fra letture consecutive dello
+    stesso PDR. Un cambio contatore (IGMG) azzera il contatore: la lettura
+    d'avvio del nuovo apparato diventa il punto di ripartenza.
+    """
+    per_pdr = {}
+    for lettura in letture:
+        per_pdr.setdefault(lettura["pdr"], []).append((lettura["data"], lettura["valore"], False))
+    for cambio in cambi:
+        per_pdr.setdefault(cambio["pdr"], []).append((cambio["data"], cambio["valore"], True))
+    consumi = {}
+    for _pdr, eventi in per_pdr.items():
+        eventi.sort(key=lambda evento: evento[0])
+        precedente = None
+        for data, valore, e_cambio in eventi:
+            if e_cambio:
+                precedente = valore
+                continue
+            if precedente is not None and valore >= precedente:
+                consumi[data] = consumi.get(data, 0) + (valore - precedente)
+            precedente = valore
+    return [{"data": data, "valore": consumi[data]} for data in sorted(consumi)]
+
+
+def _unisci(percorso, nome):
+    base = (percorso or "").strip("/")
+    return f"{base}/{nome}" if base else nome
+
+
+def _scarica_e_leggi(url, utente, password, voce):
+    try:
+        contenuto = scarica_file(url, utente, password, voce["percorso"])
+        xml = _contenuto_xml(contenuto, voce["nome"])
+        letture, cambi = leggi_flusso(xml)
+        return letture, cambi, None
+    except MisureError as errore:
+        return [], [], str(errore)
+
+
+def costruisci_serie(url, utente, password, percorso="", giorni=MAX_GIORNI_SERIE):
+    """Scarica i file di misura di una cartella e costruisce la serie."""
+    voci = elenca(url, utente, password, percorso)
+    file_misura = [v for v in voci if not v["cartella"] and v["tipo"]]
+    cartelle = [v for v in voci if v["cartella"]]
+    avvisi = []
+    if not file_misura and cartelle:
+        cartelle.sort(key=lambda v: v["nome"], reverse=True)
+        scelte = cartelle[:giorni]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            risultati = list(pool.map(lambda c: _elenca_sicura(url, utente, password, _unisci(percorso, c["nome"])), scelte))
+        for sotto in risultati:
+            file_misura.extend(v for v in sotto if not v["cartella"] and v["tipo"])
+    if not file_misura:
+        raise MisureError("nessun file di misura trovato nel percorso indicato")
+    letture, cambi, elaborati = [], [], []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        risultati = list(pool.map(lambda v: _scarica_e_leggi(url, utente, password, v), file_misura))
+    for voce, (letture_file, cambi_file, avviso) in zip(file_misura, risultati):
+        if avviso:
+            avvisi.append(f"{voce['nome']}: {avviso}")
+            continue
+        letture.extend(letture_file)
+        cambi.extend(cambi_file)
+        elaborati.append(voce["nome"])
+    serie = serie_giornaliera(letture, cambi)
+    pdr = sorted({l["pdr"] for l in letture} | {c["pdr"] for c in cambi})
+    return {
+        "serie": serie,
+        "dettagli": {
+            "pdr": len(pdr),
+            "letture": len(letture),
+            "cambi": len(cambi),
+            "file_elaborati": len(elaborati),
+            "giorni_coperti": len(serie),
+        },
+        "avvisi": avvisi,
+    }
+
+
+def _giorni_richiesti(dati):
+    try:
+        giorni = int(dati.get("giorni") or MAX_GIORNI_SERIE)
+    except (TypeError, ValueError):
+        giorni = MAX_GIORNI_SERIE
+    return max(1, min(giorni, MAX_GIORNI_SERIE))
+
+
 def _fonte(url, percorso):
     return {"origine": "SIICloud (WebDAV)", "url": url, "percorso": percorso or "/"}
 
 
 def sistema(dati):
-    """Punto d'ingresso: elenca una cartella oppure apre un file di misura."""
+    """Punto d'ingresso: elenca, apre un file o costruisce la serie."""
     dati = dati if isinstance(dati, dict) else {}
     url = str(dati.get("url") or "").strip()
     utente = str(dati.get("utente") or "").strip()
@@ -260,10 +462,14 @@ def sistema(dati):
     if azione == "apri":
         contenuto = scarica_file(url, utente, password, percorso)
         nome = urllib.parse.unquote(percorso).rstrip("/").rsplit("/", 1)[-1]
+        xml = _contenuto_xml(contenuto, nome)
         return {
             "fonte": _fonte(url, percorso),
             "file": {"nome": nome, "tipo": classifica(nome), "dimensione": len(contenuto)},
-            "contenuto": riassumi_xml(contenuto),
+            "contenuto": riassumi_xml(xml),
             "nota": NOTA_ALBERATURA,
         }
-    raise MisureError("azione non valida: atteso «elenca» o «apri»")
+    if azione == "serie":
+        esito = costruisci_serie(url, utente, password, percorso, _giorni_richiesti(dati))
+        return {"fonte": _fonte(url, percorso), **esito, "nota": NOTA_ALBERATURA}
+    raise MisureError("azione non valida: atteso «elenca», «apri» o «serie»")

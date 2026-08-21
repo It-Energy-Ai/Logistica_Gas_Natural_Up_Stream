@@ -1601,7 +1601,7 @@ test("Misure: ogni binding del pannello ha un valore dal render", () => {
   const app = new App();
   app.setState({ screen: "misure" });
   const v = app.renderVals();
-  const locali = new Set(["me", "mv", "mc", "mh", "mr", "mcell", "true", "false", "null"]);
+  const locali = new Set(["me", "mv", "mc", "mh", "mr", "mcell", "ms", "mav", "true", "false", "null"]);
   const mancanti = [...new Set([...blocco.matchAll(/\{\{\s*([A-Za-z_$][\w$.]*)\s*\}\}/g)].map((m) => m[1].split(".")[0]))]
     .filter((nome) => !locali.has(nome) && !(nome in v));
   assert.deepEqual(mancanti, []);
@@ -1658,7 +1658,7 @@ test("Misure: l'elenco invia le credenziali e classifica TGL e TMG", async () =>
   assert.equal(v.msrVoci.length, 3);
   assert.equal(v.msrVoci[0].etichetta, "Cartella");
   assert.equal(v.msrVoci[1].etichetta, "TGL");
-  assert.equal(v.msrVoci[2].etichetta, "TMG/TML");
+  assert.equal(v.msrVoci[2].etichetta, "TMV/SWG1");
   assert.equal(v.msrGiornaliere, "1");
   assert.equal(v.msrMensili, "1");
   assert.equal(v.msrTotale, "2");
@@ -1728,6 +1728,80 @@ test("Misure: un errore del server arriva a schermo e azzera l'esito", async () 
   assert.equal(app.state.msrEsito, null);
   assert.equal(app.state.msrErrori.length, 1);
   global.fetch = FETCH_OK;
+});
+
+test("Misure: la serie dei consumi invia l'azione serie e mostra i dettagli", async () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrUrl: "https://x/dav/", msrUtente: "u", msrPassword: "p", msrPercorso: "TMG_123/2026" });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = { url, body: JSON.parse(opts.body || "{}") };
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "TMG_123/2026" },
+      serie: [{ data: "2026-01-01", valore: 120 }, { data: "2026-01-02", valore: 95.5 }],
+      dettagli: { pdr: 3, letture: 40, cambi: 1, file_elaborati: 5, giorni_coperti: 2 },
+      avvisi: ["file_rotto.zip: archivio non leggibile"],
+      nota: "",
+    }), text: async () => "" };
+  };
+  await app.renderVals().serieMisure();
+  assert.equal(inviato.url, "/api/misure");
+  assert.equal(inviato.body.azione, "serie");
+  assert.equal(inviato.body.percorso, "TMG_123/2026");
+  const v = app.renderVals();
+  assert.equal(v.msrHa, true);
+  assert.equal(v.msrSerie.giorni, "2");
+  assert.equal(v.msrSerie.pdr, "3");
+  assert.equal(v.msrSerie.letture, "40");
+  assert.equal(v.msrSerie.cambi, "1");
+  assert.equal(v.msrSerie.fileElaborati, "5");
+  assert.equal(v.msrSerie.pronta, true);
+  assert.equal(v.msrSerie.righe.length, 2);
+  assert.equal(v.msrSerie.righe[0].data, "2026-01-01");
+  assert.equal(v.msrSerie.righe[1].valore, "95,5");
+  assert.deepEqual(v.msrAvvisi, ["file_rotto.zip: archivio non leggibile"]);
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: la serie costruita diventa il CSV della previsione", async () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrEsito: {
+    fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" },
+    serie: [{ data: "2026-01-01", valore: 120 }, { data: "2026-01-02", valore: 95 }],
+    dettagli: { pdr: 1, letture: 2, cambi: 0, file_elaborati: 1, giorni_coperti: 2 },
+    avvisi: [],
+    nota: "",
+  } });
+  let chiamato = false;
+  global.fetch = async () => { chiamato = true; return { ok: true, status: 200, json: async () => ({}), text: async () => "" }; };
+  app.renderVals().usaSerieInPrevisione();
+  assert.equal(chiamato, false);
+  assert.equal(app.state.screen, "previsione");
+  assert.equal(app.state.prvCsv, "data,valore\n2026-01-01,120\n2026-01-02,95");
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: senza serie il passaggio alla previsione non avviene", () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrEsito: {
+    fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" },
+    serie: [], dettagli: { pdr: 0, letture: 0, cambi: 0, file_elaborati: 0, giorni_coperti: 0 }, avvisi: [], nota: "",
+  } });
+  app.renderVals().usaSerieInPrevisione();
+  assert.equal(app.state.screen, "misure");
+  assert.equal(app.state.prvCsv, "");
+});
+
+test("Misure: i flussi IGMG sono etichettati come cambio contatore", () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrEsito: {
+    fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" },
+    voci: [{ nome: "004894_202604_IGMG_1.zip", percorso: "004894_202604_IGMG_1.zip", cartella: false, dimensione: 900, modificato: "", tipo: "cambio" }],
+    nota: "",
+  } });
+  const v = app.renderVals();
+  assert.equal(v.msrVoci[0].etichetta, "IGMG");
+  assert.match(v.msrVoci[0].dettaglio, /cambio contatore/);
 });
 
 test("Agenda: ogni binding del pannello ha un valore dal render", () => {
