@@ -26,16 +26,24 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Compone il sito (schermate incluse)
+      - name: Compone il sito (schermate incluse, in WebP)
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq webp
           mkdir -p _site/screenshots
           cp -r sito/* _site/
-          cp docs/screenshots/*.png docs/screenshots/*.gif _site/screenshots/
+          for f in docs/screenshots/*.png; do
+            cwebp -q 82 -quiet "$f" -o "_site/screenshots/$(basename "${f%.png}.webp")"
+          done
+          # dashboard.png resta anche in PNG: è l'immagine dei meta tag social
+          cp docs/screenshots/dashboard.png _site/screenshots/dashboard.png
 
       - name: Controlli di struttura
         run: |
           test -f _site/index.html
           test -f _site/style.css
+          test -f _site/404.html
+          test -f _site/screenshots/dashboard.webp
           test -f _site/screenshots/dashboard.png
           grep -q "screenshots/" _site/index.html
 

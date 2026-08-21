@@ -4,7 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vettore — Portale Logistica Gas</title>
-<meta name="description" content="Il portale operativo per shipper e trader di gas naturale sul mercato italiano: nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio e agenda regolatoria. Un file solo, senza installazioni.">
+<meta name="description" content="Il portale operativo per shipper e trader di gas naturale sul mercato italiano: nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, coefficienti Wkr, profili di prelievo e misure dei PDR da SIICloud. Un file solo, senza installazioni.">
+<link rel="canonical" href="https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Vettore — Portale Logistica Gas">
+<meta property="og:description" content="Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, Wkr, profili di prelievo e misure dei PDR: 20 moduli per shipper e trader di gas naturale, in un file solo.">
+<meta property="og:url" content="https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/">
+<meta property="og:image" content="https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/screenshots/dashboard.png">
+<meta property="og:locale" content="it_IT">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vettore — Portale Logistica Gas">
+<meta name="twitter:description" content="Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, Wkr, profili di prelievo e misure dei PDR: 20 moduli per shipper e trader di gas naturale, in un file solo.">
+<meta name="twitter:image" content="https://it-energy-ai.github.io/Logistica_Gas_Natural_Up_Stream/screenshots/dashboard.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A75'/><text x='16' y='22' font-size='17' font-weight='700' text-anchor='middle' fill='white' font-family='sans-serif'>V</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,12 +42,12 @@
   <div class="hero">
     <div class="hero-inner">
       <h1>Il portale operativo per <em>shipper e trader</em> di gas naturale.</h1>
-      <p class="sub">Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, previsione della domanda e agenda regolatoria — in un'unica piattaforma che gira sul tuo computer.</p>
-      <p class="sub2">Progettato per il mercato italiano: giorno gas reale, calendario italiano, documenti validati contro gli schemi ufficiali.</p>
+      <p class="sub">Nomine EDIG@S, REMIT, EMIR, trasporto, stoccaggio, previsione della domanda, coefficienti Wkr, profili di prelievo standard e misure dei PDR da SIICloud — in un'unica piattaforma che gira sul tuo computer.</p>
+      <p class="sub2">Progettato per il mercato italiano: giorno gas reale, calendario italiano, documenti validati contro gli schemi ufficiali, dati pubblici Snam e SIICloud letti direttamente dalle fonti.</p>
       <div class="badges">
         <span class="badge"><b>20 moduli</b> · 21 schermate</span>
         <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest"><img src="https://img.shields.io/github/v/release/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream?label=release&color=0E5A75" alt="release" style="vertical-align:middle"></a>
-        <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml">CI <b>verde</b></a>
+        <a class="badge" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/ci.yml?label=CI" alt="stato della CI" style="vertical-align:middle"></a>
         <span class="badge">MIT</span>
         <span class="badge">Python 3.11+ · FastAPI</span>
       </div>
@@ -45,7 +56,7 @@
         <a class="btn btn-primary" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-macos-apple-silicon">⬇ Scarica per macOS</a>
         <a class="btn btn-ghost" href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/releases/latest/download/Vettore-linux">⬇ Linux</a>
       </div>
-      <img class="hero-shot" src="screenshots/dashboard.png" alt="Dashboard di Vettore: posizione shipper del giorno gas" width="960">
+      <img class="hero-shot" src="screenshots/dashboard.webp" alt="Dashboard di Vettore: posizione shipper del giorno gas" width="960">
     </div>
   </div>
 
@@ -83,102 +94,102 @@
       <div class="grid">
 
         <div class="card" data-cap="Login — email/password o SSO aziendale con scelta account">
-          <img loading="lazy" src="screenshots/login.png" alt="Login con SSO aziendale">
+          <img loading="lazy" src="screenshots/login.webp" alt="Login con SSO aziendale">
           <div class="body"><h3>Login</h3><p>Email/password o SSO aziendale con scelta account.</p></div>
         </div>
 
         <div class="card" data-cap="Hub — i moduli come carte da gioco, con effetto mazzo all'hover">
-          <img loading="lazy" src="screenshots/hub.png" alt="Hub moduli">
+          <img loading="lazy" src="screenshots/hub.webp" alt="Hub moduli">
           <div class="body"><h3>Hub</h3><p>I moduli come carte da gioco, con effetto mazzo all'hover.</p></div>
         </div>
 
         <div class="card" data-cap="Nomine — documento EDIG@S 6.1 validato e registro interno dei cicli">
-          <img loading="lazy" src="screenshots/nomine.png" alt="Nomine e programmazione">
+          <img loading="lazy" src="screenshots/nomine.webp" alt="Nomine e programmazione">
           <div class="body"><h3>Nomine</h3><p>Documento EDIG@S 6.1 validato e registro interno dei cicli.</p></div>
         </div>
 
         <div class="card" data-cap="Bilanciamento — disequilibrio DS e azioni correttive, tema scuro">
-          <img loading="lazy" src="screenshots/bilanciamento-dark.png" alt="Bilanciamento in tema scuro">
+          <img loading="lazy" src="screenshots/bilanciamento-dark.webp" alt="Bilanciamento in tema scuro">
           <div class="body"><h3>Bilanciamento</h3><p>Disequilibrio DS, azioni correttive — tema scuro incluso.</p></div>
         </div>
 
         <div class="card" data-cap="Logistica Gas — le aree di lavoro operative">
-          <img loading="lazy" src="screenshots/moduli.png" alt="Aree di lavoro Logistica Gas">
+          <img loading="lazy" src="screenshots/moduli.webp" alt="Aree di lavoro Logistica Gas">
           <div class="body"><h3>Logistica Gas</h3><p>Le aree di lavoro operative del portale.</p></div>
         </div>
 
         <div class="card" data-cap="Configuratore — utenti con wizard a 3 passi e impostazioni locali">
-          <img loading="lazy" src="screenshots/configuratore-wizard.png" alt="Wizard aggiungi utente">
+          <img loading="lazy" src="screenshots/configuratore-wizard.webp" alt="Wizard aggiungi utente">
           <div class="body"><h3>Configuratore</h3><p>Utenti con wizard a 3 passi e impostazioni locali.</p></div>
         </div>
 
         <div class="card" data-cap="REMIT — registro nei tre stati, validazione XSD, UTI, audit ed export">
-          <img loading="lazy" src="screenshots/remit.png" alt="REMIT · XML ACER">
+          <img loading="lazy" src="screenshots/remit.webp" alt="REMIT · XML ACER">
           <div class="body"><h3>REMIT · XML ACER</h3><p>Registro nei tre stati, validazione XSD, UTI, audit ed export.</p><span class="tag">ACER</span></div>
         </div>
 
         <div class="card" data-cap="PDR · GME — profilo, schemi fissati, preflight e ricevute">
-          <img loading="lazy" src="screenshots/pdr.png" alt="PDR · GME">
+          <img loading="lazy" src="screenshots/pdr.webp" alt="PDR · GME">
           <div class="body"><h3>PDR · GME</h3><p>Profilo, schemi fissati, preflight per artefatto e ricevute.</p><span class="tag">GME</span></div>
         </div>
 
         <div class="card" data-cap="EMIR — segnalazione ISO 20022 auth.030 ed esito del registro">
-          <img loading="lazy" src="screenshots/emir.png" alt="EMIR · Trade Repository">
+          <img loading="lazy" src="screenshots/emir.webp" alt="EMIR · Trade Repository">
           <div class="body"><h3>EMIR · Trade Repository</h3><p>Segnalazione ISO 20022 auth.030 ed esito del registro.</p><span class="tag">ESMA</span></div>
         </div>
 
         <div class="card" data-cap="Trasporto — interruzioni Snam, Utilizzo Medio e nota UIOLI">
-          <img loading="lazy" src="screenshots/trasporto.png" alt="Trasporto · Interruzioni e UIOLI">
+          <img loading="lazy" src="screenshots/trasporto.webp" alt="Trasporto · Interruzioni e UIOLI">
           <div class="body"><h3>Trasporto</h3><p>Interruzioni ricevute da Snam, Utilizzo Medio e nota UIOLI.</p><span class="tag">Snam</span></div>
         </div>
 
         <div class="card" data-cap="Capacità & Contratti — capacità conferite, contratti attivi, scadenze d'asta">
-          <img loading="lazy" src="screenshots/capacita.png" alt="Capacità e Contratti">
+          <img loading="lazy" src="screenshots/capacita.webp" alt="Capacità e Contratti">
           <div class="body"><h3>Capacità &amp; Contratti</h3><p>Capacità conferite, contratti attivi, scadenze d'asta.</p></div>
         </div>
 
         <div class="card" data-cap="Stoccaggio — giacenza, iniezione ed erogazione, servizi Stogit">
-          <img loading="lazy" src="screenshots/stoccaggio.png" alt="Stoccaggio">
+          <img loading="lazy" src="screenshots/stoccaggio.webp" alt="Stoccaggio">
           <div class="body"><h3>Stoccaggio</h3><p>Giacenza, iniezione ed erogazione, servizi Stogit.</p><span class="tag">Stogit</span></div>
         </div>
 
         <div class="card" data-cap="Previsione della domanda — backtest onesto e futuro vero, con banda dichiarata">
-          <img loading="lazy" src="screenshots/previsione.png" alt="Previsione della domanda">
+          <img loading="lazy" src="screenshots/previsione.webp" alt="Previsione della domanda">
           <div class="body"><h3>Previsione della domanda</h3><p>Backtest onesto e futuro vero, con banda dichiarata.</p></div>
         </div>
 
         <div class="card" data-cap="Coefficienti Wkr — fattore di correzione climatica di Snam per zona, con download live da Jarvis">
-          <img loading="lazy" src="screenshots/wkr.png" alt="Coefficienti Wkr">
+          <img loading="lazy" src="screenshots/wkr.webp" alt="Coefficienti Wkr">
           <div class="body"><h3>Coefficienti Wkr</h3><p>Fattore di correzione climatica di Snam per zona, con download live da Jarvis.</p><span class="tag">Snam</span></div>
         </div>
 
         <div class="card" data-cap="Profili di prelievo standard — percentuali giornaliere Snam per anno termico, con controllo delle somme a 100">
-          <img loading="lazy" src="screenshots/prelievo.png" alt="Profili di prelievo standard">
+          <img loading="lazy" src="screenshots/prelievo.webp" alt="Profili di prelievo standard">
           <div class="body"><h3>Profili di prelievo standard</h3><p>Percentuali giornaliere Snam per anno termico, con controllo delle somme a 100.</p><span class="tag">Snam</span></div>
         </div>
 
         <div class="card" data-cap="Misure dei PDR — letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate">
-          <img loading="lazy" src="screenshots/misure.png" alt="Misure dei PDR">
+          <img loading="lazy" src="screenshots/misure.webp" alt="Misure dei PDR">
           <div class="body"><h3>Misure dei PDR</h3><p>Letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate.</p><span class="tag">SIICloud</span></div>
         </div>
 
         <div class="card" data-cap="Report & Analisi — estrazioni e invii programmati per categoria">
-          <img loading="lazy" src="screenshots/report.png" alt="Report e Analisi">
+          <img loading="lazy" src="screenshots/report.webp" alt="Report e Analisi">
           <div class="body"><h3>Report &amp; Analisi</h3><p>Estrazioni e invii programmati per categoria.</p></div>
         </div>
 
         <div class="card" data-cap="Agenda regolatoria — scadenze con data certa dalle fonti e voci personalizzate">
-          <img loading="lazy" src="screenshots/agenda.png" alt="Agenda regolatoria">
+          <img loading="lazy" src="screenshots/agenda.webp" alt="Agenda regolatoria">
           <div class="body"><h3>Agenda regolatoria</h3><p>Scadenze con data certa dalle fonti e voci personalizzate.</p></div>
         </div>
 
         <div class="card" data-cap="Impostazioni impresa — anagrafica shipper, punti e notifiche">
-          <img loading="lazy" src="screenshots/impostazioni.png" alt="Impostazioni impresa">
+          <img loading="lazy" src="screenshots/impostazioni.webp" alt="Impostazioni impresa">
           <div class="body"><h3>Impostazioni impresa</h3><p>Anagrafica shipper, punti di consegna e notifiche.</p></div>
         </div>
 
         <div class="card" data-cap="Sistema — stato dei servizi collegati e interruttore demo">
-          <img loading="lazy" src="screenshots/sistema.png" alt="Sistema">
+          <img loading="lazy" src="screenshots/sistema.webp" alt="Sistema">
           <div class="body"><h3>Sistema</h3><p>Stato dei servizi collegati e interruttore demo.</p></div>
         </div>
 
@@ -266,6 +277,10 @@
           <summary>C'è una modalità demo per provarla?</summary>
           <p>Sì: dal Configuratore → Sistema. I dati di mercato delle aree operative diventano dimostrativi, mentre i registri reali (bozze, documenti, riscontri, scadenze) restano quelli veri. Al primo avvio tutto parte pulito.</p>
         </details>
+        <details>
+          <summary>Come aggiorno Vettore?</summary>
+          <p>Scarichi l'ultima release da questa pagina e sostituisci l'eseguibile: non c'è un aggiornamento automatico. I tuoi dati non si toccano — vivono in <code>~/.vettore/vettore.db</code>, fuori dall'eseguibile — quindi l'aggiornamento non li cancella. Le novità di ogni versione sono nelle <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/CHANGELOG.md" target="_blank" rel="noopener">note di rilascio</a>.</p>
+        </details>
       </div>
     </div>
   </section>
@@ -283,7 +298,7 @@
   </div>
 </footer>
 
-<div class="lightbox" id="lightbox" role="dialog" aria-label="Schermata ingrandita">
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Schermata ingrandita">
   <img id="lightbox-img" alt="" src="">
   <div class="cap" id="lightbox-cap"></div>
 </div>
@@ -294,16 +309,35 @@
   var lb = document.getElementById("lightbox");
   var img = document.getElementById("lightbox-img");
   var cap = document.getElementById("lightbox-cap");
+  var origine = null; // elemento che ha aperto il lightbox, per restituire il focus
+
+  function apri(card) {
+    var shot = card.querySelector("img");
+    img.src = shot.src;
+    img.alt = shot.alt;
+    cap.textContent = card.dataset.cap || shot.alt;
+    origine = card;
+    lb.classList.add("open");
+    lb.setAttribute("tabindex", "-1");
+    lb.focus();
+  }
+  function chiudi() {
+    if (!lb.classList.contains("open")) return;
+    lb.classList.remove("open");
+    lb.removeAttribute("tabindex");
+    if (origine) { origine.focus(); origine = null; }
+  }
+
   document.querySelectorAll(".card").forEach(function (card) {
-    card.addEventListener("click", function () {
-      var shot = card.querySelector("img");
-      img.src = shot.src;
-      img.alt = shot.alt;
-      cap.textContent = card.dataset.cap || shot.alt;
-      lb.classList.add("open");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", "Ingrandisci: " + (card.dataset.cap || card.querySelector("img").alt));
+    card.addEventListener("click", function () { apri(card); });
+    card.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apri(card); }
     });
   });
-  function chiudi() { lb.classList.remove("open"); }
+
   lb.addEventListener("click", chiudi);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") chiudi(); });
 })();
