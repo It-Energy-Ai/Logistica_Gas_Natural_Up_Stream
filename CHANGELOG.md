@@ -2,6 +2,21 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.16.1] — 2026-08-21
+
+**Robustezza e sicurezza**: esito delle due review complete del progetto (analisi manuale + pip-audit, bandit, semgrep, checklist OWASP).
+
+### Aggiunto
+- **Blocco SSRF nel client WebDAV** (`app/misure.py`): gli indirizzi indicati dall'operatore sono risolti prima della richiesta e rifiutati se puntano a reti private, loopback, link-local (incluso l'indirizzo di metadata 169.254.169.254), riservati o multicast; i redirect sono riesaminati con le stesse regole e ammessi solo su http(s).
+- **Tetti anti zip-bomb nei parser dei profili di prelievo** (`app/prelievo.py`): limite alla decompressione degli XML interni al .xlsx (64 MB), riferimenti di colonna entro 16.384, dimensione di settore OLE2 ammessa solo 512/4096 byte, griglia finale .xls entro 40.000 celle.
+- **Validazione dello schema negli accessi a Jarvis** (`app/jarvis.py`): solo http(s), come difesa in profondità nel caso la configurazione pubblica remota di Snam fosse compromessa.
+- **7 test Python nuovi** (533 pytest totali): `tests/test_jarvis.py` per il rifiuto degli schemi non http(s); in `tests/test_sicurezza.py` la sentinella che vieta assert nel codice applicativo e la guardia «lxml mancante» dell'export ACER.
+
+### Modificato
+- **lxml 5.3.2 → 6.1.2**: chiude la segnalazione CVE-2026-41066 (lettura di file locali via entità nella configurazione predefinita di `iterparse`). Nel portale non era sfruttabile — tutti i parser usano già `resolve_entities=False, no_network=True` — ma la dipendenza ora risulta pulita a pip-audit.
+- **Otto `assert` di produzione convertiti in errori espliciti** (`pdr.py`, `edigas.py`, `acer_xml.py`): con `python -O` gli assert spariscono; le invarianti ora danno messaggi chiari in ogni caso.
+- **README**: conteggio delle verifiche aggiornato (656).
+
 ## [1.16.0] — 2026-08-21
 
 **Misure dei PDR**: le misure pubblicate dal distributore su SIICloud entrano nel portale come modulo proprio, via WebDAV standard di Nextcloud.

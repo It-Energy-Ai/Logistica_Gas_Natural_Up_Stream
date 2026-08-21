@@ -933,7 +933,8 @@ def genera_nomina(dati: dict[str, Any]) -> DocumentoEdigas:
     if errors:
         raise EdigasError("Il documento EDIG@S non è conforme: correggi i campi segnalati.", errors)
 
-    assert giorno is not None  # garantito dai controlli sopra
+    if giorno is None:  # pragma: no cover - garantito dai controlli sopra
+        raise EdigasError("Giorno gas mancante nel documento EDIG@S.")
     inizio, fine = confini_giorno_gas(giorno)
 
     avvisi: list[str] = []

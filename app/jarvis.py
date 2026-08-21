@@ -54,9 +54,23 @@ class JarvisError(ValueError):
 # ------------------------------------------------------------------ HTTP
 
 
+def _verifica_url(url: str) -> None:
+    """Difesa in profondità: ammette solo http(s).
+
+    Gli indirizzi dell'API derivano dalla configurazione pubblica remota di
+    Snam: se quella fonte fosse compromessa, uno schema diverso (per esempio
+    ``file://``) permetterebbe letture locali. Meglio rifiutare prima.
+    """
+
+    schema = urllib.parse.urlparse(url).scheme
+    if schema not in ("http", "https"):
+        raise JarvisError(f"Indirizzo di Jarvis non valido: schema «{schema}» non ammesso.")
+
+
 def http_json(url: str, payload: Any = None, headers: dict[str, str] | None = None) -> Any:
     """GET (payload=None) o POST JSON verso Jarvis; restituisce il JSON decodificato."""
 
+    _verifica_url(url)
     intestazioni = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if headers:
         intestazioni.update(headers)
@@ -71,6 +85,7 @@ def http_json(url: str, payload: Any = None, headers: dict[str, str] | None = No
 def http_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
     """Scarica un documento binario da Jarvis."""
 
+    _verifica_url(url)
     intestazioni = {"User-Agent": USER_AGENT, "Accept": "application/octet-stream"}
     if headers:
         intestazioni.update(headers)

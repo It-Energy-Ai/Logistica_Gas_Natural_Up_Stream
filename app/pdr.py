@@ -450,7 +450,8 @@ def importa_ricevuta(conn, email: str, payload: dict[str, Any]) -> tuple[dict[st
                 return presenta_ricevuta(existing), True
             raise
         receipt = db.leggi_ricevuta_pdr(conn, email, receipt_id)
-        assert receipt is not None
+        if receipt is None:  # pragma: no cover - garantito dall'INSERT appena eseguito
+            raise PdrError("Ricevuta PDR non trovata dopo l'inserimento.")
         remit.registra_ricevuta_pdr_importata(conn, email, report_id, receipt)
     return presenta_ricevuta(receipt), False
 

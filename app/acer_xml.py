@@ -417,12 +417,10 @@ def errori_dati(record: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _q(meta: dict[str, str], name: str):
-    assert etree is not None
     return etree.QName(meta["namespace"], name)
 
 
 def _element(meta: dict[str, str], name: str, value: Any | None = None):
-    assert etree is not None
     node = etree.Element(_q(meta, name))
     if value is not None:
         node.text = str(value)
@@ -430,7 +428,6 @@ def _element(meta: dict[str, str], name: str, value: Any | None = None):
 
 
 def _root(meta: dict[str, str], name: str):
-    assert etree is not None
     return etree.Element(_q(meta, name), nsmap={None: meta["namespace"]})
 
 
@@ -455,7 +452,6 @@ def _side_code(side: str) -> str:
 
 
 def _build_table_1(record: dict[str, Any], meta: dict[str, str]):
-    assert etree is not None
     root = _root(meta, "REMITTable1")
     _identifier(root, meta, "reportingEntityID", "ace", str(record["acer_code"]))
     trades = _append(root, meta, "TradeList")
@@ -489,7 +485,6 @@ def _build_table_1(record: dict[str, Any], meta: dict[str, str]):
 
 
 def _build_table_2(record: dict[str, Any], meta: dict[str, str]):
-    assert etree is not None
     root = _root(meta, "REMITTable2")
     _identifier(root, meta, "reportingEntityID", "ace", str(record["acer_code"]))
     trades = _append(root, meta, "TradeList")
@@ -555,6 +550,8 @@ def _xsd_errors(kind: str, root) -> list[dict[str, str]]:
 def genera_xml(record: dict[str, Any]) -> AcerXmlDocument:
     """Costruisce un file XML e lo valida con lo XSD ACER fissato nel repo."""
 
+    if etree is None:  # pragma: no cover
+        raise AcerXmlError("Dipendenza lxml mancante: impossibile generare il file XML.")
     errors = errori_dati(record)
     if errors:
         raise AcerXmlError("Dati incompleti o incompatibili con il tracciato ACER.", errors)
@@ -569,7 +566,6 @@ def genera_xml(record: dict[str, Any]) -> AcerXmlDocument:
     errors = _xsd_errors(kind, root)
     if errors:
         raise AcerXmlError("Il file generato non supera la validazione XSD ACER.", errors)
-    assert etree is not None
     xml_bytes = etree.tostring(root, encoding="UTF-8", xml_declaration=True, pretty_print=True)
     if len(xml_bytes) > PDR_MAX_FILE_BYTES:
         raise AcerXmlError("Il file supera il limite PDR di 10 MB.")

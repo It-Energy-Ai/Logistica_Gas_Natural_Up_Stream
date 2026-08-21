@@ -314,3 +314,38 @@ def test_la_durata_della_sessione_e_configurabile():
     from app import main
 
     assert 1 <= main.GIORNI_SESSIONE <= 365
+
+
+# ─────────────────────────────── assert in produzione
+
+
+def test_nessun_assert_rimane_nel_codice_applicativo():
+    """Gli assert spariscono con `python -O`: le difese devono essere raise.
+
+    Presidia la conversione fatta nella review: se qualcuno reintroduce un
+    assert in app/, questo test lo segnala subito.
+    """
+
+    import pathlib
+    import re
+
+    violazioni = []
+    for percorso in sorted((pathlib.Path(__file__).resolve().parent.parent / "app").glob("*.py")):
+        for numero, riga in enumerate(percorso.read_text(encoding="utf-8").splitlines(), 1):
+            if re.match(r"^\s*assert\b", riga):
+                violazioni.append(f"{percorso.name}:{numero}: {riga.strip()}")
+    assert violazioni == [], "\n".join(violazioni)
+
+
+def test_genera_xml_acer_rifiuta_senza_lxml():
+    """Se lxml manca, l'export ACER dà un errore chiaro, non un AttributeError."""
+
+    from app import acer_xml
+
+    originale = acer_xml.etree
+    acer_xml.etree = None
+    try:
+        with pytest.raises(acer_xml.AcerXmlError, match="lxml"):
+            acer_xml.genera_xml({})
+    finally:
+        acer_xml.etree = originale
