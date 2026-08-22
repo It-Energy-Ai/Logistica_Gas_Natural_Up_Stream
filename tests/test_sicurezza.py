@@ -370,6 +370,8 @@ def test_login_con_password_giusta_crea_la_sessione(sessione, monkeypatch):
     from app import main
 
     monkeypatch.setattr(main, "PASSWORD_SERVER", "segreta123")
+    # l'hash della password server è precalcolato all'avvio: va aggiornato insieme
+    monkeypatch.setattr(main, "_HASH_PASSWORD_SERVER", main._hash_password("segreta123", main._SALE_PASSWORD))
     r = sessione.post(
         "/api/login",
         json={"email": "shipper@esempio.it", "password": "segreta123"},
@@ -389,6 +391,7 @@ def test_cookie_secure_solo_in_modalità_server(sessione, monkeypatch):
     # modalità server: il cookie deve viaggiare solo su HTTPS
     monkeypatch.setattr(main, "MODALITA_SERVER", True)
     monkeypatch.setattr(main, "PASSWORD_SERVER", "segreta123")
+    monkeypatch.setattr(main, "_HASH_PASSWORD_SERVER", main._hash_password("segreta123", main._SALE_PASSWORD))
     r = sessione.post(
         "/api/login",
         json={"email": "shipper@esempio.it", "password": "segreta123"},

@@ -28,10 +28,12 @@ from . import db
 
 MAX_CORPO_BYTES = 512 * 1024
 MAX_FILE_BYTES = 20 * 1024 * 1024
+MAX_XML_DECOMPRESSO = 64 * 1024 * 1024
 MAX_RECORD = 200
 MAX_GIORNI_SERIE = 60
 MAX_FILE_SYNC = 500
 MAX_ANNI_SYNC = 2
+MAX_CARTELLE_SYNC = 400
 TIMEOUT_SECONDS = 30
 USER_AGENT = "Vettore (portale shipper; misure SIICloud)"
 NS_DAV = "DAV:"
@@ -246,7 +248,14 @@ def _contenuto_xml(contenuto, nome_file=""):
             nomi_xml = [n for n in archivio.namelist() if n.lower().endswith(".xml")]
             if not nomi_xml:
                 raise MisureError("l'archivio non contiene file XML")
-            return archivio.read(nomi_xml[0])
+            # Tetto anti zip-bomb: la dimensione dichiarata e quella reale
+            # dell'XML interno devono restare entro MAX_XML_DECOMPRESSO.
+            if archivio.getinfo(nomi_xml[0]).file_size > MAX_XML_DECOMPRESSO:
+                raise MisureError("l'archivio contiene un file XML troppo grande")
+            xml = archivio.read(nomi_xml[0])
+            if len(xml) > MAX_XML_DECOMPRESSO:
+                raise MisureError("l'archivio contiene un file XML troppo grande")
+            return xml
     return contenuto
 
 
@@ -374,7 +383,9 @@ def serie_giornaliera(letture, cambi):
         per_pdr.setdefault(cambio["pdr"], []).append((cambio["data"], cambio["valore"], True))
     consumi = {}
     for _pdr, eventi in per_pdr.items():
-        eventi.sort(key=lambda evento: evento[0])
+        # A parità di data il cambio contatore precede le letture: così la
+        # nuova base vale subito e l'ordine non dipende dai file di origine.
+        eventi.sort(key=lambda evento: (evento[0], not evento[2]))
         precedente = None
         for data, valore, e_cambio in eventi:
             if e_cambio:
@@ -498,6 +509,14 @@ def sincronizza(url, utente, password, percorso="", giorni=MAX_GIORNI_SERIE):
     frontiera = [str(percorso or "").strip("/")]
     esplorati = 0
     for livello in range(4):
+        if not frontiera:
+            break
+        # Tetto globale di cartelle per corsa: senza limite la prima
+        # sincronizzazione esplorerebbe migliaia di cartelle (distributori ×
+        # anni × giorni) martellando SIICloud per ore. Le corse successive
+        # riprendono da dove si erano fermate grazie alla deduplicazione.
+        if esplorati + len(frontiera) > MAX_CARTELLE_SYNC:
+            frontiera = frontiera[: max(0, MAX_CARTELLE_SYNC - esplorati)]
         if not frontiera:
             break
         with ThreadPoolExecutor(max_workers=8) as pool:

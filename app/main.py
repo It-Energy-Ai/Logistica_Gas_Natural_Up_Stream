@@ -5,12 +5,12 @@ localmente. Non dichiara integrazioni esterne concluse senza le relative
 ricevute ufficiali.
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
 import os
 import re
-import sqlite3
 import secrets
 import threading
 import time
@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
@@ -60,14 +60,18 @@ def _hash_password(password: str, sale: bytes) -> str:
     return hashlib.scrypt(password.encode("utf-8"), salt=sale, n=2**14, r=8, p=1).hex()
 
 
+_SALE_PASSWORD = b"vettore-modalita-server"
+# L'hash della password aziendale è calcolato una sola volta all'avvio: lo
+# scrypt è volutamente lento e rifarlo a ogni login sarebbe inutile e costoso.
+_HASH_PASSWORD_SERVER = _hash_password(PASSWORD_SERVER, _SALE_PASSWORD) if PASSWORD_SERVER else ""
+
+
 def _password_corretta(password_inviata: str) -> bool:
     """Confronto a tempo costante tra la password inviata e quella del server."""
     if not PASSWORD_SERVER:
         return True
-    sale = b"vettore-modalita-server"
-    attesa = _hash_password(PASSWORD_SERVER, sale).encode("ascii")
-    inviata = _hash_password(password_inviata, sale).encode("ascii")
-    return hmac.compare_digest(attesa, inviata)
+    inviata = _hash_password(password_inviata, _SALE_PASSWORD).encode("ascii")
+    return hmac.compare_digest(_HASH_PASSWORD_SERVER.encode("ascii"), inviata)
 
 # Chiavi di stato accettate dal client, con un validatore di forma ciascuna.
 _is_bool = lambda v: isinstance(v, bool)
@@ -929,7 +933,7 @@ async def post_wkr(request: Request):
     if payload is None:
         return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
     try:
-        return wkr.sistema(payload)
+        return await asyncio.to_thread(wkr.sistema, payload)
     except wkr.WkrError as errore:
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
@@ -954,7 +958,7 @@ async def post_prelievo(request: Request):
     if payload is None:
         return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
     try:
-        return prelievo.sistema(payload)
+        return await asyncio.to_thread(prelievo.sistema, payload)
     except prelievo.PrelievoError as errore:
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
@@ -981,7 +985,9 @@ async def post_misure(request: Request):
     if payload is None:
         return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
     try:
-        return misure.sistema(payload, email)
+        # misure.sistema fa I/O bloccante (WebDAV, thread pool): eseguirlo nel
+        # loop congelerebbe l'intero server durante le sincronizzazioni lunghe.
+        return await asyncio.to_thread(misure.sistema, payload, email)
     except misure.MisureError as errore:
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:
