@@ -1480,7 +1480,7 @@ input::placeholder{color:var(--ink3)}
     <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:23px;font-weight:700;letter-spacing:-.01em">Misure dei PDR</h1><p style="margin:0;font-size:13.5px;color:var(--ink2)">Letture pubblicate dal distributore su SIICloud · TGL letture giornaliere · TMV e SWG1 letture mensili · IGMG cambio contatore</p></div>
     <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);padding:7px 12px;border-radius:8px">Fonte: SIICloud · WebDAV Nextcloud</span>
   </div>
-  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>Le credenziali SIICloud sono tue e restano tue: il portale le usa solo per la richiesta che premi e non le salva mai. I file di misura sono aperti in memoria e mostrati a te che li hai richiesti, senza conservazione né ritrasmissione.</span></div>
+  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border:1px solid color-mix(in oklab,var(--prim) 28%,var(--line));background:color-mix(in oklab,var(--prim) 6%,var(--surface));border-radius:10px;color:var(--ink2);font-size:12.5px;line-height:1.5"><strong style="flex:none;color:var(--primText)">Confine operativo</strong><span>Le credenziali SIICloud sono tue e restano tue: di norma il portale le usa solo per la richiesta che premi e non le salva. Se scegli «Salva l'accesso», restano custodite soltanto nel database locale di questo computer per la sincronizzazione giornaliera automatica, e i file scaricati finiscono nell'archivio locale accanto al database. I file sono letti in memoria, senza ritrasmissione.</span></div>
 
   <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:18px;align-items:start">
     <div style="display:flex;flex-direction:column;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px">
@@ -1494,12 +1494,33 @@ input::placeholder{color:var(--ink3)}
       <button onClick="{{ elencaMisure }}" style="width:100%;padding:11px;border:none;border-radius:9px;background:var(--prim);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Elenca i file di misura</button>
       <button onClick="{{ serieMisure }}" style="width:100%;padding:11px;border:1px solid var(--prim);border-radius:9px;background:transparent;color:var(--primText);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Costruisci la serie dei consumi</button>
       <span style="font-size:11px;color:var(--ink3);line-height:1.5">La serie scarica i file di misura della cartella indicata (o delle sue ultime sottocartelle), converte le letture cumulative in consumi giornalieri e li somma su tutti i PDR; il cambio contatore (IGMG) azzera il contatore e riparte dalla lettura d'avvio.</span>
+      <div style="border-top:1px dashed var(--line);margin-top:4px;padding-top:12px;display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">Accesso salvato e sincronizzazione</span>
+        <button onClick="{{ salvaAccessoMisure }}" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Salva l'accesso su questo computer</button>
+        <button onClick="{{ sincronizzaMisure }}" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Sincronizza ora i file di misura</button>
+        <button onClick="{{ serieArchivioMisure }}" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Costruisci la serie dall'archivio locale</button>
+        <span style="font-size:11px;color:var(--ink3);line-height:1.5">Con l'accesso salvato, ogni giorno il portale scarica da solo i file nuovi nell'archivio locale; «Sincronizza ora» anticipa il giro, «serie dall'archivio» lavora senza collegarsi.</span>
+      </div>
       <sc-if value="{{ msrCalcolo }}" hint-placeholder-val="{{ false }}"><span role="status" style="font-size:12px;color:var(--ink3)">Lettura in corso…</span></sc-if>
       <sc-if value="{{ msrErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">{{ msrErrore }}</span></sc-if>
       <sc-for list="{{ msrErroriCampo }}" as="me" hint-placeholder-count="2"><span style="font-size:11.5px;color:#B42318">· {{ me }}</span></sc-for>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:18px">
+      <sc-if value="{{ msrStato }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;font-weight:600;color:var(--ink)">Sincronizzazione giornaliera</span><span style="font-size:11px;padding:3px 9px;border-radius:99px;background:{{ msrStatoBadgeBg }};color:{{ msrStatoBadgeFg }}">{{ msrStatoBadge }}</span></div>
+          <sc-if value="{{ msrStatoConfigurato }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink2)">
+              <span>Indirizzo: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;overflow-wrap:anywhere">{{ msrStatoUrl }}</span></span>
+              <span>Utente: <b>{{ msrStatoUtente }}</b> · Password custodita in locale</span>
+              <span>Ultima sincronizzazione: <b>{{ msrStatoUltimaSync }}</b> · File in archivio: <b>{{ msrStatoArchivio }}</b></span>
+            </div>
+            <sc-if value="{{ msrStatoErrore }}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:12px;color:#B42318">Ultimo errore: {{ msrStatoErrore }}</span></sc-if>
+          </sc-if>
+          <sc-if value="{{ msrStatoLibero }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--ink3)">Nessun accesso salvato: compila i campi a sinistra e premi «Salva l'accesso» per attivare lo scarico automatico quotidiano.</span></sc-if>
+        </div>
+      </sc-if>
       <sc-if value="{{ msrHa }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px">
           <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:var(--ink)">{{ msrFonte.origine }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3)">{{ msrFonte.percorso }}</span></div>

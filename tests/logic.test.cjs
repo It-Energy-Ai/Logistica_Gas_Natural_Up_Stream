@@ -1804,6 +1804,100 @@ test("Misure: i flussi IGMG sono etichettati come cambio contatore", () => {
   assert.match(v.msrVoci[0].dettaglio, /cambio contatore/);
 });
 
+test("Misure: salvare l'accesso invia l'azione, ricarica lo stato e svuota la password", async () => {
+  const app = new App();
+  app._sessionEmail = "operazioni@gasadriatica.it";
+  app.setState({ screen: "misure", msrUrl: "https://x/dav/", msrUtente: "u", msrPassword: "segreta", msrPercorso: "TMG_1" });
+  const chiamate = [];
+  global.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body || "{}");
+    chiamate.push(body);
+    const risposta = body.azione === "stato"
+      ? { configurato: true, url: "https://x/dav/", utente: "u", password_presente: true, archivio: { file: 0 } }
+      : { salvato: true, accesso: { url: "https://x/dav/", utente: "u", percorso: "TMG_1", attivo: true }, nota: "" };
+    return { ok: true, status: 200, json: async () => risposta, text: async () => "" };
+  };
+  await app.renderVals().salvaAccessoMisure();
+  assert.equal(chiamate.length, 2);
+  assert.equal(chiamate[0].azione, "salva_accesso");
+  assert.equal(chiamate[0].attivo, true);
+  assert.equal(chiamate[0].password, "segreta");
+  assert.equal(chiamate[1].azione, "stato");
+  assert.equal(app.state.msrPassword, "");
+  assert.equal(app.state.msrStato.configurato, true);
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: sincronizza ora non invia credenziali e ricarica lo stato", async () => {
+  const app = new App();
+  app._sessionEmail = "operazioni@gasadriatica.it";
+  app.setState({ screen: "misure" });
+  const chiamate = [];
+  global.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body || "{}");
+    chiamate.push(body);
+    const risposta = body.azione === "stato"
+      ? { configurato: true, url: "https://x/dav/", utente: "u", password_presente: true, ultima_sync: "2026-08-22T09:00:00", errore_sync: "", archivio: { file: 12 } }
+      : { fonte: { origine: "SIICloud (WebDAV)", url: "https://x/dav/", percorso: "/" }, ultima_sync: "2026-08-22T09:00:00", file_nuovi: 3, file_visti: 12, cartelle_esplorate: 6, avvisi: [], nota: "" };
+    return { ok: true, status: 200, json: async () => risposta, text: async () => "" };
+  };
+  await app.renderVals().sincronizzaMisure();
+  assert.equal(chiamate.length, 2);
+  assert.equal(chiamate[0].azione, "sincronizza");
+  assert.equal(chiamate[0].url, undefined);
+  assert.equal(chiamate[0].password, undefined);
+  assert.equal(chiamate[1].azione, "stato");
+  assert.equal(app.state.msrEsito.file_nuovi, 3);
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: la serie dall'archivio invia l'azione serie_archivio", async () => {
+  const app = new App();
+  app.setState({ screen: "misure" });
+  let inviato = null;
+  global.fetch = async (url, opts) => {
+    inviato = JSON.parse(opts.body || "{}");
+    return { ok: true, status: 200, json: async () => ({
+      fonte: { origine: "Archivio locale", percorso: "/dati/misure" },
+      serie: [{ data: "2026-01-01", valore: 139 }],
+      dettagli: { pdr: 1, letture: 2, cambi: 0, file_elaborati: 1, giorni_coperti: 1 },
+      avvisi: [],
+      nota: "",
+    }), text: async () => "" };
+  };
+  await app.renderVals().serieArchivioMisure();
+  assert.equal(inviato.azione, "serie_archivio");
+  const v = app.renderVals();
+  assert.equal(v.msrHa, true);
+  assert.equal(v.msrSerie.pronta, true);
+  assert.equal(v.msrSerie.righe[0].valore, "139");
+  global.fetch = FETCH_OK;
+});
+
+test("Misure: lo stato della sincronizzazione mostra badge, ultima sync e archivio", () => {
+  const app = new App();
+  app.setState({ screen: "misure", msrStato: {
+    configurato: true, url: "https://x/dav/", utente: "u", password_presente: true,
+    ultima_sync: "2026-08-22T09:00:12", errore_sync: "", archivio: { file: 12 },
+  } });
+  let v = app.renderVals();
+  assert.equal(v.msrStatoConfigurato, true);
+  assert.equal(v.msrStatoLibero, false);
+  assert.equal(v.msrStatoBadge, "attivo");
+  assert.equal(v.msrStatoUltimaSync, "2026-08-22 09:00");
+  assert.equal(v.msrStatoArchivio, "12");
+  assert.equal(v.msrStatoErrore, "");
+  app.setState({ msrStato: { configurato: true, url: "https://x/dav/", utente: "u", password_presente: true, ultima_sync: "2026-08-22T09:00:00", errore_sync: "credenziali rifiutate dal server (401)", archivio: { file: 0 } } });
+  v = app.renderVals();
+  assert.equal(v.msrStatoBadge, "errore");
+  assert.match(v.msrStatoErrore, /401/);
+  app.setState({ msrStato: { configurato: false, archivio: { file: 0 } } });
+  v = app.renderVals();
+  assert.equal(v.msrStatoBadge, "non configurato");
+  assert.equal(v.msrStatoLibero, true);
+  assert.equal(v.msrStatoUltimaSync, "mai");
+});
+
 test("Agenda: ogni binding del pannello ha un valore dal render", () => {
   const fs = require("node:fs");
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "static", "index.html"), "utf8");

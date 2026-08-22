@@ -38,6 +38,11 @@ nessuna dipendenza nuova.
    il contatore che riparte da zero non produce consumi negativi. Le
    differenze negative (ricalcoli del distributore) sono ignorate, non
    inventate.
+5. **Salva l'accesso e sincronizza ogni giorno** — su scelta dell'operatore
+   le credenziali restano nel database locale e il portale scarica da solo,
+   una volta al giorno, i file nuovi nell'archivio locale; la serie si può
+   poi ricalcolare dall'archivio anche senza rete. I dettagli nella sezione
+   dedicata più sotto.
 
 ## L'alberatura pubblicata dal distributore
 
@@ -52,6 +57,30 @@ Dentro ogni giorno si trovano l'indice `ElencoFileGiornalieri.txt` e gli
 archivi dei flussi, con nomi del tipo
 `[PIVA_DISTR]_[PIVA_UDD]_[AAAAMM]_[FLUSSO]_[marca]_[progressivo].zip`.
 
+## L'accesso salvato e la sincronizzazione giornaliera
+
+Di base le credenziali sono usa e getta. Se però l'operatore preme «Salva
+l'accesso su questo computer», il portale le custodisce **solo nel database
+locale di questa macchina** (tabella `sii_accesso`, mai trasmesse altrove) e
+da quel momento:
+
+- **ogni giorno scarica da solo** — un filo in background controlla una volta
+  all'ora gli accessi salvati e sincronizza quelli la cui ultima
+  sincronizzazione non è oggi;
+- **l'archivio cresce senza duplicati** — i file scaricati finiscono nella
+  cartella `misure/` accanto al database, con lo stesso percorso di
+  SIICloud; un file già presente non viene riscaricato;
+- **«Sincronizza ora»** anticipa il giro quando serve, e lo stato della
+  sincronizzazione (ultima volta, file in archivio, eventuale errore) resta
+  visibile nella schermata;
+- **«Costruisci la serie dall'archivio locale»** ricalcola la serie dei
+  consumi dai file già scaricati, **senza rete**: utile per ripetere la
+  previsione o lavorare offline.
+
+La password non torna mai al frontend: lo stato dice solo se è custodita.
+Per togliere l'accesso basta salvarne uno nuovo con credenziali diverse o
+disattivarlo; l'eliminazione rimuove la riga dal database locale.
+
 ## Il ponte con la previsione della domanda
 
 La serie costruita (data, consumo del giorno) è esattamente il formato che
@@ -63,13 +92,16 @@ giornaliere dipende da quante pubblicazioni sono disponibili.
 
 ## Due onestà dovute
 
-- Le credenziali sono **usa e getta per la richiesta**: il portale non le
-  memorizza, non le scrive nel database e non le ritrasmette. Se la sessione
-  scade o la pagina si ricarica, vanno reinserite — è una scelta, non un
-  limite.
-- I file sono aperti **solo in memoria** e mostrati all'operatore che li ha
-  richiesti: il portale non li conserva e non li ritrasmette, la stessa
-  posizione di chi li scarica con un client WebDAV.
+- Le credenziali sono **usa e getta per la richiesta**, a meno che
+  l'operatore non scelga esplicitamente «Salva l'accesso»: in quel caso
+  restano **solo nel database locale di questa macchina** (in chiaro, come
+  ogni altro dato del portale: l'app gira in locale e non ha un server),
+  servono unicamente alla sincronizzazione giornaliera e non escono mai dal
+  computer. La password non viene mai rimandata al frontend.
+- I file sono aperti **solo in memoria** quando l'operatore li consulta, e
+  conservati nell'archivio locale solo dalla sincronizzazione: il portale
+  non li ritrasmette, la stessa posizione di chi li scarica con un client
+  WebDAV.
 
 ## Cosa NON fa
 

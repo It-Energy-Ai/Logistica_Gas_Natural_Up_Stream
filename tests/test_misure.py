@@ -1,7 +1,7 @@
 """Test del modulo misure dei PDR da SIICloud (WebDAV Nextcloud).
 
 Le chiamate di rete sono sempre finte: il modulo non tocca mai internet
-durante i test. Le credenziali non devono mai essere salvate.
+durante i test. L'accesso salvato resta solo nel database locale.
 """
 
 import io
@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from app import misure
+from app import db, misure
 
 
 # ------------------------------------------------------------- classificatore
@@ -682,3 +682,242 @@ def test_un_corpo_enorme_viene_rifiutato_prima_di_leggerlo(client):
                  "Content-Length": str(misure.MAX_CORPO_BYTES + 1)},
     )
     assert risposta.status_code == 413
+
+
+# ------------------------------------------------------------- accesso salvato (db)
+
+
+def test_accesso_sii_scrivi_leggi_elimina(client):
+    with db.connect() as connessione:
+        db.scrivi_accesso_sii(connessione, "shipper@esempio.it", {
+            "url": "https://cloud.example.com/dav/", "utente": "u",
+            "password": "p", "percorso": "TMG_1/2026", "attivo": True,
+        })
+        letto = db.leggi_accesso_sii(connessione, "shipper@esempio.it")
+        assert letto["url"] == "https://cloud.example.com/dav/"
+        assert letto["utente"] == "u"
+        assert letto["password"] == "p"
+        assert letto["percorso"] == "TMG_1/2026"
+        assert letto["attivo"] is True
+        assert letto["ultima_sync"] is None
+        # aggiornamento (upsert) sulla stessa email
+        db.scrivi_accesso_sii(connessione, "shipper@esempio.it", {
+            "url": "https://cloud.example.com/dav/", "utente": "u2",
+            "password": "p2", "percorso": "", "attivo": False,
+        })
+        aggiornato = db.leggi_accesso_sii(connessione, "shipper@esempio.it")
+        assert aggiornato["utente"] == "u2"
+        assert aggiornato["attivo"] is False
+        assert db.elimina_accesso_sii(connessione, "shipper@esempio.it") is True
+        assert db.leggi_accesso_sii(connessione, "shipper@esempio.it") is None
+
+
+def test_accessi_sii_attivi_filtra_e_registra_esito(client):
+    with db.connect() as connessione:
+        db.scrivi_accesso_sii(connessione, "a@esempio.it", {
+            "url": "https://a.example.com/", "utente": "a", "password": "p",
+            "percorso": "", "attivo": True,
+        })
+        db.scrivi_accesso_sii(connessione, "b@esempio.it", {
+            "url": "https://b.example.com/", "utente": "b", "password": "p",
+            "percorso": "", "attivo": False,
+        })
+        attivi = db.accessi_sii_attivi(connessione)
+        assert [a["email"] for a in attivi] == ["a@esempio.it"]
+        db.registra_esito_sync_sii(connessione, "a@esempio.it",
+                                   quando="2026-08-22T09:00:00", errore="")
+        assert db.leggi_accesso_sii(connessione, "a@esempio.it")["ultima_sync"] == "2026-08-22T09:00:00"
+        db.registra_esito_sync_sii(connessione, "a@esempio.it",
+                                   quando="2026-08-22T11:00:00", errore="credenziali rifiutate")
+        letto = db.leggi_accesso_sii(connessione, "a@esempio.it")
+        assert letto["errore_sync"] == "credenziali rifiutate"
+
+
+# ------------------------------------------------------------- salva_accesso / stato
+
+
+def test_salva_accesso_valida_le_credenziali(client):
+    with pytest.raises(misure.MisureError) as errore:
+        misure.salva_accesso("shipper@esempio.it", {"url": "", "utente": "", "password": ""})
+    assert errore.value.errors
+
+
+def test_salva_accesso_riusa_password_vuota(client):
+    misure.salva_accesso("shipper@esempio.it", {
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "segreta",
+    })
+    esito = misure.salva_accesso("shipper@esempio.it", {
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "",
+    })
+    assert esito["salvato"] is True
+    with db.connect() as connessione:
+        assert db.leggi_accesso_sii(connessione, "shipper@esempio.it")["password"] == "segreta"
+
+
+def test_salva_accesso_non_espone_la_password(client):
+    esito = misure.salva_accesso("shipper@esempio.it", {
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "segreta",
+    })
+    assert "password" not in esito["accesso"]
+    assert esito["accesso"]["url"] == "https://cloud.example.com/dav/"
+
+
+def test_stato_accesso_non_configurato(client):
+    stato = misure.stato_accesso("nessuno@esempio.it")
+    assert stato["configurato"] is False
+    assert stato["archivio"]["file"] == 0
+
+
+def test_stato_accesso_configurato_non_espone_password(client):
+    misure.salva_accesso("shipper@esempio.it", {
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "segreta",
+    })
+    stato = misure.stato_accesso("shipper@esempio.it")
+    assert stato["configurato"] is True
+    assert stato["password_presente"] is True
+    assert "password" not in stato
+    assert "segreta" not in str(stato)
+
+
+# ------------------------------------------------------------- sincronizzazione
+
+
+def _albero_sync():
+    """Elenco finto: radice -> distributore -> anno -> giorno -> file TGL."""
+    voci = {
+        "": [_voce("TMG_1", percorso="TMG_1", cartella=True)],
+        "TMG_1": [_voce("2026", percorso="TMG_1/2026", cartella=True),
+                  _voce("2020", percorso="TMG_1/2020", cartella=True)],
+        "TMG_1/2026": [_voce("0101", percorso="TMG_1/2026/0101", cartella=True)],
+        "TMG_1/2026/0101": [_voce(
+            "1_2_202601_TGL_20260102_1.zip",
+            percorso="TMG_1/2026/0101/1_2_202601_TGL_20260102_1.zip",
+            tipo="giornaliera")],
+        "TMG_1/2020": [],
+    }
+
+    def elenca_finto(url, utente, password, percorso=""):
+        return voci.get(percorso.strip("/"), [])
+
+    return elenca_finto
+
+
+def test_sincronizza_scarica_e_deduplica(client, monkeypatch):
+    monkeypatch.setattr(misure, "elenca", _albero_sync())
+    scaricati = []
+
+    def scarica_finto(url, utente, password, percorso):
+        scaricati.append(percorso)
+        return _zip_con("flusso.xml", XML_TGL)
+
+    monkeypatch.setattr(misure, "scarica_file", scarica_finto)
+    esito = misure.sincronizza("https://cloud.example.com/dav/", "u", "p")
+    assert esito["file_nuovi"] == 1
+    assert esito["file_visti"] == 1
+    assert esito["avvisi"] == []
+    assert len(scaricati) == 1
+    # seconda corsa: il file è già in archivio, nessun nuovo download
+    esito2 = misure.sincronizza("https://cloud.example.com/dav/", "u", "p")
+    assert esito2["file_nuovi"] == 0
+    assert esito2["file_visti"] == 1
+    assert len(scaricati) == 1
+
+
+def test_sincronizza_senza_file_solleva_errore(client, monkeypatch):
+    monkeypatch.setattr(misure, "elenca", lambda *a, **k: [])
+    with pytest.raises(misure.MisureError, match="nessun file di misura"):
+        misure.sincronizza("https://cloud.example.com/dav/", "u", "p")
+
+
+def test_serie_da_archivio_legge_i_file_scaricati(client, monkeypatch):
+    monkeypatch.setattr(misure, "elenca", _albero_sync())
+    monkeypatch.setattr(misure, "scarica_file",
+                        lambda *a, **k: _zip_con("flusso.xml", XML_TGL))
+    misure.sincronizza("https://cloud.example.com/dav/", "u", "p")
+    esito = misure.serie_da_archivio()
+    assert esito["dettagli"]["file_elaborati"] == 1
+    assert esito["dettagli"]["letture"] == 2
+    assert esito["serie"][0]["data"] == "2026-01-01"
+    assert esito["serie"][0]["valore"] == 139
+
+
+def test_serie_da_archivio_vuoto_solleva_errore(client):
+    with pytest.raises(misure.MisureError, match="archivio locale è vuoto"):
+        misure.sistema({"azione": "serie_archivio"}, email="shipper@esempio.it")
+
+
+def test_sincronizza_accesso_registra_errore(client, monkeypatch):
+    misure.salva_accesso("shipper@esempio.it", {
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "p",
+    })
+
+    def sincronizza_rotta(*a, **k):
+        raise misure.MisureError("credenziali rifiutate dal server (401)")
+
+    monkeypatch.setattr(misure, "sincronizza", sincronizza_rotta)
+    with pytest.raises(misure.MisureError, match="401"):
+        misure.sincronizza_accesso("shipper@esempio.it")
+    with db.connect() as connessione:
+        assert "401" in db.leggi_accesso_sii(connessione, "shipper@esempio.it")["errore_sync"]
+
+
+def test_sincronizza_accesso_senza_accesso(client):
+    with pytest.raises(misure.MisureError, match="non configurato"):
+        misure.sincronizza_accesso("nessuno@esempio.it")
+
+
+# ------------------------------------------------------------- rotte accesso salvato
+
+
+def test_rotta_salva_accesso_e_stato(client):
+    client.post("/api/login", json={"email": "shipper@esempio.it"})
+    risposta = client.post("/api/misure", json={
+        "azione": "salva_accesso",
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "p",
+    })
+    assert risposta.status_code == 200
+    assert risposta.json()["salvato"] is True
+    stato = client.post("/api/misure", json={"azione": "stato"}).json()
+    assert stato["configurato"] is True
+    assert stato["password_presente"] is True
+    assert "password" not in stato
+
+
+def test_rotta_sincronizza_usa_accesso_salvato(client, monkeypatch):
+    client.post("/api/login", json={"email": "shipper@esempio.it"})
+    client.post("/api/misure", json={
+        "azione": "salva_accesso",
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "p",
+    })
+    monkeypatch.setattr(misure, "elenca", _albero_sync())
+    monkeypatch.setattr(misure, "scarica_file",
+                        lambda *a, **k: _zip_con("flusso.xml", XML_TGL))
+    risposta = client.post("/api/misure", json={"azione": "sincronizza"})
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert corpo["file_nuovi"] == 1
+    assert corpo["ultima_sync"]
+
+
+def test_rotta_sincronizza_senza_accesso_dà_422(client):
+    client.post("/api/login", json={"email": "shipper@esempio.it"})
+    risposta = client.post("/api/misure", json={"azione": "sincronizza"})
+    assert risposta.status_code == 422
+    assert "non configurato" in risposta.json()["errore"]
+
+
+def test_rotta_serie_archivio_via_http(client, monkeypatch):
+    client.post("/api/login", json={"email": "shipper@esempio.it"})
+    client.post("/api/misure", json={
+        "azione": "salva_accesso",
+        "url": "https://cloud.example.com/dav/", "utente": "u", "password": "p",
+    })
+    monkeypatch.setattr(misure, "elenca", _albero_sync())
+    monkeypatch.setattr(misure, "scarica_file",
+                        lambda *a, **k: _zip_con("flusso.xml", XML_TGL))
+    client.post("/api/misure", json={"azione": "sincronizza"})
+    risposta = client.post("/api/misure", json={"azione": "serie_archivio"})
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert corpo["fonte"]["origine"] == "Archivio locale"
+    assert corpo["serie"][0]["valore"] == 139

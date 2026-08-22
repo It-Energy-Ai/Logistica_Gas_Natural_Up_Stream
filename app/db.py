@@ -298,6 +298,22 @@ CREATE TABLE IF NOT EXISTS agenda_scadenza (
 );
 CREATE INDEX IF NOT EXISTS idx_agenda_scadenza_email_data
     ON agenda_scadenza(email, data_scadenza);
+
+-- Accesso dell'operatore a SIICloud (WebDAV di Acquirente Unico): le
+-- credenziali restano solo nel database locale dell'app e servono alla
+-- sincronizzazione giornaliera dei file di misura. ``ultima_sync`` e
+-- ``errore_sync`` fotografano l'esito dell'ultimo collegamento.
+CREATE TABLE IF NOT EXISTS sii_accesso (
+    email TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    utente TEXT NOT NULL,
+    password TEXT NOT NULL,
+    percorso TEXT NOT NULL DEFAULT '',
+    attivo INTEGER NOT NULL DEFAULT 1,
+    ultima_sync TEXT,
+    errore_sync TEXT NOT NULL DEFAULT '',
+    aggiornato_il TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -1323,3 +1339,72 @@ def elimina_scadenza(conn: sqlite3.Connection, email: str, scadenza_id: str) -> 
         (email, scadenza_id),
     )
     return cursore.rowcount > 0
+
+
+def leggi_accesso_sii(conn: sqlite3.Connection, email: str) -> dict | None:
+    riga = conn.execute(
+        "SELECT url, utente, password, percorso, attivo, ultima_sync, errore_sync "
+        "FROM sii_accesso WHERE email = ?",
+        (email,),
+    ).fetchone()
+    if not riga:
+        return None
+    return {
+        "url": riga["url"],
+        "utente": riga["utente"],
+        "password": riga["password"],
+        "percorso": riga["percorso"],
+        "attivo": bool(riga["attivo"]),
+        "ultima_sync": riga["ultima_sync"],
+        "errore_sync": riga["errore_sync"],
+    }
+
+
+def scrivi_accesso_sii(conn: sqlite3.Connection, email: str, record: dict) -> None:
+    conn.execute(
+        "INSERT INTO sii_accesso (email, url, utente, password, percorso, attivo, aggiornato_il) "
+        "VALUES (?, ?, ?, ?, ?, ?, datetime('now')) "
+        "ON CONFLICT (email) DO UPDATE SET url = excluded.url, utente = excluded.utente, "
+        "password = excluded.password, percorso = excluded.percorso, attivo = excluded.attivo, "
+        "aggiornato_il = datetime('now')",
+        (
+            email,
+            record["url"],
+            record["utente"],
+            record["password"],
+            record.get("percorso", ""),
+            1 if record.get("attivo", True) else 0,
+        ),
+    )
+
+
+def registra_esito_sync_sii(
+    conn: sqlite3.Connection, email: str, *, quando: str, errore: str = ""
+) -> None:
+    conn.execute(
+        "UPDATE sii_accesso SET ultima_sync = ?, errore_sync = ? WHERE email = ?",
+        (quando, errore, email),
+    )
+
+
+def elimina_accesso_sii(conn: sqlite3.Connection, email: str) -> bool:
+    cursore = conn.execute("DELETE FROM sii_accesso WHERE email = ?", (email,))
+    return cursore.rowcount > 0
+
+
+def accessi_sii_attivi(conn: sqlite3.Connection) -> list[dict]:
+    righe = conn.execute(
+        "SELECT email, url, utente, password, percorso, ultima_sync FROM sii_accesso "
+        "WHERE attivo = 1"
+    ).fetchall()
+    return [
+        {
+            "email": riga["email"],
+            "url": riga["url"],
+            "utente": riga["utente"],
+            "password": riga["password"],
+            "percorso": riga["percorso"],
+            "ultima_sync": riga["ultima_sync"],
+        }
+        for riga in righe
+    ]

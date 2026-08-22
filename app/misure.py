@@ -21,12 +21,17 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime
+from pathlib import Path
+
+from . import db
 
 MAX_CORPO_BYTES = 512 * 1024
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_RECORD = 200
 MAX_GIORNI_SERIE = 60
+MAX_FILE_SYNC = 500
+MAX_ANNI_SYNC = 2
 TIMEOUT_SECONDS = 30
 USER_AGENT = "Vettore (portale shipper; misure SIICloud)"
 NS_DAV = "DAV:"
@@ -444,18 +449,237 @@ def _giorni_richiesti(dati):
     return max(1, min(giorni, MAX_GIORNI_SERIE))
 
 
-def _fonte(url, percorso):
-    return {"origine": "SIICloud (WebDAV)", "url": url, "percorso": percorso or "/"}
+# --- Archivio locale e sincronizzazione giornaliera -------------------------
+
+_ANNO = re.compile(r"^(19|20)\d{2}$")
+_GIORNO = re.compile(r"^(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$")
 
 
-def sistema(dati):
-    """Punto d'ingresso: elenca, apre un file o costruisce la serie."""
+def percorso_archivio():
+    """Cartella dell'archivio misure, accanto al database dell'app."""
+    return Path(db.db_path()).parent / "misure"
+
+
+def _nome_sicuro(nome):
+    """Rende un segmento di percorso sicuro per il filesystem."""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", str(nome)) or "_"
+
+
+def _percorso_archivio(relativo):
+    parti = [_nome_sicuro(p) for p in str(relativo).strip("/").split("/") if p]
+    return percorso_archivio().joinpath(*parti) if parti else percorso_archivio()
+
+
+def _salva_archivio(contenuto, relativo):
+    destinazione = _percorso_archivio(relativo)
+    destinazione.parent.mkdir(parents=True, exist_ok=True)
+    destinazione.write_bytes(contenuto)
+
+
+def _cartelle_sync(cartelle, giorni):
+    """Sceglie le cartelle da esplorare: tutti i distributori, gli anni più
+    recenti e i giorni più recenti (per contenere i tempi di scansione)."""
+    anni = [c for c in cartelle if _ANNO.match(c["nome"])]
+    giorni_fmt = [c for c in cartelle if _GIORNO.match(c["nome"])]
+    altre = [c for c in cartelle if c not in anni and c not in giorni_fmt]
+    scelte = list(altre)
+    scelte += sorted(anni, key=lambda c: c["nome"], reverse=True)[:MAX_ANNI_SYNC]
+    scelte += sorted(giorni_fmt, key=lambda c: c["nome"], reverse=True)[:giorni]
+    return scelte
+
+
+def sincronizza(url, utente, password, percorso="", giorni=MAX_GIORNI_SERIE):
+    """Scarica nell'archivio locale i file di misura non ancora presenti.
+
+    Esplora l'alberatura WebDAV (distributore/anno/giorno) fino a 4 livelli,
+    salta i file già archiviati e scarica solo i nuovi.
+    """
+    file_misura = []
+    frontiera = [str(percorso or "").strip("/")]
+    esplorati = 0
+    for livello in range(4):
+        if not frontiera:
+            break
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            liste = list(pool.map(lambda p: _elenca_sicura(url, utente, password, p), frontiera))
+        esplorati += len(frontiera)
+        prossima = []
+        for voci in liste:
+            for voce in voci:
+                if not voce["cartella"] and voce["tipo"]:
+                    file_misura.append(voce)
+            if livello < 3:
+                cartelle = [v for v in voci if v["cartella"]]
+                prossima.extend(c["percorso"] for c in _cartelle_sync(cartelle, giorni))
+        frontiera = prossima
+    if not file_misura:
+        raise MisureError("nessun file di misura trovato nel percorso indicato")
+    nuovi = [v for v in file_misura if not _percorso_archivio(v["percorso"]).exists()]
+    nuovi = nuovi[:MAX_FILE_SYNC]
+    avvisi = []
+    scaricati = 0
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        risultati = list(pool.map(lambda v: _scarica_salva(url, utente, password, v), nuovi))
+    for voce, avviso in zip(nuovi, risultati):
+        if avviso:
+            avvisi.append(f"{voce['nome']}: {avviso}")
+        else:
+            scaricati += 1
+    return {
+        "file_nuovi": scaricati,
+        "file_visti": len(file_misura),
+        "cartelle_esplorate": esplorati,
+        "avvisi": avvisi,
+    }
+
+
+def _scarica_salva(url, utente, password, voce):
+    try:
+        contenuto = scarica_file(url, utente, password, voce["percorso"])
+        _salva_archivio(contenuto, voce["percorso"])
+        return None
+    except MisureError as errore:
+        return str(errore)
+
+
+def _stato_archivio():
+    radice = percorso_archivio()
+    if not radice.exists():
+        return {"file": 0}
+    return {"file": sum(1 for p in radice.rglob("*") if p.is_file())}
+
+
+def serie_da_archivio():
+    """Costruisce la serie dei consumi leggendo l'archivio locale."""
+    radice = percorso_archivio()
+    letture, cambi, avvisi = [], [], []
+    elaborati = 0
+    if radice.exists():
+        for file in sorted(p for p in radice.rglob("*") if p.is_file()):
+            try:
+                xml = _contenuto_xml(file.read_bytes(), file.name)
+                letture_file, cambi_file = leggi_flusso(xml)
+                letture.extend(letture_file)
+                cambi.extend(cambi_file)
+                elaborati += 1
+            except MisureError as errore:
+                avvisi.append(f"{file.name}: {errore}")
+    serie = serie_giornaliera(letture, cambi)
+    pdr = sorted({l["pdr"] for l in letture} | {c["pdr"] for c in cambi})
+    return {
+        "serie": serie,
+        "dettagli": {
+            "pdr": len(pdr),
+            "letture": len(letture),
+            "cambi": len(cambi),
+            "file_elaborati": elaborati,
+            "giorni_coperti": len(serie),
+        },
+        "avvisi": avvisi,
+    }
+
+
+def salva_accesso(email, dati):
+    """Salva le credenziali SIICloud dell'operatore nel database locale."""
     dati = dati if isinstance(dati, dict) else {}
     url = str(dati.get("url") or "").strip()
     utente = str(dati.get("utente") or "").strip()
     password = str(dati.get("password") or "")
     percorso = str(dati.get("percorso") or "").strip()
+    attivo = bool(dati.get("attivo", True))
+    with db.connect() as conn:
+        esistente = db.leggi_accesso_sii(conn, email)
+        if not password and esistente:
+            password = esistente["password"]
+        _valida_credenziali(url, utente, password)
+        db.scrivi_accesso_sii(conn, email, {
+            "url": url,
+            "utente": utente,
+            "password": password,
+            "percorso": percorso,
+            "attivo": attivo,
+        })
+    return {
+        "salvato": True,
+        "accesso": {
+            "url": url,
+            "utente": utente,
+            "percorso": percorso,
+            "attivo": attivo,
+        },
+        "nota": "Le credenziali restano solo nel database locale dell'app.",
+    }
+
+
+def stato_accesso(email):
+    """Fotografa configurazione, ultima sincronizzazione e archivio."""
+    with db.connect() as conn:
+        accesso = db.leggi_accesso_sii(conn, email)
+    if not accesso:
+        return {"configurato": False, "archivio": _stato_archivio(), "nota": NOTA_ALBERATURA}
+    return {
+        "configurato": True,
+        "url": accesso["url"],
+        "utente": accesso["utente"],
+        "percorso": accesso["percorso"],
+        "attivo": accesso["attivo"],
+        "ultima_sync": accesso["ultima_sync"],
+        "errore_sync": accesso["errore_sync"],
+        "password_presente": True,
+        "archivio": _stato_archivio(),
+        "nota": NOTA_ALBERATURA,
+    }
+
+
+def sincronizza_accesso(email):
+    """Esegue la sincronizzazione con le credenziali salvate dall'operatore."""
+    with db.connect() as conn:
+        accesso = db.leggi_accesso_sii(conn, email)
+    if not accesso:
+        raise MisureError("accesso a SIICloud non configurato")
+    quando = datetime.now().isoformat(timespec="seconds")
+    try:
+        esito = sincronizza(
+            accesso["url"], accesso["utente"], accesso["password"], accesso["percorso"]
+        )
+    except MisureError as errore:
+        with db.connect() as conn:
+            db.registra_esito_sync_sii(conn, email, quando=quando, errore=str(errore))
+        raise
+    with db.connect() as conn:
+        db.registra_esito_sync_sii(conn, email, quando=quando, errore="")
+    return {
+        "fonte": _fonte(accesso["url"], accesso["percorso"]),
+        "ultima_sync": quando,
+        **esito,
+        "archivio": _stato_archivio(),
+        "nota": NOTA_ALBERATURA,
+    }
+
+
+def _fonte(url, percorso):
+    return {"origine": "SIICloud (WebDAV)", "url": url, "percorso": percorso or "/"}
+
+
+def sistema(dati, email=""):
+    """Punto d'ingresso: elenca, apre, costruisce la serie o sincronizza."""
+    dati = dati if isinstance(dati, dict) else {}
     azione = str(dati.get("azione") or "elenca").strip().lower()
+    if azione == "salva_accesso":
+        return salva_accesso(email, dati)
+    if azione == "stato":
+        return stato_accesso(email)
+    if azione == "sincronizza":
+        return sincronizza_accesso(email)
+    if azione == "serie_archivio":
+        esito = serie_da_archivio()
+        if esito["dettagli"]["file_elaborati"] == 0:
+            raise MisureError("l'archivio locale è vuoto: sincronizza prima i file da SIICloud")
+        return {"fonte": {"origine": "Archivio locale", "percorso": str(percorso_archivio())}, **esito, "nota": NOTA_ALBERATURA}
+    url = str(dati.get("url") or "").strip()
+    utente = str(dati.get("utente") or "").strip()
+    password = str(dati.get("password") or "")
+    percorso = str(dati.get("percorso") or "").strip()
     _valida_credenziali(url, utente, password)
     if azione == "elenca":
         return {"fonte": _fonte(url, percorso), "voci": elenca(url, utente, password, percorso), "nota": NOTA_ALBERATURA}
@@ -472,4 +696,4 @@ def sistema(dati):
     if azione == "serie":
         esito = costruisci_serie(url, utente, password, percorso, _giorni_richiesti(dati))
         return {"fonte": _fonte(url, percorso), **esito, "nota": NOTA_ALBERATURA}
-    raise MisureError("azione non valida: atteso «elenca», «apri» o «serie»")
+    raise MisureError("azione non valida: atteso «elenca», «apri», «serie» o «sincronizza»")

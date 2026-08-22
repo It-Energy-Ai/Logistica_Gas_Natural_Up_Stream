@@ -152,7 +152,7 @@
         prvEsito: null, prvErrore: "", prvErrori: [], prvCalcolo: false,
         wkrCsv: "", wkrAnno: "", wkrEsito: null, wkrErrore: "", wkrErrori: [], wkrCalcolo: false,
         prlFile: null, prlFileName: "", prlAnno: "", prlEsito: null, prlErrore: "", prlErrori: [], prlCalcolo: false,
-        msrUrl: "", msrUtente: "", msrPassword: "", msrPercorso: "", msrEsito: null, msrErrore: "", msrErrori: [], msrCalcolo: false,
+        msrUrl: "", msrUtente: "", msrPassword: "", msrPercorso: "", msrEsito: null, msrErrore: "", msrErrori: [], msrCalcolo: false, msrStato: null,
         agnScadenze: [], agnCatalogo: null, agnContatori: null, agnOggi: "",
         agnErrore: "", agnInfo: "", agnErrori: [], agnElencoErrore: "",
         agnTitolo: "", agnCategoria: "operativo", agnData: "", agnRicorrenza: "una_tantum",
@@ -273,7 +273,12 @@
       }
     }
 
-    go(s) { return () => this.setState({ screen: s }); }
+    go(s) {
+      return () => {
+        if (s === "misure") this._caricaStatoMisure();
+        this.setState({ screen: s });
+      };
+    }
 
     // Idrata lo stato dal payload di /api/state: separa l'identità (email)
     // dallo stato persistito e, se c'è una sessione, salta il login.
@@ -458,6 +463,24 @@
       } catch (error) {
         if (!miaSessione()) return;
         this.setState({ pdrCaricamento: false, pdrErrore: `Configurazione PDR non disponibile: ${error.message}` });
+      }
+    }
+
+    async _caricaStatoMisure() {
+      if (!this._sessionEmail) return;
+      const epoca = this._sessionEpoch;
+      const miaSessione = () => epoca === this._sessionEpoch;
+      try {
+        const stato = await this._json("/api/misure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ azione: "stato" }),
+        });
+        if (!miaSessione()) return;
+        this.setState({ msrStato: stato && typeof stato === "object" ? stato : null });
+      } catch {
+        if (!miaSessione()) return;
+        this.setState({ msrStato: null });
       }
     }
 
@@ -1778,6 +1801,19 @@
       const elencaMisure = unaVolta("elencaMisure", () => inviaMisure({ ...credenzialiMisure(), azione: "elenca" }));
       const apriMisure = (voce) => unaVolta(`apriMisure:${voce.percorso}`, () => inviaMisure({ ...credenzialiMisure(), azione: "apri", percorso: voce.percorso }))();
       const serieMisure = unaVolta("serieMisure", () => inviaMisure({ ...credenzialiMisure(), azione: "serie" }));
+      // Accesso salvato: le credenziali restano nel database locale e lo
+      // scarico giornaliero avviene da solo. Dopo il salvataggio ricarica lo
+      // stato e svuota il campo password (non serve più a video).
+      const salvaAccessoMisure = unaVolta("salvaAccessoMisure", async () => {
+        await inviaMisure({ ...credenzialiMisure(), azione: "salva_accesso", attivo: true });
+        await this._caricaStatoMisure();
+        if (!this.state.msrErrore) this.setSilent({ msrPassword: "" });
+      });
+      const sincronizzaMisure = unaVolta("sincronizzaMisure", async () => {
+        await inviaMisure({ azione: "sincronizza" });
+        await this._caricaStatoMisure();
+      });
+      const serieArchivioMisure = unaVolta("serieArchivioMisure", () => inviaMisure({ azione: "serie_archivio" }));
       // La serie costruita dalle misure diventa il CSV della previsione:
       // intestazione data,valore e una riga per giorno di consumo.
       const usaSerieInPrevisione = () => {
@@ -1831,6 +1867,14 @@
         pronta: msr.serie.length > 0,
       } : null;
       const msrAvvisi = msr && Array.isArray(msr.avvisi) ? msr.avvisi : [];
+      const msrStatoGrezzo = this.state.msrStato && typeof this.state.msrStato === "object" ? this.state.msrStato : null;
+      const msrStatoConfigurato = !!(msrStatoGrezzo && msrStatoGrezzo.configurato);
+      const msrStatoUltima = msrStatoGrezzo && msrStatoGrezzo.ultima_sync ? String(msrStatoGrezzo.ultima_sync) : "";
+      const msrStatoUltimaSync = msrStatoUltima ? msrStatoUltima.replace("T", " ").replace(/:\d{2}$/, "") : "mai";
+      const msrStatoArchivio = msrStatoGrezzo && msrStatoGrezzo.archivio && msrStatoGrezzo.archivio.file != null ? String(msrStatoGrezzo.archivio.file) : "0";
+      const msrStatoErrore = msrStatoGrezzo && msrStatoGrezzo.errore_sync ? String(msrStatoGrezzo.errore_sync) : "";
+      const msrStatoBadge = msrStatoGrezzo ? (msrStatoConfigurato ? (msrStatoErrore ? "errore" : "attivo") : "non configurato") : "";
+      const msrStatoColori = msrStatoErrore ? NEG : msrStatoConfigurato ? OK : WAIT;
 
       // --- Agenda regolatoria: dominio server-side, stati derivati ----------
       const agnStatoC = {
@@ -2348,7 +2392,14 @@
         msrGiornaliere: String(msrGiornaliere), msrMensili: String(msrMensili),
         msrFile, msrContenuto, msrSerie, msrAvvisi,
         msrNota: msr ? (msr.nota || "") : "",
+        msrStato: msrStatoGrezzo,
+        msrStatoConfigurato, msrStatoLibero: !msrStatoConfigurato,
+        msrStatoUrl: msrStatoGrezzo && msrStatoGrezzo.url ? String(msrStatoGrezzo.url) : "—",
+        msrStatoUtente: msrStatoGrezzo && msrStatoGrezzo.utente ? String(msrStatoGrezzo.utente) : "—",
+        msrStatoUltimaSync, msrStatoArchivio, msrStatoErrore,
+        msrStatoBadge, msrStatoBadgeBg: msrStatoColori.bg, msrStatoBadgeFg: msrStatoColori.fg,
         elencaMisure, serieMisure, usaSerieInPrevisione,
+        salvaAccessoMisure, sincronizzaMisure, serieArchivioMisure,
         setMsrUrl: (e) => this.setSilent({ msrUrl: e.target.value }),
         setMsrUtente: (e) => this.setSilent({ msrUtente: e.target.value }),
         setMsrPassword: (e) => this.setSilent({ msrPassword: e.target.value }),

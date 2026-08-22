@@ -10,6 +10,8 @@ import os
 import re
 import sqlite3
 import secrets
+import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -119,9 +121,56 @@ VALIDATORS = {
 }
 
 
+# --- Sincronizzazione giornaliera di SIICloud -------------------------------
+# Un filo in background controlla ogni ora se qualche accesso SIICloud attivo
+# non ha ancora sincronizzato oggi; in tal caso scarica i file nuovi. Il filo
+# è demone: si spegne con l'app e non blocca mai l'avvio.
+
+INTERVALLO_SYNC_SIICLOUD = 3600  # secondi tra un controllo e l'altro
+
+
+def _sync_siicloud_dovuta(ultima_sync: str | None) -> bool:
+    """Vero se l'accesso non ha mai sincronizzato o l'ultima volta non è oggi."""
+    if not ultima_sync:
+        return True
+    return not ultima_sync.startswith(date.today().isoformat())
+
+
+def _giro_sync_siicloud() -> None:
+    try:
+        with db.connect() as connessione:
+            accessi = db.accessi_sii_attivi(connessione)
+    except Exception:
+        return
+    for accesso in accessi:
+        if not _sync_siicloud_dovuta(accesso.get("ultima_sync")):
+            continue
+        try:
+            misure.sincronizza_accesso(accesso["email"])
+        except Exception:
+            # L'esito (con l'errore) è già registrato dentro sincronizza_accesso.
+            continue
+
+
+def _ciclo_sync_siicloud() -> None:
+    while True:
+        time.sleep(INTERVALLO_SYNC_SIICLOUD)
+        try:
+            _giro_sync_siicloud()
+        except Exception:
+            continue
+
+
+def avvia_sync_siicloud() -> threading.Thread:
+    filo = threading.Thread(target=_ciclo_sync_siicloud, name="sync-siicloud", daemon=True)
+    filo.start()
+    return filo
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init_db()
+    avvia_sync_siicloud()
     yield
 
 
@@ -883,10 +932,12 @@ async def post_prelievo(request: Request):
 
 @app.post("/api/misure")
 async def post_misure(request: Request):
-    """Misure dei PDR da SIICloud (WebDAV): elenca una cartella o apre un file.
+    """Misure dei PDR da SIICloud (WebDAV): elenca, apre, sincronizza.
 
-    Stateless: indirizzo WebDAV, utente e password arrivano con la
-    richiesta e non vengono mai salvati.
+    Le azioni «elenca», «apri» e «serie» restano usa-e-getta: le credenziali
+    arrivano con la richiesta e non vengono salvate. Le azioni «salva_accesso»,
+    «stato», «sincronizza» e «serie_archivio» usano invece l'accesso SIICloud
+    che l'operatore ha scelto di conservare nel database locale.
     """
 
     email = _sessione(request)
@@ -899,7 +950,7 @@ async def post_misure(request: Request):
     if payload is None:
         return JSONResponse({"errore": "atteso un oggetto JSON"}, status_code=400)
     try:
-        return misure.sistema(payload)
+        return misure.sistema(payload, email)
     except misure.MisureError as errore:
         return JSONResponse({"errore": str(errore), "errors": errore.errors}, status_code=422)
     except (ValueError, OverflowError, TypeError) as errore:

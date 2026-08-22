@@ -2,6 +2,21 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.18.0] — 2026-08-22
+
+**SIICloud in automatico**: l'operatore salva l'accesso WebDAV una volta sola e il portale scarica i file di misura ogni giorno, da solo, costruendo un archivio locale pronto per la previsione.
+
+### Aggiunto
+- **Accesso salvato** (`POST /api/misure`, azioni `salva_accesso` e `stato`): l'operatore incolla indirizzo WebDAV, utente e password e preme «Salva l'accesso su questo computer»; le credenziali restano **solo nel database locale** (tabella `sii_accesso`) e la password non torna mai al frontend — lo stato dice soltanto se è custodita. La password vuota riusa quella già salvata.
+- **Sincronizzazione giornaliera automatica** (`app/main.py`): un filo in background controlla ogni ora gli accessi attivi e sincronizza quelli la cui ultima sincronizzazione non è oggi; gli errori non fermano il portale e restano registrati nello stato.
+- **Sincronizzazione incrementale** (`app/misure.py`, azione `sincronizza`): il modulo percorre l'alberatura (distributore → anno → giorno, con gli ultimi 2 anni e gli ultimi giorni pubblicati), scarica solo i file di misura **non ancora in archivio** (fino a 500 per giro) e li conserva nella cartella `misure/` accanto al database, con lo stesso percorso di SIICloud. Esito con file nuovi, file visti, cartelle esplorate e avvisi.
+- **Serie dall'archivio locale** (azione `serie_archivio`): ricalcola la serie giornaliera dei consumi dai file già scaricati, **senza rete**; se l'archivio è vuoto il messaggio invita a sincronizzare.
+- **Schermata Misure aggiornata**: blocco «Accesso salvato e sincronizzazione» con i tre bottoni (salva, sincronizza ora, serie dall'archivio) e carta di stato con badge attivo/errore/non configurato, ultima sincronizzazione, file in archivio ed eventuale ultimo errore.
+- **17 test Python nuovi** (573 pytest totali, in `tests/test_misure.py`: funzioni del database per l'accesso, salvataggio con riuso della password, stato senza password in uscita, sincronizzazione con rete mockata e deduplica, registrazione degli errori, serie dall'archivio, rotte per le nuove azioni) e **4 test Node nuovi** (121 totali) per i tre bottoni e la carta di stato.
+
+### Modificato
+- **docs/misure.md** con la nuova sezione «L'accesso salvato e la sincronizzazione giornaliera» e le onestà aggiornate; **README** con il conteggio delle verifiche (704).
+
 ## [1.17.0] — 2026-08-22
 
 **Misure dei PDR → previsione della domanda**: il modulo misure impara i tracciati reali pubblicati su SIICloud e costruisce la serie giornaliera dei consumi, pronta per l'ensemble di previsione.
