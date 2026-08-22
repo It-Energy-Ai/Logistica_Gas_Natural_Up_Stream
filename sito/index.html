@@ -171,9 +171,9 @@
           <div class="body"><h3>Profili di prelievo standard</h3><p>Percentuali giornaliere Snam per anno termico, con controllo delle somme a 100.</p><span class="tag">Snam</span></div>
         </div>
 
-        <div class="card" data-cap="Misure dei PDR — letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate">
+        <div class="card" data-cap="Misure dei PDR — letture da SIICloud: giornaliere TGL e mensili TMV/SWG1, serie dei consumi pronta per la previsione">
           <img loading="lazy" src="screenshots/misure.webp" alt="Misure dei PDR">
-          <div class="body"><h3>Misure dei PDR</h3><p>Letture da SIICloud: giornaliere TGL e mensili TMG/TML, credenziali mai salvate.</p><span class="tag">SIICloud</span></div>
+          <div class="body"><h3>Misure dei PDR</h3><p>Letture da SIICloud: giornaliere TGL e mensili TMV/SWG1, serie dei consumi pronta per la previsione.</p><span class="tag">SIICloud</span></div>
         </div>
 
         <div class="card" data-cap="Report & Analisi — estrazioni e invii programmati per categoria">
@@ -213,7 +213,7 @@
         <li><b>PDR · GME</b> — <span>readiness e controlli preliminari, senza credenziali locali né falso invio.</span></li>
         <li><b>Coefficienti Wkr</b> — <span>il fattore di correzione climatica pubblicato ogni giorno da Snam Rete Gas: griglia zona × giorno, download live da Jarvis e aggancio alla previsione della domanda.</span></li>
         <li><b>Profili di prelievo standard</b> — <span>le percentuali giornaliere dei profili di prelievo pubblicate da Snam: parser .xls/.xlsx senza dipendenze e controllo che ogni colonna sommi 100 sull'anno termico.</span></li>
-        <li><b>Misure dei PDR</b> — <span>le letture pubblicate dal distributore su SIICloud (WebDAV Nextcloud): giornaliere TGL e mensili TMG/TML, apertura XML in memoria, credenziali usa-e-getta mai salvate.</span></li>
+        <li><b>Misure dei PDR</b> — <span>le letture pubblicate dal distributore su SIICloud (WebDAV Nextcloud): giornaliere TGL e mensili TMV/SWG1, cambio contatore (IGMG) come nuova base di conteggio, serie giornaliera dei consumi che alimenta la previsione della domanda. Le credenziali restano sul tuo computer: usa-e-getta, oppure salvate nel solo database locale per la sincronizzazione giornaliera automatica.</span></li>
         <li><b>Agenda regolatoria</b> — <span>scadenze con data certa dalle fonti (modello Stogit/Snam, 14 voci per Anno Termico) e voci personalizzate, con stati adempiuta/saltata e occorrenze ricorrenti.</span></li>
       </ul>
     </div>
@@ -283,6 +283,10 @@
         <details>
           <summary>Come aggiorno Vettore?</summary>
           <p>Scarichi l'ultima release da questa pagina e sostituisci l'eseguibile: non c'è un aggiornamento automatico. I tuoi dati non si toccano — vivono in <code>~/.vettore/vettore.db</code>, fuori dall'eseguibile — quindi l'aggiornamento non li cancella. Le novità di ogni versione sono nelle <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/CHANGELOG.md" target="_blank" rel="noopener">note di rilascio</a>.</p>
+        </details>
+        <details>
+          <summary>Si può installare sul server aziendale?</summary>
+          <p>Sì: dalla v1.19.0 c'è la <b>modalità server</b>, pensata per un'istanza per azienda sul vostro server. Si avvia con Docker (<code>docker-compose.server.yml</code> nel repository), chiede una password condivisa al login (hash scrypt, confronto a tempo costante) e usa cookie di sessione con flag <code>Secure</code> dietro HTTPS — il kit include un profilo Caddy opzionale con certificato automatico. Le credenziali SIICloud restano nel database dell'istanza, dentro la vostra infrastruttura, e la sincronizzazione giornaliera delle misure avviene in automatico. La guida passo-passo è in <a href="https://github.com/It-Energy-Ai/Logistica_Gas_Natural_Up_Stream/blob/main/docs/server.md" target="_blank" rel="noopener">docs/server.md</a>.</p>
         </details>
       </div>
     </div>
