@@ -12,6 +12,7 @@ import json
 import os
 import re
 import secrets
+import sqlite3
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -20,7 +21,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
