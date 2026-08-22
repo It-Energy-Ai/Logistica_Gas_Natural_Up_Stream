@@ -2,6 +2,22 @@
 
 Tutte le modifiche rilevanti del progetto, in stile [Keep a Changelog](https://keepachangelog.com/it-IT/).
 
+## [1.19.0] — 2026-08-22
+
+**Modalità server**: Vettore può girare sul server dell'azienda — una istanza per azienda, sempre accesa, che scarica da sola le misure da SIICloud ogni giorno e risponde al browser degli operatori con login protetto da password condivisa.
+
+### Aggiunto
+- **Login con password in modalità server** (`app/main.py`): con `VETTORE_ENV=production` ogni operatore accede con la propria email più la password condivisa dell'azienda (`VETTORE_PASSWORD`). La password è verificata con derivazione **scrypt** (stdlib) e confronto a tempo costante; senza password configurata l'avvio si interrompe con un messaggio chiaro. In modalità locale nulla cambia: si entra con la sola email.
+- **Cookie `Secure` in modalità server**: il cookie di sessione viaggia solo su HTTPS.
+- **Kit di deploy** (`docker-compose.server.yml` + `Caddyfile.example`): container hardenizzato (read-only, cap_drop ALL, no-new-privileges, porta sul solo loopback) con password obbligatoria via compose e profilo opzionale `tls` con Caddy per il TLS automatico di Let's Encrypt.
+- **Binding configurabile** (`launcher.py`): `VETTORE_INDIRIZZO` sceglie l'indirizzo di ascolto; in modalità server il browser non si apre da solo.
+- **Campo password nel login**: il frontend invia la password digitata e mostra il messaggio del server in caso di credenziali errate; un chiarimento sotto il campo ricorda che in locale non serve.
+- **docs/server.md**: guida di installazione per il sistemista aziendale (variabili d'ambiente, HTTPS, backup del volume, il download giornaliero come job dell'istanza sempre accesa).
+- **6 test Python nuovi** (579 pytest totali, in `tests/test_sicurezza.py`: avvio in produzione bloccato senza password e ammesso con password, login locale senza password, password errata → 401 senza sessione, password giusta → sessione, flag Secure solo in modalità server) e **2 test Node nuovi** (123 totali) per l'invio della password e il messaggio di errore del server.
+
+### Modificato
+- **README** con la modalità server e il conteggio delle verifiche (712).
+
 ## [1.18.0] — 2026-08-22
 
 **SIICloud in automatico**: l'operatore salva l'accesso WebDAV una volta sola e il portale scarica i file di misura ogni giorno, da solo, costruendo un archivio locale pronto per la previsione.

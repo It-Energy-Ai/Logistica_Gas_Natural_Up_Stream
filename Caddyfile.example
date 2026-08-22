@@ -1,0 +1,7 @@
+# Caddyfile per Vettore in modalità server (usato dal profilo «tls» di
+# docker-compose.server.yml). Caddy ottiene e rinnova i certificati Let's
+# Encrypt da solo: serve solo che il dominio punti al server e che le porte
+# 80/443 siano raggiungibili dall'esterno.
+{$VETTORE_DOMINIO} {
+	reverse_proxy vettore:8080
+}

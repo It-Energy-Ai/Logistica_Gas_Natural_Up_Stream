@@ -294,20 +294,106 @@ def test_l_invio_reale_resta_bloccato(sessione):
 # ─────────────────────────────── configurazione e ambiente
 
 
-def test_avviare_in_produzione_e_impedito():
-    """Meglio fermarsi che far credere che ci sia un'autenticazione vera."""
+def test_avviare_in_produzione_senza_password_e_impedito():
+    """In modalità server senza password l'avvio si ferma: meglio un errore
+    chiaro che un login aperto esposto sulla rete."""
 
     import subprocess
     import sys
 
+    env = {k: v for k, v in os.environ.items() if k != "VETTORE_PASSWORD"}
     esito = subprocess.run(
         [sys.executable, "-c", "import app.main"],
         cwd=__import__("pathlib").Path(__file__).resolve().parent.parent,
-        env={**os.environ, "VETTORE_ENV": "production"},
+        env={**env, "VETTORE_ENV": "production"},
         capture_output=True, text=True,
     )
-    assert esito.returncode != 0 or "non ha autenticazione reale" in esito.stderr + esito.stdout
-    assert "OIDC" in esito.stderr + esito.stdout
+    assert esito.returncode != 0
+    assert "VETTORE_PASSWORD" in esito.stderr + esito.stdout
+
+
+def test_avviare_in_produzione_con_password_e_ammesso():
+    """Con la password aziendale configurata la modalità server parte."""
+
+    import subprocess
+    import sys
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as cartella:
+        esito = subprocess.run(
+            [sys.executable, "-c", "import app.main; print('avviato')"],
+            cwd=__import__("pathlib").Path(__file__).resolve().parent.parent,
+            env={
+                **os.environ,
+                "VETTORE_ENV": "production",
+                "VETTORE_PASSWORD": "segreta-di-prova",
+                "VETTORE_DB": str(__import__("pathlib").Path(cartella) / "vettore.db"),
+            },
+            capture_output=True, text=True,
+        )
+    assert esito.returncode == 0, esito.stderr
+    assert "avviato" in esito.stdout
+
+
+# ─────────────────────────────── login con password (modalità server)
+
+
+def test_login_senza_password_in_locale_funziona(sessione):
+    """In modalità locale la password non è richiesta: basta l'email."""
+
+    r = sessione.post("/api/login", json={"email": "shipper@esempio.it"})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+def test_password_corretta_senza_password_server():
+    from app import main
+
+    assert main._password_corretta("qualsiasi cosa") is True
+
+
+def test_login_con_password_sbagliata_dà_401(sessione, monkeypatch):
+    from app import main
+
+    monkeypatch.setattr(main, "PASSWORD_SERVER", "segreta123")
+    r = sessione.post(
+        "/api/login",
+        json={"email": "shipper@esempio.it", "password": "sbagliata"},
+    )
+    assert r.status_code == 401
+    assert "Password errata" in r.json()["errore"]
+    # nessuna sessione deve essere stata creata
+    assert "vettore_session" not in r.cookies
+
+
+def test_login_con_password_giusta_crea_la_sessione(sessione, monkeypatch):
+    from app import main
+
+    monkeypatch.setattr(main, "PASSWORD_SERVER", "segreta123")
+    r = sessione.post(
+        "/api/login",
+        json={"email": "shipper@esempio.it", "password": "segreta123"},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert "vettore_session" in r.cookies
+
+
+def test_cookie_secure_solo_in_modalità_server(sessione, monkeypatch):
+    from app import main
+
+    # modalità locale: niente flag Secure (si naviga su http://127.0.0.1)
+    r = sessione.post("/api/login", json={"email": "shipper@esempio.it"})
+    assert "Secure" not in r.headers.get("set-cookie", "")
+
+    # modalità server: il cookie deve viaggiare solo su HTTPS
+    monkeypatch.setattr(main, "MODALITA_SERVER", True)
+    monkeypatch.setattr(main, "PASSWORD_SERVER", "segreta123")
+    r = sessione.post(
+        "/api/login",
+        json={"email": "shipper@esempio.it", "password": "segreta123"},
+    )
+    assert "Secure" in r.headers.get("set-cookie", "")
 
 
 def test_la_durata_della_sessione_e_configurabile():

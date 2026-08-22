@@ -13,8 +13,9 @@ import time
 import webbrowser
 from pathlib import Path
 
-INDIRIZZO = "127.0.0.1"
+INDIRIZZO = os.environ.get("VETTORE_INDIRIZZO", "127.0.0.1")
 PORTA = int(os.environ.get("VETTORE_PORTA", "8080"))
+MODALITA_SERVER = os.environ.get("VETTORE_ENV", "").strip().lower() in {"production", "produzione", "prod"}
 
 
 def _porta_libera() -> bool:
@@ -65,10 +66,18 @@ def main() -> None:
 
     from app.main import app
 
-    if not os.environ.get("VETTORE_NO_BROWSER"):
+    if not os.environ.get("VETTORE_NO_BROWSER") and not MODALITA_SERVER:
         threading.Thread(target=_apri_quando_pronto, daemon=True).start()
 
-    print(f"Vettore in avvio su http://{INDIRIZZO}:{PORTA} — Ctrl+C per uscire", flush=True)
+    destinazione = f"http://{INDIRIZZO}:{PORTA}"
+    if MODALITA_SERVER:
+        print(
+            f"Vettore in modalità server su {destinazione} — login con password "
+            f"aziendale attivo, Ctrl+C per uscire",
+            flush=True,
+        )
+    else:
+        print(f"Vettore in avvio su {destinazione} — Ctrl+C per uscire", flush=True)
     # loop/http espliciti: evitano dipendenze binarie opzionali nell'eseguibile
     uvicorn.run(app, host=INDIRIZZO, port=PORTA, loop="asyncio", http="h11", log_level="warning")
 

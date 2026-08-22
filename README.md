@@ -119,6 +119,15 @@ Al primo avvio crea da solo l'ambiente e installa le dipendenze, poi apre il bro
 docker compose up -d --build      # → http://localhost:8080
 ```
 
+### 4 · Server aziendale (una istanza per azienda)
+
+Vettore può girare sul server dell'azienda, sempre acceso: login con email e password condivisa, download automatico delle misure da SIICloud ogni giorno. La guida completa è in [docs/server.md](docs/server.md):
+
+```bash
+export VETTORE_PASSWORD="la-password-condivisa"
+docker compose -f docker-compose.server.yml up -d --build
+```
+
 ## Primo avvio pulito, demo su richiesta
 
 Al primo avvio il portale è **pulito e tuo**: l'identità mostrata deriva dall'email con cui accedi, il giorno gas è quello reale, liste e contatori partono da zero, pronti per i dati veri.
@@ -198,7 +207,7 @@ node tests/logic.test.cjs     # test logica: navigazione, nomine, wizard, sync, 
 node tests/runtime.test.cjs   # test del runtime del template
 ```
 
-Settecentoquattro verifiche fra Python e Node (573 pytest + 121 logica + 10 runtime): sessioni e isolamento per account, generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, coefficienti Wkr di Snam (parsing del CSV di Jarvis, griglia zona × giorno, download live e aggancio alla previsione), profili di prelievo standard (parser .xls BIFF8 e .xlsx senza dipendenze, validazione delle somme a 100 per colonna, download live), misure dei PDR da SIICloud (client WebDAV con i flussi reali TGL/TMV-SWG1/IGMG, serie giornaliera dei consumi con cambio contatore e aggancio alla previsione, accesso salvato su scelta con sincronizzazione giornaliera automatica e archivio locale), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
+Settecentododici verifiche fra Python e Node (579 pytest + 123 logica + 10 runtime): sessioni e isolamento per account, login con password condivisa in modalità server (scrypt, confronto a tempo costante, avvio bloccato senza password, cookie Secure), generazione XML REMIT con validazione XSD, algoritmo UTI sui 181 vettori ufficiali ACER, ciclo EDIG@S completo (NOMINT, NOMRES, ACKNOW — inclusa la riproduzione strutturale degli esempi ufficiali EASEE-gas), segnalazione EMIR nelle otto azioni con validazione contro gli XSD ESMA e copertura esatta delle enumerazioni, giorno gas ai cambi d'ora (al PSV sempre 24 ore, per i punti fisici 23 o 25), progressivi PDR, audit, blocco dell'invio reale, agenda regolatoria con le date del modello fissate dalla fonte e scadenze operative sul giorno gas (fino alle 06:00 del giorno dopo), ensemble di previsione con backtest a finestre scorrevoli e determinismo, coefficienti Wkr di Snam (parsing del CSV di Jarvis, griglia zona × giorno, download live e aggancio alla previsione), profili di prelievo standard (parser .xls BIFF8 e .xlsx senza dipendenze, validazione delle somme a 100 per colonna, download live), misure dei PDR da SIICloud (client WebDAV con i flussi reali TGL/TMV-SWG1/IGMG, serie giornaliera dei consumi con cambio contatore e aggancio alla previsione, accesso salvato su scelta con sincronizzazione giornaliera automatica e archivio locale), runtime del template e sincronizzazione del frontend. Nessun input malformato deve produrre un errore interno: c'è una batteria che lo garantisce.
 
 ## Autore
 

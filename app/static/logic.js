@@ -257,13 +257,21 @@
 
     // Ritorna l'email normalizzata dal server. Non considera completato
     // l'accesso finché non riceve una risposta 2xx con un'identità valida.
-    async login(email) {
+    // In modalità server il backend esige anche la password aziendale; il
+    // messaggio di errore del server (es. «Password errata») ha la priorità
+    // su quello generico di _apriSessione.
+    async login(email, password = "") {
       try {
         const r = await fetch("/api/login", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, password }),
         });
-        if (!r.ok) throw new Error(`login HTTP ${r.status}`);
+        if (!r.ok) {
+          let dettaglio = "";
+          try { dettaglio = (await r.json()).errore || ""; } catch (_) { /* corpo non JSON */ }
+          this.setState({ loginErrore: dettaglio || `login HTTP ${r.status}` });
+          return null;
+        }
         const dati = await r.json();
         if (!dati || typeof dati.email !== "string" || !dati.email) throw new Error("risposta login non valida");
         return dati.email;
@@ -488,14 +496,18 @@
       await Promise.all([this._caricaRemit(), this._caricaPdr(), this._caricaEdigas(), this._caricaEmir(), this._caricaTrasporto(), this._caricaAgenda()]);
     }
 
-    async _apriSessione(email) {
+    async _apriSessione(email, password = "") {
       if (this._loginInCorso) return false;
       this._loginInCorso = true;
       this.setState({ loginErrore: "" });
       try {
-        const confermata = await this.login(email);
+        const confermata = await this.login(email, password);
         if (!confermata) {
-          this.setState({ loginErrore: "Accesso non riuscito. Verifica la connessione e riprova." });
+          // login() ha già scritto il messaggio preciso del server (password
+          // errata, HTTP 401…): qui si interviene solo se è rimasto vuoto.
+          if (!this.state.loginErrore) {
+            this.setState({ loginErrore: "Accesso non riuscito. Verifica la connessione e riprova." });
+          }
           return false;
         }
         const riprendiCoda = this._sospesa && this._sessionEmail === confermata;
@@ -2202,7 +2214,8 @@
 
       const doLogin = async () => {
         const email = (this.state.loginEmail || "").trim();
-        await this._apriSessione(email);
+        const password = this.state.loginPass || "";
+        await this._apriSessione(email, password);
       };
       const logout = async () => {
         // La coda di sincronizzazione va svuotata PRIMA di chiudere: il

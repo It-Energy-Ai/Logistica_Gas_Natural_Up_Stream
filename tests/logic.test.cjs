@@ -330,6 +330,44 @@ test("login: non apre l'hub se l'API non risponde", async () => {
   global.fetch = FETCH_OK;
 });
 
+test("login: la password digitata viene inviata al server", async () => {
+  const app = new App();
+  let corpo = null;
+  global.fetch = async (url, opts = {}) => {
+    if (url === "/api/login") {
+      corpo = JSON.parse(opts.body || "{}");
+      return { ok: true, status: 200, json: async () => ({ ok: true, email: corpo.email }), text: async () => "" };
+    }
+    if (url === "/api/state" && !opts.method) {
+      return { ok: true, status: 200, json: async () => ({ email: corpo.email }), text: async () => "" };
+    }
+    return { ok: true, status: 200, text: async () => "" };
+  };
+  app.renderVals().setLoginEmail(ev("operazioni@gasadriatica.it"));
+  app.renderVals().setLoginPass(ev("segreta123"));
+  await app.renderVals().doLogin();
+  assert.equal(corpo.email, "operazioni@gasadriatica.it");
+  assert.equal(corpo.password, "segreta123");
+  assert.equal(app.state.screen, "hub");
+  global.fetch = FETCH_OK;
+});
+
+test("login: password errata mostra il messaggio del server", async () => {
+  const app = new App();
+  global.fetch = async () => ({
+    ok: false,
+    status: 401,
+    json: async () => ({ ok: false, errore: "Password errata. Riprova o contatta il referente aziendale." }),
+    text: async () => "",
+  });
+  app.renderVals().setLoginEmail(ev("operazioni@gasadriatica.it"));
+  app.renderVals().setLoginPass(ev("sbagliata"));
+  await app.renderVals().doLogin();
+  assert.equal(app.state.screen, "login");
+  assert.match(app.state.loginErrore, /Password errata/);
+  global.fetch = FETCH_OK;
+});
+
 test("logout e nuovo login non conservano i dati dell'utente precedente", async () => {
   const app = new App();
   app.idrata({ email: "prima@azienda.it", nomList: [{ punto: "PSV", ciclo: "R4", qta: "500", stato: "Registrata" }] });

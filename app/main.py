@@ -5,6 +5,8 @@ localmente. Non dichiara integrazioni esterne concluse senza le relative
 ricevute ufficiali.
 """
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -31,19 +33,41 @@ COOKIE = "vettore_session"
 # politica che varia da azienda ad azienda, non il programma.
 GIORNI_SESSIONE = max(1, min(365, int(os.environ.get("VETTORE_GIORNI_SESSIONE", "30") or 30)))
 
-# Questo login accetta qualunque credenziale: è una scelta dichiarata per un
-# portale che gira in locale, non una svista. Chi prova ad avviarlo come
-# ambiente di produzione va fermato, non rassicurato con una password fissa:
-# servirebbe un vero IdP (OIDC/SAML), e fingere di averlo sarebbe peggio che
-# non averlo.
-if os.environ.get("VETTORE_ENV", "").strip().lower() in {"production", "produzione", "prod"}:
+# Due modalità di funzionamento, dichiarate:
+# - LOCALE (default): il login accetta qualunque email, perché il portale gira
+#   su 127.0.0.1 del PC dell'operatore e l'identità serve solo a separare i
+#   dati, non a proteggerli da terzi.
+# - SERVER (VETTORE_ENV=production): il portale è esposto sulla rete aziendale
+#   e ogni operatore accede con la propria email più la password condivisa
+#   dell'azienda (VETTORE_PASSWORD). Senza password l'avvio è interrotto:
+#   esporre un login aperto sarebbe una porta spalancata.
+AMBIENTE = os.environ.get("VETTORE_ENV", "").strip().lower()
+MODALITA_SERVER = AMBIENTE in {"production", "produzione", "prod"}
+PASSWORD_SERVER = os.environ.get("VETTORE_PASSWORD", "")
+
+if MODALITA_SERVER and not PASSWORD_SERVER:
     raise SystemExit(
-        "VETTORE_ENV=production: questo portale non ha autenticazione reale.\n"
-        "Il login accetta qualunque credenziale e il server si lega a 127.0.0.1.\n"
-        "Per un uso produttivo servono un provider di identità (OIDC/SAML), TLS con\n"
-        "reverse proxy e isolamento per azienda: vedi la sezione «Cosa sostituire per\n"
-        "andare in produzione» nella documentazione. L'avvio è interrotto di proposito."
+        "VETTORE_ENV=production senza VETTORE_PASSWORD: avvio interrotto.\n"
+        "In modalità server ogni operatore accede con la propria email e la\n"
+        "password condivisa dell'azienda. Imposta VETTORE_PASSWORD (almeno 8\n"
+        "caratteri) nell'ambiente o nel docker-compose e riavvia. Vedi\n"
+        "docs/server.md per la guida di installazione."
     )
+
+
+def _hash_password(password: str, sale: bytes) -> str:
+    """Deriva la password con scrypt (stdlib) e la rende esadecimale."""
+    return hashlib.scrypt(password.encode("utf-8"), salt=sale, n=2**14, r=8, p=1).hex()
+
+
+def _password_corretta(password_inviata: str) -> bool:
+    """Confronto a tempo costante tra la password inviata e quella del server."""
+    if not PASSWORD_SERVER:
+        return True
+    sale = b"vettore-modalita-server"
+    attesa = _hash_password(PASSWORD_SERVER, sale).encode("ascii")
+    inviata = _hash_password(password_inviata, sale).encode("ascii")
+    return hmac.compare_digest(attesa, inviata)
 
 # Chiavi di stato accettate dal client, con un validatore di forma ciascuna.
 _is_bool = lambda v: isinstance(v, bool)
@@ -276,6 +300,12 @@ async def login(request: Request, response: Response):
     # non è un oggetto (una lista, un numero): senza questo, `body.get` su una
     # lista sollevava AttributeError e il login rispondeva 500.
     body = await _body_object(request) or {}
+    password = str(body.get("password") or "")
+    if not _password_corretta(password):
+        return JSONResponse(
+            {"ok": False, "errore": "Password errata. Riprova o contatta il referente aziendale."},
+            status_code=401,
+        )
     # Su email assente o malformata si ripiega su un'identità NEUTRA, mai su
     # quella di scena (Marco Rossi), che contaminerebbe la modalità pulita.
     # Nessun troncamento: tagliare a 120 caratteri farebbe collassare due
@@ -291,6 +321,7 @@ async def login(request: Request, response: Response):
         token,
         httponly=True,
         samesite="lax",
+        secure=MODALITA_SERVER,
         max_age=60 * 60 * 24 * GIORNI_SESSIONE,
         path="/",
     )

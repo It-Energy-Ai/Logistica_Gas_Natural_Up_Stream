@@ -1,0 +1,55 @@
+# Vettore in modalità server: un'istanza per azienda, sul server dell'azienda.
+#
+# Uso minimo (dietro il reverse proxy aziendale già esistente):
+#   VETTORE_PASSWORD="la-password-aziendale" docker compose -f docker-compose.server.yml up -d --build
+# Il container risponde su 127.0.0.1:8080 dell'host: il proxy aziendale
+# (nginx, Apache, IIS…) punta lì e termina TLS.
+#
+# Senza un proxy aziendale, si aggiunge Caddy con TLS automatico:
+#   VETTORE_PASSWORD="…" VETTORE_DOMINIO=vettore.azienda.it \
+#   docker compose -f docker-compose.server.yml --profile tls up -d --build
+services:
+  vettore:
+    build: .
+    environment:
+      VETTORE_ENV: production
+      # Obbligatoria: senza password condivisa l'avvio in modalità server è
+      # rifiutato dall'applicazione stessa.
+      VETTORE_PASSWORD: ${VETTORE_PASSWORD:?"Impostare VETTORE_PASSWORD (password condivisa dell'azienda)"}
+      VETTORE_GIORNI_SESSIONE: ${VETTORE_GIORNI_SESSIONE:-30}
+    ports:
+      # Solo loopback dell'host: l'esposizione in rete è compito del reverse
+      # proxy (aziendale o Caddy), mai del container direttamente.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - vettore-data:/data
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      VETTORE_DOMINIO: ${VETTORE_DOMINIO:?"Con --profile tls impostare VETTORE_DOMINIO (es. vettore.azienda.it)"}
+    volumes:
+      - ./Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    depends_on:
+      - vettore
+
+volumes:
+  vettore-data:
+  caddy-data:
+  caddy-config:
